@@ -4,12 +4,17 @@ mod errors;
 mod screen_utils;
 
 fn window_conf() -> Conf {
+    let (w, h) = if std::env::args().find(|it| it.starts_with("unsized")).is_some() {
+        (640, 360)
+    } else {
+        (1280, 720)
+    };
     if std::env::args().find(|it| it.starts_with("windowed")).is_some() {
         Conf {
             window_title: "Нечистая сила".to_owned(),
             high_dpi: false,
-            window_width: 1280,
-            window_height: 720,
+            window_width: w,
+            window_height: h,
             fullscreen: false,
             window_resizable: false,
             ..Default::default()
@@ -18,8 +23,8 @@ fn window_conf() -> Conf {
         Conf {
             window_title: "Нечистая сила".to_owned(),
             high_dpi: false,
-            window_width: 1280,
-            window_height: 720,
+            window_width: w,
+            window_height: h,
             fullscreen: true,
             ..Default::default()
         }
