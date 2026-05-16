@@ -1,0 +1,69 @@
+{
+  "screen_size_in_tiles": [80, 45],
+  "tile_size": [8, 8],
+  "labels": {
+    "title": {
+      "color_code": [172, 50, 50],
+      "pos": [0, 36],
+      "size": [20, 3]
+    }
+  },
+  "buttons": {
+    "old_game": {
+      "color_code": [153, 229, 80],
+      "size": [21, 6],
+      "states": { "idle": [0, 0], "hover": [0, 6], "clicked": [0, 12] }
+    },
+    "new_game": {
+      "color_code": [91, 110, 225],
+      "size": [21, 6],
+      "states": { "idle": [0, 18], "hover": [0, 24], "clicked": [0, 30] }
+    },
+    "editor": {
+      "color_code": [55, 148, 110],
+      "size": [21, 6],
+      "states": { "idle": [21, 0], "hover": [21, 6], "clicked": [21, 12] }
+    },
+    "exit": {
+      "color_code": [215, 123, 186],
+      "size": [21, 6],
+      "states": { "idle": [21, 18], "hover": [21, 24], "clicked": [21, 30] }
+    },
+
+    "github": {
+      "color_code": [95, 205, 228],
+      "size": [11, 6],
+      "states": { "idle": [42, 36], "hover": [53, 36], "clicked": [64, 36] }
+    },
+    "gamedev": {
+      "color_code": [75, 105, 47],
+      "size": [11, 6],
+      "states": { "idle": [42, 30], "hover": [53, 30], "clicked": [64, 30] }
+    },
+    "telegram": {
+      "color_code": [82, 75, 36],
+      "size": [11, 6],
+      "states": { "idle": [42, 24], "hover": [53, 24], "clicked": [64, 24] }
+    },
+    "vk": {
+      "color_code": [118, 66, 138],
+      "size": [11, 6],
+      "states": { "idle": [42, 18], "hover": [53, 18], "clicked": [64, 18] }
+    },
+    "mastodon": {
+      "color_code": [63, 63, 116],
+      "size": [11, 6],
+      "states": { "idle": [42, 12], "hover": [53, 12], "clicked": [64, 12] }
+    },
+    "feedback": {
+      "color_code": [105, 106, 106],
+      "size": [11, 6],
+      "states": { "idle": [42, 6], "hover": [53, 6], "clicked": [64, 6] }
+    },
+    "donate": {
+      "color_code": [251, 242, 54],
+      "size": [11, 6],
+      "states": { "idle": [42, 0], "hover": [53, 0], "clicked": [64, 0] }
+    }
+  }
+}
