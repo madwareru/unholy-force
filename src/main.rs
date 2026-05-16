@@ -25,7 +25,11 @@ async fn main() -> Result<(), errors::GameError> {
     loop {
         clear_background(BLACK);
 
-        let scaling_factor = (screen_width() / 640.0).trunc();
+        let scaling_factor =
+            (screen_width() / 640.0)
+            .trunc()
+            .min((screen_height() / 360.0).trunc())
+            .max(1.0);
         let expected_width = 640.0 * scaling_factor;
         let expected_height = 360.0 * scaling_factor;
 
