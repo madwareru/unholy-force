@@ -25,10 +25,18 @@ async fn main() -> Result<(), errors::GameError> {
     loop {
         clear_background(BLACK);
 
+        let origin_pos_x = (screen_width() - 1280.0) / 2.0;
+        let origin_pos_y = (screen_height() - 720.0) / 2.0;
+
+        let mouse_x = mouse_position().0 - origin_pos_x;
+        let mouse_y = mouse_position().1 - origin_pos_y;
+
+        draw_text(&format!("{}, {}", mouse_x, mouse_y), 16., 16., 16., WHITE);
+
         draw_texture_ex(
             &main_menu_texture,
-            (screen_width() - 1280.0) / 2.0,
-            (screen_height() - 720.0) / 2.0,
+            origin_pos_x,
+            origin_pos_y,
             WHITE,
             DrawTextureParams {
                 dest_size: Some(vec2(1280.0, 720.0)),
