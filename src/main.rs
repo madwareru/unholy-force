@@ -25,8 +25,12 @@ async fn main() -> Result<(), errors::GameError> {
     loop {
         clear_background(BLACK);
 
-        let origin_pos_x = (screen_width() - 1280.0) / 2.0;
-        let origin_pos_y = (screen_height() - 720.0) / 2.0;
+        let scaling_factor = (screen_width() / 640.0).trunc();
+        let expected_width = 640.0 * scaling_factor;
+        let expected_height = 360.0 * scaling_factor;
+
+        let origin_pos_x = (screen_width() - expected_width) / 2.0;
+        let origin_pos_y = (screen_height() - expected_height) / 2.0;
 
         let mouse_x = mouse_position().0 - origin_pos_x;
         let mouse_y = mouse_position().1 - origin_pos_y;
@@ -39,7 +43,7 @@ async fn main() -> Result<(), errors::GameError> {
             origin_pos_y,
             WHITE,
             DrawTextureParams {
-                dest_size: Some(vec2(1280.0, 720.0)),
+                dest_size: Some(vec2(expected_width, expected_height)),
                 source: Some(Rect {
                     x: 0.0,
                     y: 360.0,
