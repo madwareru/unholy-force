@@ -1,16 +1,28 @@
-use macroquad::miniquad::window::dpi_scale;
 use macroquad::prelude::*;
 
 mod errors;
+mod screen_utils;
 
 fn window_conf() -> Conf {
-    Conf {
-        window_title: "Нечистая сила".to_owned(),
-        high_dpi: false,
-        window_width: 1280,
-        window_height: 720,
-        fullscreen: true,
-        ..Default::default()
+    if std::env::args().find(|it| it.starts_with("windowed")).is_some() {
+        Conf {
+            window_title: "Нечистая сила".to_owned(),
+            high_dpi: false,
+            window_width: 1280,
+            window_height: 720,
+            fullscreen: false,
+            window_resizable: false,
+            ..Default::default()
+        }
+    } else {
+        Conf {
+            window_title: "Нечистая сила".to_owned(),
+            high_dpi: false,
+            window_width: 1280,
+            window_height: 720,
+            fullscreen: true,
+            ..Default::default()
+        }
     }
 }
 
@@ -25,19 +37,13 @@ async fn main() -> Result<(), errors::GameError> {
     loop {
         clear_background(BLACK);
 
-        let scaling_factor =
-            (screen_width() / 640.0)
-            .trunc()
-            .min((screen_height() / 360.0).trunc())
-            .max(1.0);
-        let expected_width = 640.0 * scaling_factor;
-        let expected_height = 360.0 * scaling_factor;
+        let scaling_factor = screen_utils::screen_scaling_factor();
+        let expected_width = screen_utils::TARGET_WIDTH * scaling_factor;
+        let expected_height = screen_utils::TARGET_HEIGHT * scaling_factor;
 
-        let origin_pos_x = (screen_width() - expected_width) / 2.0;
-        let origin_pos_y = (screen_height() - expected_height) / 2.0;
+        let (origin_pos_x, origin_pos_y) = screen_utils::screen_origin_pos();
 
-        let mouse_x = (mouse_position().0 - origin_pos_x) / scaling_factor;
-        let mouse_y = (mouse_position().1 - origin_pos_y) / scaling_factor;
+        let (mouse_x, mouse_y) = screen_utils::scaled_mouse_position();
 
         draw_texture_ex(
             &main_menu_texture,
