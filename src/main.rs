@@ -32,10 +32,8 @@ async fn main() -> Result<(), errors::GameError> {
         let origin_pos_x = (screen_width() - expected_width) / 2.0;
         let origin_pos_y = (screen_height() - expected_height) / 2.0;
 
-        let mouse_x = mouse_position().0 - origin_pos_x;
-        let mouse_y = mouse_position().1 - origin_pos_y;
-
-        draw_text(&format!("{}, {}", mouse_x, mouse_y), 16., 16., 16., WHITE);
+        let mouse_x = (mouse_position().0 - origin_pos_x) / scaling_factor;
+        let mouse_y = (mouse_position().1 - origin_pos_y) / scaling_factor;
 
         draw_texture_ex(
             &main_menu_texture,
@@ -53,6 +51,8 @@ async fn main() -> Result<(), errors::GameError> {
                 ..Default::default()
             }
         );
+
+        draw_text(&format!("{}, {}", mouse_x, mouse_y), 16., 16., 16., WHITE);
 
         next_frame().await;
 
