@@ -1,5 +1,4 @@
 use macroquad::prelude::*;
-use crate::screen_utils;
 
 pub const TARGET_WIDTH: f32 = 640f32;
 pub const TARGET_HEIGHT: f32 = 360f32;
@@ -21,7 +20,7 @@ pub fn screen_origin_pos() -> (f32, f32) {
 
 pub fn scaled_mouse_position() -> (f32, f32) {
     let scaling_factor = screen_scaling_factor();
-    let (origin_pos_x, origin_pos_y) = screen_utils::screen_origin_pos();
+    let (origin_pos_x, origin_pos_y) = screen_origin_pos();
     let mouse_x = (mouse_position().0 - origin_pos_x) / scaling_factor;
     let mouse_y = (mouse_position().1 - origin_pos_y) / scaling_factor;
     (mouse_x, mouse_y)

@@ -1,5 +1,9 @@
-use crate::app::app_stage::{AppStage, AppStageStatus};
-use crate::app::main_menu_stage::MainMenuCommand;
+use crate::{
+    app::{
+        app_stage::{AppStage, AppStageStatus},
+        main_menu_stage::MainMenuCommand
+    }
+};
 
 pub mod app_stage;
 mod main_menu_stage;

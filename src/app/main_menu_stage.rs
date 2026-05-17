@@ -1,5 +1,7 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    sync::Arc
+};
 use lazy_static::lazy_static;
 use macroquad::prelude::*;
 use serde::Deserialize;

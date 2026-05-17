@@ -767,7 +767,6 @@ dependencies = [
  "macroquad",
  "serde",
  "serde_json",
- "thiserror",
  "webbrowser",
 ]
 

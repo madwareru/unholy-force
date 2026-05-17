@@ -1,15 +1,14 @@
 use macroquad::prelude::*;
 use crate::app::app_stage::AppStageStatus;
 
-mod errors;
 mod screen_utils;
 mod app;
 
 fn window_conf() -> Conf {
     let (w, h) = if std::env::args().find(|it| it.starts_with("unsized")).is_some() {
-        (640, 360)
+        (screen_utils::TARGET_WIDTH as i32, screen_utils::TARGET_HEIGHT as i32)
     } else {
-        (1280, 720)
+        ((screen_utils::TARGET_WIDTH as i32) * 2, (screen_utils::TARGET_HEIGHT as i32) * 2)
     };
     let conf = Conf {
         window_title: "Нечистая сила".to_owned(),
@@ -27,7 +26,7 @@ fn window_conf() -> Conf {
 }
 
 #[macroquad::main(window_conf)]
-async fn main() -> Result<(), errors::GameError> {
+async fn main() {
     let rt = render_target(
         screen_utils::TARGET_WIDTH as u32,
         screen_utils::TARGET_HEIGHT as u32
@@ -73,5 +72,4 @@ async fn main() -> Result<(), errors::GameError> {
         );
         next_frame().await;
     }
-    Ok(())
 }
