@@ -3,12 +3,7 @@ pub enum AppStageStatus<R> {
     Complete(R)
 }
 
-pub trait AppStageLogic {
-    type R;
-    fn process(&mut self) -> AppStageStatus<Self::R>;
-    fn render(&mut self);
-}
-
+#[derive(Copy, Clone)]
 pub enum AppStage {
     MainMenu,
     Game,

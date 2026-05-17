@@ -1,11 +1,9 @@
 use macroquad::prelude::*;
-use crate::app_stage::*;
-use crate::main_menu_stage::{MainMenuCommand, MainMenuStage};
+use crate::app::app_stage::AppStageStatus;
 
-mod app_stage;
 mod errors;
 mod screen_utils;
-mod main_menu_stage;
+mod app;
 
 fn window_conf() -> Conf {
     let (w, h) = if std::env::args().find(|it| it.starts_with("unsized")).is_some() {
@@ -13,25 +11,18 @@ fn window_conf() -> Conf {
     } else {
         (1280, 720)
     };
+    let conf = Conf {
+        window_title: "Нечистая сила".to_owned(),
+        high_dpi: false,
+        window_width: w,
+        window_height: h,
+        ..Default::default()
+    };
+
     if std::env::args().find(|it| it.starts_with("windowed")).is_some() {
-        Conf {
-            window_title: "Нечистая сила".to_owned(),
-            high_dpi: false,
-            window_width: w,
-            window_height: h,
-            fullscreen: false,
-            window_resizable: false,
-            ..Default::default()
-        }
+        Conf { fullscreen: false, window_resizable: false, ..conf }
     } else {
-        Conf {
-            window_title: "Нечистая сила".to_owned(),
-            high_dpi: false,
-            window_width: w,
-            window_height: h,
-            fullscreen: true,
-            ..Default::default()
-        }
+        Conf { fullscreen: true, ..conf }
     }
 }
 
@@ -43,36 +34,24 @@ async fn main() -> Result<(), errors::GameError> {
     );
     rt.texture.set_filter(FilterMode::Nearest);
 
-    let mut main_menu_stage = main_menu_stage::MainMenuStage::new();
-    let mut app_stage = AppStage::MainMenu;
+    let mut app = app::App::new();
 
     loop {
-        { // all stage logic are occur here
-            match app_stage {
-                AppStage::MainMenu => {
-                    if !process_main_menu(&mut main_menu_stage, &mut app_stage) { break; }
-                }
-                _ => {}
+        match app.process() {
+            AppStageStatus::Continue => {}
+            AppStageStatus::Complete(()) => {
+                break;
             }
         }
 
-        { // all normal stage renders are occur here
-            set_camera(&Camera2D {
-                zoom: vec2(2f32 / screen_utils::TARGET_WIDTH, 2f32 / screen_utils::TARGET_HEIGHT),
-                target: vec2(screen_utils::TARGET_WIDTH / 2f32, screen_utils::TARGET_HEIGHT / 2f32),
-                render_target: Some(rt.clone()),
-                ..Default::default()
-            });
-
-            match app_stage {
-                AppStage::MainMenu => {
-                    main_menu_stage.render();
-                },
-                AppStage::Game => todo!(),
-                AppStage::OldGame => todo!(),
-                AppStage::Editor => todo!()
-            }
-        }
+        set_camera(&Camera2D {
+            zoom: vec2(2f32 / screen_utils::TARGET_WIDTH, 2f32 / screen_utils::TARGET_HEIGHT),
+            target: vec2(screen_utils::TARGET_WIDTH / 2f32, screen_utils::TARGET_HEIGHT / 2f32),
+            render_target: Some(rt.clone()),
+            ..Default::default()
+        });
+        clear_background(BLACK);
+        app.render();
 
         set_default_camera();
         clear_background(BLACK);
@@ -92,69 +71,7 @@ async fn main() -> Result<(), errors::GameError> {
                 ..Default::default()
             }
         );
-
-        let (mouse_x, mouse_y) = screen_utils::scaled_mouse_position();
-        draw_text(&format!("{}, {}", mouse_x, mouse_y), 16., 16., 16., WHITE);
-
         next_frame().await;
-
-        if should_quit() {
-            break;
-        }
     }
     Ok(())
-}
-
-fn process_main_menu(main_menu_stage: &mut MainMenuStage, app_stage: &mut AppStage) -> bool {
-    match main_menu_stage.process() {
-        AppStageStatus::Continue => {},
-        AppStageStatus::Complete(command) => {
-            match command {
-                MainMenuCommand::OpenOldGame => {
-                    *app_stage = AppStage::OldGame;
-                }
-                MainMenuCommand::StartNewGame => {
-                    *app_stage = AppStage::Game;
-                }
-                MainMenuCommand::OpenEditor => {
-                    *app_stage = AppStage::Editor;
-                }
-                MainMenuCommand::Exit => {
-                    return false;
-                }
-                MainMenuCommand::VisitGithub => {
-                    webbrowser::open("https://github.com/madwareru/unholy-force")
-                        .unwrap();
-                }
-                MainMenuCommand::VisitGamedev => {
-                    webbrowser::open("https://gamedev.ru/users/?id=41788")
-                        .unwrap();
-                }
-                MainMenuCommand::VisitTelegram => {
-                    webbrowser::open("https://t.me/obscure_computer_science")
-                        .unwrap();
-                }
-                MainMenuCommand::VisitVK => {
-                    webbrowser::open("https://vk.com/madware")
-                        .unwrap();
-                }
-                MainMenuCommand::VisitMastodon => {
-                    webbrowser::open("https://mastodon.gamedev.place/@madware")
-                        .unwrap();
-                }
-                MainMenuCommand::LeaveFeedback => {
-                    webbrowser::open("https://github.com/madwareru/unholy-force/issues/new/choose")
-                        .unwrap();
-                }
-                MainMenuCommand::Donate => {
-                    // todo
-                }
-            }
-        }
-    }
-    true
-}
-
-fn should_quit() -> bool {
-    is_key_released(KeyCode::Escape)
 }

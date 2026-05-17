@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 use macroquad::prelude::*;
 use serde::Deserialize;
-use crate::app_stage::*;
+use super::app_stage::*;
 use crate::screen_utils;
 
 #[derive(Copy, Clone, Deserialize)]
@@ -51,7 +51,7 @@ struct MenuLayoutDef {
 
 lazy_static!(
     static ref ATLAS_DEF: Arc<AtlasDef> = {
-        let bytes = include_bytes!("../assets/main_menu_atlas.json");
+        let bytes = include_bytes!("../../assets/main_menu_atlas.json");
         let atlas_def: AtlasDef =
             serde_json::from_slice(bytes)
                 .expect("Failed to load atlas json");
@@ -60,7 +60,7 @@ lazy_static!(
 
     static ref ATLAS_TEXTURE: Texture2D = {
         let main_menu_texture = Texture2D::from_file_with_format(
-            include_bytes!("../assets/main_menu_atlas.png"),
+            include_bytes!("../../assets/main_menu_atlas.png"),
             None
         );
         main_menu_texture.set_filter(FilterMode::Nearest);
@@ -68,7 +68,7 @@ lazy_static!(
     };
 
     static ref MENU_LAYOUT: Arc<MenuLayoutDef> = {
-        let bytes = include_bytes!("../assets/main_menu_layout.json");
+        let bytes = include_bytes!("../../assets/main_menu_layout.json");
         let layout_def: MenuLayoutDef =
             serde_json::from_slice(bytes)
                 .expect("Failed to load layout json");
@@ -157,10 +157,8 @@ impl MainMenuStage {
     }
 }
 
-impl AppStageLogic for MainMenuStage {
-    type R = MainMenuCommand;
-
-    fn process(&mut self) -> AppStageStatus<Self::R> {
+impl MainMenuStage {
+    pub fn process(&mut self) -> AppStageStatus<MainMenuCommand> {
         if is_mouse_button_released(MouseButton::Left) {
             for (button_name, _) in self.buttons.iter() {
                 let Some(button_def) = ATLAS_DEF.buttons.get(button_name.as_str()) else {
@@ -181,7 +179,7 @@ impl AppStageLogic for MainMenuStage {
         AppStageStatus::Continue
     }
 
-    fn render(&mut self) {
+    pub fn render(&self) {
         let mouse_down = is_mouse_button_down(MouseButton::Left);
         draw_texture_ex(
             &self.main_menu_texture,
