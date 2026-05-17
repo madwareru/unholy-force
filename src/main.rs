@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
-use crate::app_stage::AppStage;
+use crate::app_stage::*;
+use crate::main_menu_stage::MainMenuCommand;
 
 mod app_stage;
 mod errors;
@@ -43,8 +44,63 @@ async fn main() -> Result<(), errors::GameError> {
     rt.texture.set_filter(FilterMode::Nearest);
 
     let mut main_menu_stage = main_menu_stage::MainMenuStage::new();
+    let mut app_stage = AppStage::MainMenu;
 
     loop {
+        { // all stage logic are occur here
+            match app_stage {
+                AppStage::MainMenu => {
+                    match main_menu_stage.process() {
+                        AppStageStatus::Continue => {}
+                        AppStageStatus::Complete(command) => {
+                            match command {
+                                MainMenuCommand::OpenOldGame => {
+                                    app_stage = AppStage::OldGame;
+                                }
+                                MainMenuCommand::StartNewGame => {
+                                    app_stage = AppStage::Game;
+                                }
+                                MainMenuCommand::OpenEditor => {
+                                    app_stage = AppStage::Editor;
+                                }
+                                MainMenuCommand::Exit => {
+                                    break;
+                                }
+                                MainMenuCommand::VisitGithub => {
+                                    webbrowser::open("https://github.com/madwareru/unholy-force")
+                                        .unwrap();
+                                }
+                                MainMenuCommand::VisitGamedev => {
+                                    webbrowser::open("https://gamedev.ru/users/?id=41788")
+                                        .unwrap();
+                                }
+                                MainMenuCommand::VisitTelegram => {
+                                    webbrowser::open("https://t.me/obscure_computer_science")
+                                        .unwrap();
+                                }
+                                MainMenuCommand::VisitVK => {
+                                    webbrowser::open("https://vk.com/madware")
+                                        .unwrap();
+                                }
+                                MainMenuCommand::VisitMastodon => {
+                                    webbrowser::open("https://mastodon.gamedev.place/@madware")
+                                        .unwrap();
+                                }
+                                MainMenuCommand::LeaveFeedback => {
+                                    webbrowser::open("https://github.com/madwareru/unholy-force/issues/new/choose")
+                                        .unwrap();
+                                }
+                                MainMenuCommand::Donate => {
+                                    // todo
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
         { // all normal stage renders are occur here
             set_camera(&Camera2D {
                 zoom: vec2(2f32 / screen_utils::TARGET_WIDTH, 2f32 / screen_utils::TARGET_HEIGHT),
@@ -53,7 +109,14 @@ async fn main() -> Result<(), errors::GameError> {
                 ..Default::default()
             });
 
-            main_menu_stage.render();
+            match app_stage {
+                AppStage::MainMenu => {
+                    main_menu_stage.render();
+                },
+                AppStage::Game => todo!(),
+                AppStage::OldGame => todo!(),
+                AppStage::Editor => todo!()
+            }
         }
 
         set_default_camera();

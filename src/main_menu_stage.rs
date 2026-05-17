@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::app_stage::*;
 use crate::screen_utils;
 
-#[derive(Deserialize)]
+#[derive(Copy, Clone, Deserialize)]
 pub enum MainMenuCommand {
     OpenOldGame,
     StartNewGame,
@@ -133,17 +133,36 @@ impl MainMenuStage {
             button_hitboxes
         }
     }
+
+    fn is_button_hovered(&self, button: &str) -> bool {
+        let (mouse_x, mouse_y) = screen_utils::scaled_mouse_position();
+        let Some(hit_info) = self.button_hitboxes.get(button) else {
+            return false;
+        };
+
+        (mouse_x >= (hit_info.0.0 as f32) && mouse_x <= (hit_info.1.0 as f32)) &&
+            (mouse_y >= (hit_info.0.1 as f32) && mouse_y <= (hit_info.1.1 as f32))
+    }
 }
 
-impl AppStage for MainMenuStage {
+impl AppStageLogic for MainMenuStage {
     type R = MainMenuCommand;
 
     fn process(&mut self) -> AppStageStatus<Self::R> {
-        todo!()
+        if is_mouse_button_released(MouseButton::Left) {
+            for (button_name, (x, y)) in self.buttons.iter() {
+                if self.is_button_hovered(button_name.as_str()) {
+                    let Some(button_def) = ATLAS_DEF.buttons.get(button_name.as_str()) else {
+                        continue;
+                    };
+                    return AppStageStatus::Complete(button_def.command)
+                }
+            }
+        }
+        AppStageStatus::Continue
     }
 
     fn render(&mut self) {
-        let (mouse_x, mouse_y) = screen_utils::scaled_mouse_position();
         let mouse_down = is_mouse_button_down(MouseButton::Left);
         draw_texture_ex(
             &self.main_menu_texture,
@@ -195,13 +214,7 @@ impl AppStage for MainMenuStage {
         }
 
         for (button_name, (x, y)) in self.buttons.iter() {
-            let Some(hit_info) = self.button_hitboxes.get(button_name.as_str()) else {
-                continue;
-            };
-
-            let hovered =
-                (mouse_x >= (hit_info.0.0 as f32) && mouse_x <= (hit_info.1.0 as f32)) &&
-                    (mouse_y >= (hit_info.0.1 as f32) && mouse_y <= (hit_info.1.1 as f32));
+            let hovered = self.is_button_hovered(&button_name);
 
             let key =
                 if hovered && mouse_down { "clicked" }
