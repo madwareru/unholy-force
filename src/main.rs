@@ -1,7 +1,10 @@
 use macroquad::prelude::*;
+use crate::app_stage::AppStage;
 
+mod app_stage;
 mod errors;
 mod screen_utils;
+mod main_menu_stage;
 
 fn window_conf() -> Conf {
     let (w, h) = if std::env::args().find(|it| it.starts_with("unsized")).is_some() {
@@ -33,40 +36,43 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() -> Result<(), errors::GameError> {
-    let main_menu_texture = Texture2D::from_file_with_format(
-        include_bytes!("../assets/main_menu_atlas.png"),
-        None
+    let render_target = render_target(
+        screen_utils::TARGET_WIDTH as _,
+        screen_utils::TARGET_HEIGHT as _
     );
-    main_menu_texture.set_filter(FilterMode::Nearest);
+    render_target.texture.set_filter(FilterMode::Nearest);
+    let mut main_menu_stage = main_menu_stage::MainMenuStage::new();
 
     loop {
+        set_camera(&Camera2D {
+            zoom: vec2(2f32 / screen_utils::TARGET_WIDTH, 2f32 / screen_utils::TARGET_HEIGHT),
+            target: vec2(screen_utils::TARGET_WIDTH / 2f32, screen_utils::TARGET_HEIGHT / 2f32),
+            render_target: Some(render_target.clone()),
+            ..Default::default()
+        });
+
+        main_menu_stage.render();
+
+        set_default_camera();
         clear_background(BLACK);
 
         let scaling_factor = screen_utils::screen_scaling_factor();
         let expected_width = screen_utils::TARGET_WIDTH * scaling_factor;
         let expected_height = screen_utils::TARGET_HEIGHT * scaling_factor;
-
         let (origin_pos_x, origin_pos_y) = screen_utils::screen_origin_pos();
 
-        let (mouse_x, mouse_y) = screen_utils::scaled_mouse_position();
-
         draw_texture_ex(
-            &main_menu_texture,
+            &render_target.texture,
             origin_pos_x,
             origin_pos_y,
             WHITE,
             DrawTextureParams {
                 dest_size: Some(vec2(expected_width, expected_height)),
-                source: Some(Rect {
-                    x: 0.0,
-                    y: 360.0,
-                    w: 640.0,
-                    h: 360.0,
-                }),
                 ..Default::default()
             }
         );
 
+        let (mouse_x, mouse_y) = screen_utils::scaled_mouse_position();
         draw_text(&format!("{}, {}", mouse_x, mouse_y), 16., 16., 16., WHITE);
 
         next_frame().await;

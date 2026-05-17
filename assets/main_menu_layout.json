@@ -1,0 +1,18 @@
+{
+  "labels": {
+    "title": [12, 8]
+  },
+  "buttons": {
+    "old_game": [11, 13],
+    "new_game": [11, 19],
+    "editor": [11, 25],
+    "exit": [11, 31],
+    "github": [60, 37],
+    "gamedev": [63, 31],
+    "telegram": [65, 25],
+    "vk": [66, 19],
+    "mastodon": [65, 13],
+    "feedback": [63, 7],
+    "donate": [60, 1]
+  }
+}
