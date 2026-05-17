@@ -31,6 +31,8 @@ struct AtlasLabelDef {
 struct AtlasButtonDef {
     size: [u8; 2],
     command: MainMenuCommand,
+    #[serde(default)]
+    condition: Option<String>,
     states: HashMap<String, [u8; 2]>
 }
 
@@ -80,6 +82,7 @@ pub struct MainMenuStage {
     buttons: HashMap<String, (i32, i32)>,
     button_hitboxes: HashMap<String, ((i32, i32), (i32, i32))>,
 }
+
 impl MainMenuStage {
     pub fn new() -> Self {
         let main_menu_texture = ATLAS_TEXTURE.clone();
@@ -134,6 +137,15 @@ impl MainMenuStage {
         }
     }
 
+    fn check_condition(&self, cond: &str) -> bool {
+        match cond {
+            // todo: activate donates when there is a reason to do so
+            "donate_active" => false,
+            "save_exists" => std::fs::exists("save.dat").unwrap_or(false),
+            _ => false
+        }
+    }
+
     fn is_button_hovered(&self, button: &str) -> bool {
         let (mouse_x, mouse_y) = screen_utils::scaled_mouse_position();
         let Some(hit_info) = self.button_hitboxes.get(button) else {
@@ -150,11 +162,18 @@ impl AppStageLogic for MainMenuStage {
 
     fn process(&mut self) -> AppStageStatus<Self::R> {
         if is_mouse_button_released(MouseButton::Left) {
-            for (button_name, (x, y)) in self.buttons.iter() {
-                if self.is_button_hovered(button_name.as_str()) {
-                    let Some(button_def) = ATLAS_DEF.buttons.get(button_name.as_str()) else {
+            for (button_name, _) in self.buttons.iter() {
+                let Some(button_def) = ATLAS_DEF.buttons.get(button_name.as_str()) else {
+                    continue;
+                };
+
+                if let Some(cond) = &button_def.condition {
+                    if !self.check_condition(cond.as_str()) {
                         continue;
-                    };
+                    }
+                }
+
+                if self.is_button_hovered(button_name.as_str()) {
                     return AppStageStatus::Complete(button_def.command)
                 }
             }
@@ -224,6 +243,12 @@ impl AppStageLogic for MainMenuStage {
             match ATLAS_DEF.buttons.get(button_name.as_str()) {
                 None => { continue; }
                 Some(btn_def) => {
+                    if let Some(cond) = &btn_def.condition {
+                        if !self.check_condition(cond.as_str()) {
+                            continue;
+                        }
+                    }
+
                     let sub_rect_x = btn_def.states[key][0] as u32 * ATLAS_DEF.tile_size[0] as u32;
                     let sub_rect_y = btn_def.states[key][1] as u32 * ATLAS_DEF.tile_size[1] as u32;
                     let sub_rect_w = btn_def.size[0] as u32 * ATLAS_DEF.tile_size[0] as u32;

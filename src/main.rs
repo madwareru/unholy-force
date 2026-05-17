@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use crate::app_stage::*;
-use crate::main_menu_stage::MainMenuCommand;
+use crate::main_menu_stage::{MainMenuCommand, MainMenuStage};
 
 mod app_stage;
 mod errors;
@@ -50,52 +50,7 @@ async fn main() -> Result<(), errors::GameError> {
         { // all stage logic are occur here
             match app_stage {
                 AppStage::MainMenu => {
-                    match main_menu_stage.process() {
-                        AppStageStatus::Continue => {}
-                        AppStageStatus::Complete(command) => {
-                            match command {
-                                MainMenuCommand::OpenOldGame => {
-                                    app_stage = AppStage::OldGame;
-                                }
-                                MainMenuCommand::StartNewGame => {
-                                    app_stage = AppStage::Game;
-                                }
-                                MainMenuCommand::OpenEditor => {
-                                    app_stage = AppStage::Editor;
-                                }
-                                MainMenuCommand::Exit => {
-                                    break;
-                                }
-                                MainMenuCommand::VisitGithub => {
-                                    webbrowser::open("https://github.com/madwareru/unholy-force")
-                                        .unwrap();
-                                }
-                                MainMenuCommand::VisitGamedev => {
-                                    webbrowser::open("https://gamedev.ru/users/?id=41788")
-                                        .unwrap();
-                                }
-                                MainMenuCommand::VisitTelegram => {
-                                    webbrowser::open("https://t.me/obscure_computer_science")
-                                        .unwrap();
-                                }
-                                MainMenuCommand::VisitVK => {
-                                    webbrowser::open("https://vk.com/madware")
-                                        .unwrap();
-                                }
-                                MainMenuCommand::VisitMastodon => {
-                                    webbrowser::open("https://mastodon.gamedev.place/@madware")
-                                        .unwrap();
-                                }
-                                MainMenuCommand::LeaveFeedback => {
-                                    webbrowser::open("https://github.com/madwareru/unholy-force/issues/new/choose")
-                                        .unwrap();
-                                }
-                                MainMenuCommand::Donate => {
-                                    // todo
-                                }
-                            }
-                        }
-                    }
+                    if !process_main_menu(&mut main_menu_stage, &mut app_stage) { break; }
                 }
                 _ => {}
             }
@@ -148,6 +103,56 @@ async fn main() -> Result<(), errors::GameError> {
         }
     }
     Ok(())
+}
+
+fn process_main_menu(main_menu_stage: &mut MainMenuStage, app_stage: &mut AppStage) -> bool {
+    match main_menu_stage.process() {
+        AppStageStatus::Continue => {},
+        AppStageStatus::Complete(command) => {
+            match command {
+                MainMenuCommand::OpenOldGame => {
+                    *app_stage = AppStage::OldGame;
+                }
+                MainMenuCommand::StartNewGame => {
+                    *app_stage = AppStage::Game;
+                }
+                MainMenuCommand::OpenEditor => {
+                    *app_stage = AppStage::Editor;
+                }
+                MainMenuCommand::Exit => {
+                    return false;
+                }
+                MainMenuCommand::VisitGithub => {
+                    webbrowser::open("https://github.com/madwareru/unholy-force")
+                        .unwrap();
+                }
+                MainMenuCommand::VisitGamedev => {
+                    webbrowser::open("https://gamedev.ru/users/?id=41788")
+                        .unwrap();
+                }
+                MainMenuCommand::VisitTelegram => {
+                    webbrowser::open("https://t.me/obscure_computer_science")
+                        .unwrap();
+                }
+                MainMenuCommand::VisitVK => {
+                    webbrowser::open("https://vk.com/madware")
+                        .unwrap();
+                }
+                MainMenuCommand::VisitMastodon => {
+                    webbrowser::open("https://mastodon.gamedev.place/@madware")
+                        .unwrap();
+                }
+                MainMenuCommand::LeaveFeedback => {
+                    webbrowser::open("https://github.com/madwareru/unholy-force/issues/new/choose")
+                        .unwrap();
+                }
+                MainMenuCommand::Donate => {
+                    // todo
+                }
+            }
+        }
+    }
+    true
 }
 
 fn should_quit() -> bool {

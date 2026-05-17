@@ -12,6 +12,7 @@
       "color_code": [153, 229, 80],
       "size": [21, 6],
       "command": "OpenOldGame",
+      "condition": "save_exists",
       "states": { "idle": [0, 0], "hover": [0, 6], "clicked": [0, 12] }
     },
     "new_game": {
@@ -73,6 +74,7 @@
       "color_code": [251, 242, 54],
       "size": [11, 6],
       "command": "Donate",
+      "condition": "donate_active",
       "states": { "idle": [42, 0], "hover": [53, 0], "clicked": [64, 0] }
     }
   }
