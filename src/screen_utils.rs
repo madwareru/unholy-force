@@ -16,7 +16,7 @@ pub fn screen_origin_pos() -> (f32, f32) {
     let expected_height = TARGET_HEIGHT * scaling_factor;
     let origin_pos_x = (screen_width() - expected_width) / 2.0;
     let origin_pos_y = (screen_height() - expected_height) / 2.0;
-    (origin_pos_x, origin_pos_y)
+    (origin_pos_x.trunc(), origin_pos_y.trunc())
 }
 
 pub fn scaled_mouse_position() -> (f32, f32) {

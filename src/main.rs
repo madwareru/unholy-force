@@ -36,22 +36,25 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() -> Result<(), errors::GameError> {
-    let render_target = render_target(
-        screen_utils::TARGET_WIDTH as _,
-        screen_utils::TARGET_HEIGHT as _
+    let rt = render_target(
+        screen_utils::TARGET_WIDTH as u32,
+        screen_utils::TARGET_HEIGHT as u32
     );
-    render_target.texture.set_filter(FilterMode::Nearest);
+    rt.texture.set_filter(FilterMode::Nearest);
+
     let mut main_menu_stage = main_menu_stage::MainMenuStage::new();
 
     loop {
-        set_camera(&Camera2D {
-            zoom: vec2(2f32 / screen_utils::TARGET_WIDTH, 2f32 / screen_utils::TARGET_HEIGHT),
-            target: vec2(screen_utils::TARGET_WIDTH / 2f32, screen_utils::TARGET_HEIGHT / 2f32),
-            render_target: Some(render_target.clone()),
-            ..Default::default()
-        });
+        { // all normal stage renders are occur here
+            set_camera(&Camera2D {
+                zoom: vec2(2f32 / screen_utils::TARGET_WIDTH, 2f32 / screen_utils::TARGET_HEIGHT),
+                target: vec2(screen_utils::TARGET_WIDTH / 2f32, screen_utils::TARGET_HEIGHT / 2f32),
+                render_target: Some(rt.clone()),
+                ..Default::default()
+            });
 
-        main_menu_stage.render();
+            main_menu_stage.render();
+        }
 
         set_default_camera();
         clear_background(BLACK);
@@ -62,7 +65,7 @@ async fn main() -> Result<(), errors::GameError> {
         let (origin_pos_x, origin_pos_y) = screen_utils::screen_origin_pos();
 
         draw_texture_ex(
-            &render_target.texture,
+            &rt.texture,
             origin_pos_x,
             origin_pos_y,
             WHITE,
