@@ -72,7 +72,7 @@ async fn main() {
             }
         );
 
-        egui_macroquad::draw();
+        app.draw_egui();
 
         next_frame().await;
     }

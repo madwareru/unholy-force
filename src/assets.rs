@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
 use uuid::Uuid;
 
+type SharedAssetDb = Arc<Mutex<AssetDb>>;
+
 lazy_static!(
-    pub static ref ASSET_DATABASE: Arc<AssetDatabase> = Arc::new(AssetDatabase::load());
+    pub static ref ASSET_DATABASE: SharedAssetDb = Arc::new(Mutex::new(AssetDb::load()));
 );
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -18,13 +20,13 @@ pub enum AssetKind {
     FloorFlowGraphConfig
 }
 
-pub struct AssetDatabase {
+pub struct AssetDb {
     assets: HashMap<AssetKind, HashMap<Uuid, (String, Vec<u8>)>>,
     deleted_assets: HashSet<(AssetKind, Uuid)>,
     changed_assets: HashSet<(AssetKind, Uuid)>,
 }
 
-impl AssetDatabase {
+impl AssetDb {
     fn load() -> Self {
         let mut unit_assets = HashMap::new();
         let mut item_assets = HashMap::new();
@@ -96,7 +98,14 @@ impl AssetDatabase {
         if let Some(assets) = self.assets.get_mut(&kind) {
             assets.insert(uuid, (String::from(name), data.to_vec()));
         }
-        self.changed_assets.insert((kind, uuid));
+        uuid
+    }
+
+    pub fn create_json5_asset(&mut self, kind: AssetKind, name: &str, text: &str) -> Uuid {
+        let uuid = create_new_asset(kind, name, text.as_bytes());
+        if let Some(assets) = self.assets.get_mut(&kind) {
+            assets.insert(uuid, (String::from(name), text.as_bytes().to_vec()));
+        }
         uuid
     }
 
@@ -172,7 +181,7 @@ fn get_asset_name(kind: AssetKind, id: Uuid) -> String {
 }
 
 fn rename_asset(kind: AssetKind, id: Uuid, new_name: &str) {
-    let file_name = asset_file_name(kind, id);
+    let file_name = asset_name_file_name(kind, id);
     std::fs::write(file_name, new_name).expect("Failed to rename asset");
 }
 

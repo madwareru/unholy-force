@@ -113,4 +113,11 @@ impl App {
         }
         Some(self.app_stage)
     }
+
+    pub fn draw_egui(&self) {
+        match self.app_stage {
+            AppStage::Editor => egui_macroquad::draw(),
+            _ => {}
+        }
+    }
 }
