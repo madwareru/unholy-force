@@ -4,22 +4,27 @@ use crate::{
         main_menu_stage::MainMenuCommand
     }
 };
+use crate::app::editor_stage::EditorCommand;
 
 pub mod app_stage;
 mod main_menu_stage;
+mod editor_stage;
 
 pub struct App {
     app_stage: AppStage,
     main_menu_stage : main_menu_stage::MainMenuStage,
+    editor_stage : editor_stage::EditorStage,
 }
 
 impl App {
     pub fn new() -> Self {
         let main_menu_stage = main_menu_stage::MainMenuStage::new();
+        let editor_stage = editor_stage::EditorStage::new();
         let app_stage = AppStage::MainMenu;
         Self {
             app_stage,
             main_menu_stage,
+            editor_stage,
         }
     }
 
@@ -30,7 +35,9 @@ impl App {
             },
             AppStage::Game => todo!(),
             AppStage::OldGame => todo!(),
-            AppStage::Editor => todo!()
+            AppStage::Editor => {
+                self.editor_stage.render();
+            }
         }
     }
 
@@ -42,6 +49,14 @@ impl App {
                         self.app_stage = result_stage;
                     }
                     None => { return AppStageStatus::Complete(()); }
+                }
+            },
+            AppStage::Editor => {
+                match self.editor_stage.process() {
+                    AppStageStatus::Continue => {}
+                    AppStageStatus::Complete(EditorCommand::BackToMainMenu) => {
+                        self.app_stage = AppStage::MainMenu;
+                    }
                 }
             }
             _ => todo!()

@@ -70,6 +70,9 @@ async fn main() {
                 ..Default::default()
             }
         );
+
+        egui_macroquad::draw();
+
         next_frame().await;
     }
 }

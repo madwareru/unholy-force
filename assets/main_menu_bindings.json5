@@ -1,0 +1,16 @@
+{
+  // main buttons
+  old_game: { command: "OpenOldGame", condition: "save_exists" },
+  new_game: { command: "StartNewGame" },
+  editor: { command: "OpenEditor" },
+  exit: { command: "Exit" },
+
+  // social buttons
+  github: { command: "VisitGithub" },
+  gamedev: { command: "VisitGamedev" },
+  telegram: { command: "VisitTelegram" },
+  vk: { command: "VisitVK" },
+  mastodon: { command: "VisitMastodon" },
+  feedback: { command: "LeaveFeedback" },
+  donate: { command: "Donate", condition: "donate_active" }
+}

@@ -30,11 +30,15 @@ struct AtlasLabelDef {
 }
 
 #[derive(Deserialize)]
-struct AtlasButtonDef {
-    size: [u8; 2],
+struct MainMenuBindingDef {
     command: MainMenuCommand,
     #[serde(default)]
     condition: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AtlasButtonDef {
+    size: [u8; 2],
     states: HashMap<String, [u8; 2]>
 }
 
@@ -52,14 +56,6 @@ struct MenuLayoutDef {
 }
 
 lazy_static!(
-    static ref ATLAS_DEF: Arc<AtlasDef> = {
-        let bytes = include_bytes!("../../assets/main_menu_atlas.json");
-        let atlas_def: AtlasDef =
-            serde_json::from_slice(bytes)
-                .expect("Failed to load atlas json");
-        Arc::new(atlas_def)
-    };
-
     static ref ATLAS_TEXTURE: Texture2D = {
         let main_menu_texture = Texture2D::from_file_with_format(
             include_bytes!("../../assets/main_menu_atlas.png"),
@@ -69,12 +65,22 @@ lazy_static!(
         main_menu_texture
     };
 
+    static ref ATLAS_DEF: Arc<AtlasDef> = {
+        const CONFIG_TEXT: &str = include_str!("../../assets/main_menu_atlas.json5");
+        let atlas_def = json5::from_str(CONFIG_TEXT);
+        Arc::new(atlas_def.expect("Failed to load atlas json"))
+    };
+
     static ref MENU_LAYOUT: Arc<MenuLayoutDef> = {
-        let bytes = include_bytes!("../../assets/main_menu_layout.json");
-        let layout_def: MenuLayoutDef =
-            serde_json::from_slice(bytes)
-                .expect("Failed to load layout json");
-        Arc::new(layout_def)
+        const CONFIG_TEXT: &str = include_str!("../../assets/main_menu_layout.json5");
+        let layout_def = json5::from_str(CONFIG_TEXT);
+        Arc::new(layout_def.expect("Failed to load layout json"))
+    };
+
+    static ref MENU_BINDINGS: Arc<HashMap<String, MainMenuBindingDef>> = {
+        const CONFIG_TEXT: &str = include_str!("../../assets/main_menu_bindings.json5");
+        let binding_def = json5::from_str(CONFIG_TEXT);
+        Arc::new(binding_def.expect("Failed to load main menu bindings"))
     };
 );
 
@@ -123,7 +129,7 @@ impl MainMenuStage {
                     let hitbox_right = hitbox_left + hitbox_w;
                     let hitbox_bottom = hitbox_top + hitbox_h;
                     buttons.insert(button.to_owned(), (x, y));
-                    button_hitboxes.insert(button.to_owned(),(
+                    button_hitboxes.insert(button.to_owned(), (
                         (hitbox_left, hitbox_top),
                         (hitbox_right, hitbox_bottom)
                     ));
@@ -137,6 +143,14 @@ impl MainMenuStage {
             buttons,
             button_hitboxes
         }
+    }
+
+    fn is_button_active(&self, button_name: &str) -> bool {
+        MENU_BINDINGS
+        .get(button_name)
+        .and_then(|btn_def| btn_def.condition.as_ref())
+        .map(|cond| self.check_condition(cond.as_str()))
+        .unwrap_or(true)
     }
 
     fn check_condition(&self, cond: &str) -> bool {
@@ -157,24 +171,24 @@ impl MainMenuStage {
         (mouse_x >= (hit_info.0.0 as f32) && mouse_x <= (hit_info.1.0 as f32)) &&
             (mouse_y >= (hit_info.0.1 as f32) && mouse_y <= (hit_info.1.1 as f32))
     }
-}
 
-impl MainMenuStage {
     pub fn process(&mut self) -> AppStageStatus<MainMenuCommand> {
         if is_mouse_button_released(MouseButton::Left) {
             for (button_name, _) in self.buttons.iter() {
-                let Some(button_def) = ATLAS_DEF.buttons.get(button_name.as_str()) else {
+                if !self.is_button_active(button_name.as_str()) {
                     continue;
-                };
-
-                if let Some(cond) = &button_def.condition {
-                    if !self.check_condition(cond.as_str()) {
-                        continue;
-                    }
                 }
 
                 if self.is_button_hovered(button_name.as_str()) {
-                    return AppStageStatus::Complete(button_def.command)
+                    return AppStageStatus::Complete(
+                        MENU_BINDINGS
+                            .get(button_name.as_str())
+                            .map(|it| it.command)
+                            .unwrap_or_else(|| {
+                                let error_text = format!("Command for button {button_name} not found");
+                                panic!("{error_text}");
+                            })
+                    )
                 }
             }
         }
@@ -236,19 +250,14 @@ impl MainMenuStage {
             let hovered = self.is_button_hovered(&button_name);
 
             let key =
-                if hovered && mouse_down { "clicked" }
-                else if hovered { "hover" }
-                else { "idle" };
+                if hovered && mouse_down { "clicked" } else if hovered { "hover" } else { "idle" };
 
             match ATLAS_DEF.buttons.get(button_name.as_str()) {
                 None => { continue; }
                 Some(btn_def) => {
-                    if let Some(cond) = &btn_def.condition {
-                        if !self.check_condition(cond.as_str()) {
-                            continue;
-                        }
+                    if !self.is_button_active(button_name.as_str()) {
+                        continue;
                     }
-
                     let sub_rect_x = btn_def.states[key][0] as u32 * ATLAS_DEF.tile_size[0] as u32;
                     let sub_rect_y = btn_def.states[key][1] as u32 * ATLAS_DEF.tile_size[1] as u32;
                     let sub_rect_w = btn_def.size[0] as u32 * ATLAS_DEF.tile_size[0] as u32;

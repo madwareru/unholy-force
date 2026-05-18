@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 macroquad = "0.4.14"
 serde = { version =  "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.149" }
+json5 = { version = "1.3.1" }
 lazy_static = "1.5.0"
 webbrowser = "1.2.1"
+egui-macroquad = "0.17.3"
+egui = "0.31.1"
