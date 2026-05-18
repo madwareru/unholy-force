@@ -4,6 +4,7 @@ use crate::app::app_stage::AppStageStatus;
 mod screen_utils;
 mod app;
 mod assets;
+mod graphics;
 
 fn window_conf() -> Conf {
     let (w, h) = if std::env::args().find(|it| it.starts_with("unsized")).is_some() {
