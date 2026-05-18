@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use lazy_static::lazy_static;
@@ -20,6 +20,8 @@ pub enum AssetKind {
 
 pub struct AssetDatabase {
     assets: HashMap<AssetKind, HashMap<Uuid, (String, Vec<u8>)>>,
+    deleted_assets: HashSet<(AssetKind, Uuid)>,
+    changed_assets: HashSet<(AssetKind, Uuid)>,
 }
 
 impl AssetDatabase {
@@ -51,11 +53,11 @@ impl AssetDatabase {
                         .map(|it| it.to_string()) else {
                         continue;
                     };
-                    if !file_name.ends_with(".json5") {
+                    if !file_name.ends_with(ext) {
                         continue;
                     }
 
-                    let mut uuid_split = file_name.split(".json5");
+                    let mut uuid_split = file_name.split(ext);
                     let Some(uuid_string) = uuid_split.next() else {
                         continue;
                     };
@@ -78,11 +80,46 @@ impl AssetDatabase {
         assets.insert(AssetKind::FloorConfig, floor_assets);
         assets.insert(AssetKind::FloorFlowGraphConfig, floor_flow_graph_assets);
 
-        Self { assets }
+        Self {
+            assets,
+            deleted_assets: Default::default(),
+            changed_assets: Default::default()
+        }
     }
 
     pub fn list_all_assets(&self, kind: AssetKind) -> impl Iterator<Item = (Uuid, &str)> {
         self.assets[&kind].iter().map(|(id, (name, _))| (*id, name.as_str()))
+    }
+
+    pub fn create_asset(&mut self, kind: AssetKind, name: &str, data: &[u8]) -> Uuid {
+        let uuid = create_new_asset(kind, name, data);
+        if let Some(assets) = self.assets.get_mut(&kind) {
+            assets.insert(uuid, (String::from(name), data.to_vec()));
+        }
+        self.changed_assets.insert((kind, uuid));
+        uuid
+    }
+
+    pub fn delete_asset(&mut self, kind: AssetKind, uuid: Uuid) {
+        if self.assets.get(&kind).and_then(|x| x.get(&uuid)).is_none() {
+            return;
+        }
+        self.deleted_assets.insert((kind, uuid));
+        let Some(assets) = self.assets.get_mut(&kind) else {
+            return;
+        };
+        assets.remove(&uuid);
+    }
+
+    pub fn flush_assets_to_disk(&mut self) {
+        for (kind, id) in self.deleted_assets.drain() {
+            remove_asset(kind, id);
+        }
+        for (kind, uuid) in self.changed_assets.drain() {
+            if let Some((_, bytes)) = self.assets[&kind].get(&uuid) {
+                write_asset_bytes(kind, uuid, bytes);
+            }
+        }
     }
 }
 
@@ -135,18 +172,25 @@ fn get_asset_name(kind: AssetKind, id: Uuid) -> String {
 }
 
 fn rename_asset(kind: AssetKind, id: Uuid, new_name: &str) {
-    let file_name = asset_name_file_name(kind, id);
+    let file_name = asset_file_name(kind, id);
     std::fs::write(file_name, new_name).expect("Failed to rename asset");
 }
 
 fn load_asset_bytes (kind: AssetKind, id: Uuid) -> Vec<u8> {
-    let file_name = asset_name_file_name(kind, id);
+    let file_name = asset_file_name(kind, id);
     std::fs::read(file_name).expect("Failed to read asset file")
 }
 
 fn write_asset_bytes (kind: AssetKind, id: Uuid, data: &[u8]) {
-    let file_name = asset_name_file_name(kind, id);
+    let file_name = asset_file_name(kind, id);
     std::fs::write(file_name, data).expect("Failed to write asset file");
+}
+
+fn remove_asset(kind: AssetKind, id: Uuid) {
+    std::fs::remove_file(asset_name_file_name(kind, id))
+        .expect("Failed to remove asset name file");
+    std::fs::remove_file(asset_file_name(kind, id))
+        .expect("Failed to remove asset file");
 }
 
 fn create_new_asset(kind: AssetKind, name: &str, data: &[u8]) -> Uuid {
