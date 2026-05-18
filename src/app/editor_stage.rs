@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use crate::app::app_stage::AppStageStatus;
+use crate::assets::AssetKind;
 
 #[derive(Copy, Clone, Deserialize)]
 pub enum EditorCommand {
@@ -14,9 +15,16 @@ impl EditorStage {
     pub fn new() -> Self {
         Self {}
     }
-    
+
     pub fn process(&mut self) -> AppStageStatus<EditorCommand> {
         let mut result_status = AppStageStatus::Continue;
+
+        let items = crate::assets::ASSET_DATABASE.list_all_assets(AssetKind::ItemConfig);
+
+        for (id, item_asset_name) in items {
+            println!("{}: {}", id, item_asset_name);
+        }
+
         egui_macroquad::ui(|egui_ctx| {
             egui::Window::new("egui ❤ macroquad")
                 .show(egui_ctx, |ui| {

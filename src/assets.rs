@@ -1,0 +1,166 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use lazy_static::lazy_static;
+use uuid::Uuid;
+
+lazy_static!(
+    pub static ref ASSET_DATABASE: Arc<AssetDatabase> = Arc::new(AssetDatabase::load());
+);
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum AssetKind {
+    UnitConfig,
+    ItemConfig,
+    FloorPart,
+    FloorPartAdjacency,
+    FloorConfig,
+    FloorFlowGraphConfig
+}
+
+pub struct AssetDatabase {
+    assets: HashMap<AssetKind, HashMap<Uuid, (String, Vec<u8>)>>,
+}
+
+impl AssetDatabase {
+    fn load() -> Self {
+        let mut unit_assets = HashMap::new();
+        let mut item_assets = HashMap::new();
+        let mut floor_part_assets = HashMap::new();
+        let mut floor_part_adjacency_assets = HashMap::new();
+        let mut floor_assets = HashMap::new();
+        let mut floor_flow_graph_assets = HashMap::new();
+
+        for (kind, map, ext) in [
+            (AssetKind::UnitConfig, &mut unit_assets, ".json5"),
+            (AssetKind::ItemConfig, &mut item_assets, ".json5"),
+            (AssetKind::FloorPart, &mut floor_part_assets, ".part"),
+            (AssetKind::FloorPartAdjacency, &mut floor_part_adjacency_assets, ".json5"),
+            (AssetKind::FloorConfig, &mut floor_assets, ".json5"),
+            (AssetKind::FloorFlowGraphConfig, &mut floor_flow_graph_assets, ".json5"),
+        ] {
+            let asset_dir = get_or_create_asset_dir(kind);
+            if let Ok(dir) = std::fs::read_dir(asset_dir) {
+                for entry in dir {
+                    let Ok(entry) = entry else {
+                        continue;
+                    };
+                    let Some(file_name) = entry
+                        .file_name()
+                        .to_str()
+                        .map(|it| it.to_string()) else {
+                        continue;
+                    };
+                    if !file_name.ends_with(".json5") {
+                        continue;
+                    }
+
+                    let mut uuid_split = file_name.split(".json5");
+                    let Some(uuid_string) = uuid_split.next() else {
+                        continue;
+                    };
+                    let Ok(id) = Uuid::parse_str(uuid_string) else {
+                        panic!("Failed to parse uuid: {}", file_name);
+                    };
+
+                    let bytes = load_asset_bytes(kind, id);
+                    let name = get_asset_name(kind, id);
+                    map.insert(id, (name, bytes));
+                }
+            }
+        }
+
+        let mut assets = HashMap::new();
+        assets.insert(AssetKind::UnitConfig, unit_assets);
+        assets.insert(AssetKind::ItemConfig, item_assets);
+        assets.insert(AssetKind::FloorPart, floor_part_assets);
+        assets.insert(AssetKind::FloorPartAdjacency, floor_part_adjacency_assets);
+        assets.insert(AssetKind::FloorConfig, floor_assets);
+        assets.insert(AssetKind::FloorFlowGraphConfig, floor_flow_graph_assets);
+
+        Self { assets }
+    }
+
+    pub fn list_all_assets(&self, kind: AssetKind) -> impl Iterator<Item = (Uuid, &str)> {
+        self.assets[&kind].iter().map(|(id, (name, _))| (*id, name.as_str()))
+    }
+}
+
+fn executable_dir() -> PathBuf {
+    std::env::current_exe()
+        .expect("Failed to get exe path")
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .expect("executable path has no parent directory")
+}
+
+fn asset_dir(kind: AssetKind) -> PathBuf {
+    executable_dir().join("assets").join(
+        match kind {
+            AssetKind::UnitConfig => "units",
+            AssetKind::ItemConfig => "items",
+            AssetKind::FloorPart => "floor_parts",
+            AssetKind::FloorPartAdjacency => "floor_part_adjacency",
+            AssetKind::FloorConfig => "floors",
+            AssetKind::FloorFlowGraphConfig => "floor_flow_graph"
+        }
+    )
+}
+
+fn get_or_create_asset_dir(kind: AssetKind) -> PathBuf {
+    let asset_dir = asset_dir(kind);
+    if !asset_dir.exists() {
+        std::fs::create_dir_all(&asset_dir)
+            .unwrap_or_else(|_| panic!("Failed to create asset dir: {:?}", &asset_dir));
+    }
+    asset_dir
+}
+
+fn asset_name_file_name(kind: AssetKind, id: Uuid) -> PathBuf {
+    asset_dir(kind).join(format!("{}.name", id))
+}
+
+fn asset_file_name(kind: AssetKind, id: Uuid) -> PathBuf {
+    asset_dir(kind)
+        .join(match kind {
+            AssetKind::FloorPart => format!("{id}.part"),
+            _ => format!("{id}.json5")
+        })
+}
+
+fn get_asset_name(kind: AssetKind, id: Uuid) -> String {
+    let file_name = asset_name_file_name(kind, id);
+    std::fs::read_to_string(file_name)
+        .expect("Failed to read asset name")
+}
+
+fn rename_asset(kind: AssetKind, id: Uuid, new_name: &str) {
+    let file_name = asset_name_file_name(kind, id);
+    std::fs::write(file_name, new_name).expect("Failed to rename asset");
+}
+
+fn load_asset_bytes (kind: AssetKind, id: Uuid) -> Vec<u8> {
+    let file_name = asset_name_file_name(kind, id);
+    std::fs::read(file_name).expect("Failed to read asset file")
+}
+
+fn write_asset_bytes (kind: AssetKind, id: Uuid, data: &[u8]) {
+    let file_name = asset_name_file_name(kind, id);
+    std::fs::write(file_name, data).expect("Failed to write asset file");
+}
+
+fn create_new_asset(kind: AssetKind, name: &str, data: &[u8]) -> Uuid {
+    let unix_epoch = std::time::SystemTime::UNIX_EPOCH;
+    let ts = std::time::SystemTime::now()
+        .duration_since(unix_epoch)
+        .expect("Failed to get timestamp")
+        .as_millis()
+        .try_into()
+        .expect("Failed to get timestamp");
+    let rand_bytes = rand::random::<[u8; 10]>();
+    let id = uuid::Builder::from_unix_timestamp_millis(ts, &rand_bytes).into_uuid();
+    let file_name = asset_file_name(kind, id);
+    std::fs::write(file_name, data).expect("Failed to write asset file");
+    rename_asset(kind, id, name);
+    id
+}
