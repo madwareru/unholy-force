@@ -1,0 +1,30 @@
+{
+  tile_size: [16, 16],
+  floor_tile_groups: {
+    Dirt: { base_coords: [4, 5] },
+    Water: { base_coords: [0, 5] },
+    Lava: { base_coords: [0, 1] },
+    Tile: { base_coords: [8, 9] },
+  },
+  wall_tile_groups: {
+    Rocks: { base_coords: [4, 1] },
+    Bricks: { base_coords: [8, 1] },
+    Sandstone: { base_coords: [8, 5] },
+  },
+  visibility_tile_groups: {
+    Unvisible: { base_coords: [12, 1] },
+    FogOfVar: { base_coords: [12, 5] }
+  },
+  sprites: {
+    "летучая мышь": { coords: [0, 8], size: [2, 3] },
+    "девушка": { coords: [2, 8], size: [2, 3] },
+    "змея": { coords: [4, 8], size: [2, 3] },
+    "чёрт": { coords: [6, 8], size: [2, 3] },
+    "лютокрыс": { coords: [0, 11], size: [2, 3] },
+    "крыса": { coords: [2, 11], size: [2, 3] },
+    "нечистотный ком": { coords: [2, 11], size: [2, 3] },
+    "противоядие": { coords: [16, 0], size: [1, 1] },
+    "лекарство": { coords: [17, 0], size: [1, 1] },
+    "колба": { coords: [18, 0], size: [1, 1] }
+  }
+}
