@@ -109,6 +109,24 @@ impl AssetDb {
         uuid
     }
 
+    pub fn update_asset(&mut self, kind: AssetKind, uuid: Uuid, data: &[u8]) {
+        if let Some(assets) = self.assets.get_mut(&kind) {
+            if let Some(asset) = assets.get_mut(&uuid) {
+                asset.1 = data.to_vec();
+                self.changed_assets.insert((kind, uuid));
+            }
+        }
+    }
+
+    pub fn update_json5_asset(&mut self, kind: AssetKind, uuid: Uuid, text: &str) {
+        if let Some(assets) = self.assets.get_mut(&kind) {
+            if let Some(asset) = assets.get_mut(&uuid) {
+                asset.1 = text.as_bytes().to_vec();
+                self.changed_assets.insert((kind, uuid));
+            }
+        }
+    }
+
     pub fn delete_asset(&mut self, kind: AssetKind, uuid: Uuid) {
         if self.assets.get(&kind).and_then(|x| x.get(&uuid)).is_none() {
             return;

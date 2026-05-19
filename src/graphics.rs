@@ -28,6 +28,11 @@ pub enum FloorGraphicsTileGroup {
     Water = 2,
     Lava = 3,
 }
+impl Default for FloorGraphicsTileGroup {
+    fn default() -> Self {
+        FloorGraphicsTileGroup::Dirt
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize)]
 pub enum WallGraphicsTileGroup {
@@ -35,6 +40,11 @@ pub enum WallGraphicsTileGroup {
     Sandstone = 1,
     Rocks = 2,
     Bricks = 3,
+}
+impl Default for WallGraphicsTileGroup {
+    fn default() -> Self {
+        WallGraphicsTileGroup::Rocks
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize)]

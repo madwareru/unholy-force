@@ -11,5 +11,6 @@ lazy_static = "1.5.0"
 webbrowser = "1.2.1"
 egui-macroquad = "0.17.3"
 egui = "0.31.1"
-uuid = "1.23.1"
+uuid = { version = "1.23.1", features = ["serde"] }
 rand = "0.10.1"
+hecs = "0.11.0"

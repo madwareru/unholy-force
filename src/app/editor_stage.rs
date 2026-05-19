@@ -3,6 +3,9 @@ use serde::Deserialize;
 use uuid::Uuid;
 use crate::app::app_stage::AppStageStatus;
 use crate::assets::AssetKind;
+use crate::game_config::items::ItemConfig;
+
+pub mod item_config_editor;
 
 #[derive(Copy, Clone, Deserialize)]
 pub enum EditorCommand {
@@ -11,7 +14,8 @@ pub enum EditorCommand {
 
 pub struct EditorStage {
     current_file_kind: AssetKind,
-    selected_item_config: Option<Uuid>,
+    selected_item_config_id: Option<Uuid>,
+    current_item_config: Option<ItemConfig>,
     selected_unit_config: Option<Uuid>,
     selected_floor_part: Option<Uuid>,
     selected_fpa_config: Option<Uuid>,
@@ -24,7 +28,8 @@ impl EditorStage {
     pub fn new() -> Self {
         Self {
             current_file_kind: AssetKind::UnitConfig,
-            selected_item_config: None,
+            selected_item_config_id: None,
+            current_item_config: None,
             selected_unit_config: None,
             selected_floor_part: None,
             selected_fpa_config: None,
@@ -125,52 +130,6 @@ impl EditorStage {
         // todo: render here something relevant to editor logic
     }
 
-    fn draw_item_selector(&mut self, ui: &mut Ui) {
-        match crate::assets::ASSET_DATABASE.lock() {
-            Ok(mut asset_db) => {
-                let full_width = ui.available_width();
-                ui.add_sized(
-                    [full_width, 24f32],
-                    egui::TextEdit::singleline(&mut self.new_asset_name)
-                );
-                if ui.add_sized(
-                    [full_width, 24f32],
-                    egui::Button::new("+")
-                ).clicked(){
-                    let id =asset_db.create_json5_asset(
-                        AssetKind::ItemConfig,
-                        &self.new_asset_name,
-                        "{}" // todo: сделать нормальное создание дефолтного ассета
-                    );
-                    if self.selected_item_config.is_none() {
-                        self.selected_item_config = Some(id);
-                    }
-                    self.new_asset_name.clear();
-                }
-                ui.add_space(12f32);
-                egui::ScrollArea::vertical()
-                    .max_height(400f32)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        let items = asset_db.list_all_assets(AssetKind::ItemConfig);
-                        for (id, item_asset_name) in items {
-                            let selected = self.selected_item_config
-                                .map(|it| it.eq(&id))
-                                .unwrap_or(false);
-                            if thick_selector_button(
-                                ui,
-                                selected,
-                                egui::Align2::LEFT_CENTER,
-                                item_asset_name
-                            ).clicked() {
-                                self.selected_item_config = Some(id);
-                            };
-                        }
-                });
-            },
-            _ => {}
-        };
-    }
     fn draw_unit_selector(&mut self, ui: &mut Ui) {
         // todo
     }

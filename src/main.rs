@@ -1,10 +1,12 @@
 use macroquad::prelude::*;
 use crate::app::app_stage::AppStageStatus;
 
-mod screen_utils;
-mod app;
-mod assets;
-mod graphics;
+pub mod screen_utils;
+pub mod app;
+pub mod assets;
+pub mod graphics;
+pub mod game_config;
+pub mod effect_mechanics;
 
 fn window_conf() -> Conf {
     let (w, h) = if std::env::args().find(|it| it.starts_with("unsized")).is_some() {

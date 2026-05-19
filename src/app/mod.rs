@@ -7,8 +7,9 @@ use crate::{
 use crate::app::editor_stage::EditorCommand;
 
 pub mod app_stage;
-mod main_menu_stage;
-mod editor_stage;
+pub mod main_menu_stage;
+pub mod editor_stage;
+pub mod game_stage;
 
 pub struct App {
     app_stage: AppStage,
