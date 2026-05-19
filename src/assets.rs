@@ -109,6 +109,11 @@ impl AssetDb {
         uuid
     }
 
+    pub fn load_json5_asset(&self, kind: AssetKind, uuid: Uuid) -> &str {
+        str::from_utf8(&self.assets[&kind][&uuid].1)
+            .expect("Failed to load json5 asset")
+    }
+
     pub fn update_asset(&mut self, kind: AssetKind, uuid: Uuid, data: &[u8]) {
         if let Some(assets) = self.assets.get_mut(&kind) {
             if let Some(asset) = assets.get_mut(&uuid) {

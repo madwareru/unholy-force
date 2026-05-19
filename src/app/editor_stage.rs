@@ -6,6 +6,7 @@ use crate::assets::AssetKind;
 use crate::game_config::items::ItemConfig;
 
 pub mod item_config_editor;
+pub mod reusable_image_widget;
 
 #[derive(Copy, Clone, Deserialize)]
 pub enum EditorCommand {
@@ -13,6 +14,7 @@ pub enum EditorCommand {
 }
 
 pub struct EditorStage {
+    atlas_texture: Option<egui::TextureHandle>,
     current_file_kind: AssetKind,
     selected_item_config_id: Option<Uuid>,
     current_item_config: Option<ItemConfig>,
@@ -26,7 +28,9 @@ pub struct EditorStage {
 
 impl EditorStage {
     pub fn new() -> Self {
+
         Self {
+            atlas_texture: None,
             current_file_kind: AssetKind::UnitConfig,
             selected_item_config_id: None,
             current_item_config: None,
@@ -43,6 +47,25 @@ impl EditorStage {
         let mut result_status = AppStageStatus::Continue;
 
         egui_macroquad::ui(|egui_ctx| {
+            if self.atlas_texture.is_none() {
+                let atlas_image = crate::graphics::SPRITE_ATLAS_TEXTURE.get_texture_data();
+
+                let size = [atlas_image.width as usize, atlas_image.height as usize];
+
+                let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                    size,
+                    &atlas_image.bytes,
+                );
+
+                let atlas = egui_ctx.load_texture(
+                    "sprite_atlas",
+                    color_image,
+                    egui::TextureOptions::NEAREST,
+                );
+
+                self.atlas_texture = Some(atlas);
+            }
+
             egui::SidePanel::left("Режим редактора и кнопки сохранения/выхода")
                 .show(egui_ctx, |ui| {
                     ui.vertical(|ui| {
@@ -108,8 +131,8 @@ impl EditorStage {
                         ui.separator();
 
                         match self.current_file_kind {
-                            AssetKind::UnitConfig => self.draw_unit_selector(ui),
                             AssetKind::ItemConfig => self.draw_item_selector(ui),
+                            AssetKind::UnitConfig => self.draw_unit_selector(ui),
                             AssetKind::FloorPart => self.draw_floor_part_selector(ui),
                             AssetKind::FloorPartAdjacency => self.draw_fpa_selector(ui),
                             AssetKind::FloorConfig => self.draw_floor_selector(ui),
@@ -117,11 +140,26 @@ impl EditorStage {
                         }
 
                         ui.separator();
+                        if ui.button("Сохранить изменения на диске").clicked() {
+                            match crate::assets::ASSET_DATABASE.lock() {
+                                Ok(mut asset_db) => {
+                                    asset_db.flush_assets_to_disk();
+                                },
+                                _ => {}
+                            };
+                        }
                         if ui.button("Вернуться в главное меню").clicked() {
                             result_status = AppStageStatus::Complete(EditorCommand::BackToMainMenu);
                         }
                     });
                 });
+
+            egui::CentralPanel::default().show(egui_ctx, |ui| {
+                match self.current_file_kind {
+                    AssetKind::ItemConfig => self.draw_item_editor(ui),
+                    _ => {} // todo
+                }
+            });
         });
         result_status
     }

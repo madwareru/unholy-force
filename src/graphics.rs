@@ -5,7 +5,7 @@ use serde::Deserialize;
 use macroquad::prelude::*;
 
 lazy_static!(
-    static ref SPRITE_ATLAS_TEXTURE: Texture2D = {
+    pub static ref SPRITE_ATLAS_TEXTURE: Texture2D = {
         let main_menu_texture = Texture2D::from_file_with_format(
             include_bytes!("../assets/sprites.png"),
             None
