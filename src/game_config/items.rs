@@ -12,6 +12,16 @@ pub enum ItemRarity {
 impl Default for ItemRarity {
     fn default() -> Self { Self::Generic }
 }
+impl ItemRarity {
+    pub fn display_name(self) -> &'static str {
+        match self {
+            ItemRarity::Generic => "Обычный",
+            ItemRarity::Rare => "Редкий",
+            ItemRarity::Unique => "Уникальный",
+            ItemRarity::Legendary => "Былинный"
+        }
+    }
+}
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum ItemKind {

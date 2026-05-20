@@ -1,4 +1,4 @@
-use egui::{Align, Align2, StrokeKind, Ui};
+use egui::{Align, Align2, Button, Label, StrokeKind, Ui};
 use serde::Deserialize;
 use uuid::Uuid;
 use crate::app::app_stage::AppStageStatus;
@@ -14,6 +14,7 @@ pub enum EditorCommand {
 }
 
 pub struct ItemConfigEditorSection {
+    item_name_filter: String,
     selected_item_config_id: Option<Uuid>,
     selected_item_name: String,
     current_item_config: Option<ItemConfig>,
@@ -28,8 +29,7 @@ pub struct EditorStage {
     selected_floor_part: Option<Uuid>,
     selected_fpa_config: Option<Uuid>,
     selected_floor_config: Option<Uuid>,
-    selected_floor_graph_config: Option<Uuid>,
-    new_asset_name: String
+    selected_floor_graph_config: Option<Uuid>
 }
 
 impl EditorStage {
@@ -40,6 +40,7 @@ impl EditorStage {
             atlas_size: [0; 2],
             current_file_kind: AssetKind::UnitConfig,
             item_section: ItemConfigEditorSection {
+                item_name_filter: "".to_string(),
                 selected_item_config_id: None,
                 selected_item_name: "".to_string(),
                 current_item_config: None,
@@ -48,8 +49,7 @@ impl EditorStage {
             selected_floor_part: None,
             selected_fpa_config: None,
             selected_floor_config: None,
-            selected_floor_graph_config: None,
-            new_asset_name: String::new()
+            selected_floor_graph_config: None
         }
     }
 
@@ -77,95 +77,122 @@ impl EditorStage {
                 self.atlas_size = [atlas_image.width, atlas_image.height];
             }
 
+            let screen_width = macroquad::prelude::screen_width();
+            let right_panel_width = screen_width - 750f32;
+
             egui::SidePanel::left("Режим редактора и кнопки сохранения/выхода")
+                .exact_width(300f32)
+                .resizable(false)
                 .show(egui_ctx, |ui| {
                     ui.vertical(|ui| {
-                        ui.label("Режим редактора:");
-                        ui.columns(2, |ui| {
-                            ui[0].vertical(|ui| {
-                                if thick_selector_button(
-                                    ui,
-                                    self.current_file_kind == AssetKind::UnitConfig,
-                                    Align2::CENTER_CENTER,
-                                    "Персонажи"
-                                ).clicked() {
-                                    self.current_file_kind = AssetKind::UnitConfig;
-                                };
-                                ui.add_space(4f32);
-                                if thick_selector_button(
-                                    ui,
-                                    self.current_file_kind == AssetKind::FloorPart,
-                                    Align2::CENTER_CENTER,
-                                    "Части уровней"
-                                ).clicked() {
-                                    self.current_file_kind = AssetKind::FloorPart;
-                                };
-                                ui.add_space(4f32);
-                                if thick_selector_button(
-                                    ui,
-                                    self.current_file_kind == AssetKind::FloorConfig,
-                                    Align2::CENTER_CENTER,
-                                    "Этажи"
-                                ).clicked() {
-                                    self.current_file_kind = AssetKind::FloorConfig;
-                                };
-                            });
-                            ui[1].vertical(|ui| {
-                                if thick_selector_button(
-                                    ui,
-                                    self.current_file_kind == AssetKind::ItemConfig,
-                                    Align2::CENTER_CENTER,
-                                    "Предметы"
-                                ).clicked() {
-                                    self.current_file_kind = AssetKind::ItemConfig;
-                                };
-                                ui.add_space(4f32);
-                                if thick_selector_button(
-                                    ui,
-                                    self.current_file_kind == AssetKind::FloorPartAdjacency,
-                                    Align2::CENTER_CENTER,
-                                    "Связи частей"
-                                ).clicked() {
-                                    self.current_file_kind = AssetKind::FloorPartAdjacency;
-                                };
-                                ui.add_space(4f32);
-                                if thick_selector_button(
-                                    ui,
-                                    self.current_file_kind == AssetKind::FloorFlowGraphConfig,
-                                    Align2::CENTER_CENTER,
-                                    "Граф этажей"
-                                ).clicked() {
-                                    self.current_file_kind = AssetKind::FloorFlowGraphConfig;
-                                };
+                        ui.add_space(6f32);
+                        ui.group(|ui| {
+                            ui.columns(2, |ui| {
+                                ui[0].vertical(|ui| {
+                                    if thick_selector_button(
+                                        ui,
+                                        self.current_file_kind == AssetKind::UnitConfig,
+                                        Align2::CENTER_CENTER,
+                                        "Персонажи"
+                                    ).clicked() {
+                                        self.current_file_kind = AssetKind::UnitConfig;
+                                    };
+                                    ui.add_space(4f32);
+                                    if thick_selector_button(
+                                        ui,
+                                        self.current_file_kind == AssetKind::FloorPart,
+                                        Align2::CENTER_CENTER,
+                                        "Части уровней"
+                                    ).clicked() {
+                                        self.current_file_kind = AssetKind::FloorPart;
+                                    };
+                                    ui.add_space(4f32);
+                                    if thick_selector_button(
+                                        ui,
+                                        self.current_file_kind == AssetKind::FloorConfig,
+                                        Align2::CENTER_CENTER,
+                                        "Этажи"
+                                    ).clicked() {
+                                        self.current_file_kind = AssetKind::FloorConfig;
+                                    };
+                                });
+                                ui[1].vertical(|ui| {
+                                    if thick_selector_button(
+                                        ui,
+                                        self.current_file_kind == AssetKind::ItemConfig,
+                                        Align2::CENTER_CENTER,
+                                        "Предметы"
+                                    ).clicked() {
+                                        self.current_file_kind = AssetKind::ItemConfig;
+                                    };
+                                    ui.add_space(4f32);
+                                    if thick_selector_button(
+                                        ui,
+                                        self.current_file_kind == AssetKind::FloorPartAdjacency,
+                                        Align2::CENTER_CENTER,
+                                        "Связи частей"
+                                    ).clicked() {
+                                        self.current_file_kind = AssetKind::FloorPartAdjacency;
+                                    };
+                                    ui.add_space(4f32);
+                                    if thick_selector_button(
+                                        ui,
+                                        self.current_file_kind == AssetKind::FloorFlowGraphConfig,
+                                        Align2::CENTER_CENTER,
+                                        "Граф этажей"
+                                    ).clicked() {
+                                        self.current_file_kind = AssetKind::FloorFlowGraphConfig;
+                                    };
+                                });
                             });
                         });
-                        ui.separator();
 
-                        match self.current_file_kind {
-                            AssetKind::ItemConfig => self.draw_item_selector(ui),
-                            AssetKind::UnitConfig => self.draw_unit_selector(ui),
-                            AssetKind::FloorPart => self.draw_floor_part_selector(ui),
-                            AssetKind::FloorPartAdjacency => self.draw_fpa_selector(ui),
-                            AssetKind::FloorConfig => self.draw_floor_selector(ui),
-                            AssetKind::FloorFlowGraphConfig => self.draw_floor_graph_selector(ui),
-                        }
+                        ui.group(|ui| {
+                            match self.current_file_kind {
+                                AssetKind::ItemConfig => self.draw_item_selector(ui),
+                                AssetKind::UnitConfig => self.draw_unit_selector(ui),
+                                AssetKind::FloorPart => self.draw_floor_part_selector(ui),
+                                AssetKind::FloorPartAdjacency => self.draw_fpa_selector(ui),
+                                AssetKind::FloorConfig => self.draw_floor_selector(ui),
+                                AssetKind::FloorFlowGraphConfig => self.draw_floor_graph_selector(ui),
+                            }
+                        });
 
-                        ui.separator();
-                        if ui.button("Сохранить изменения на диске").clicked() {
-                            match crate::assets::ASSET_DATABASE.lock() {
-                                Ok(mut asset_db) => {
-                                    asset_db.flush_assets_to_disk();
-                                },
-                                _ => {}
-                            };
-                        }
-                        if ui.button("Вернуться в главное меню").clicked() {
-                            result_status = AppStageStatus::Complete(EditorCommand::BackToMainMenu);
-                        }
+                        ui.group(|ui| {
+                            let full_width = ui.available_width();
+                            if ui.add_sized(
+                                [full_width, ui.spacing().interact_size.y],
+                                Button::new("Сохранить изменения на диске")
+                            ).clicked() {
+                                match crate::assets::ASSET_DATABASE.lock() {
+                                    Ok(mut asset_db) => {
+                                        asset_db.flush_assets_to_disk();
+                                    },
+                                    _ => {}
+                                };
+                            }
+                            if ui.add_sized(
+                                [full_width, ui.spacing().interact_size.y],
+                                Button::new("Вернуться в главное меню")
+                            ).clicked() {
+                                result_status = AppStageStatus::Complete(EditorCommand::BackToMainMenu);
+                            }
+                        });
                     });
                 });
 
-            egui::CentralPanel::default().show(egui_ctx, |ui| {
+            egui::SidePanel::right("Дополнительная информация")
+                .exact_width(right_panel_width)
+                .resizable(false)
+                .show(egui_ctx, |ui| {
+                    match self.current_file_kind {
+                        AssetKind::ItemConfig => self.draw_item_preview_in_level(ui),
+                        _ => {} // todo
+                    }
+                });
+
+            egui::CentralPanel::default()
+                .show(egui_ctx, |ui| {
                 match self.current_file_kind {
                     AssetKind::ItemConfig => self.draw_item_editor(ui),
                     _ => {} // todo
@@ -199,12 +226,12 @@ impl EditorStage {
 fn thick_selector_button(
     ui: &mut Ui,
     selected: bool,
-    align: egui::Align2,
+    align: Align2,
     text: &str,
 ) -> egui::Response {
     let desired_size = egui::vec2(
         ui.available_width(),
-        ui.spacing().interact_size.y * 4f32,
+        ui.spacing().interact_size.y * 2f32,
     );
 
     let (rect, response) = ui.allocate_exact_size(
