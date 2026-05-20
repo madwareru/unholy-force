@@ -13,11 +13,17 @@ pub enum EditorCommand {
     BackToMainMenu
 }
 
+pub struct ItemConfigEditorSection {
+    selected_item_config_id: Option<Uuid>,
+    selected_item_name: String,
+    current_item_config: Option<ItemConfig>,
+}
+
 pub struct EditorStage {
     atlas_texture: Option<egui::TextureHandle>,
+    atlas_size: [u16; 2],
     current_file_kind: AssetKind,
-    selected_item_config_id: Option<Uuid>,
-    current_item_config: Option<ItemConfig>,
+    item_section: ItemConfigEditorSection,
     selected_unit_config: Option<Uuid>,
     selected_floor_part: Option<Uuid>,
     selected_fpa_config: Option<Uuid>,
@@ -31,9 +37,13 @@ impl EditorStage {
 
         Self {
             atlas_texture: None,
+            atlas_size: [0; 2],
             current_file_kind: AssetKind::UnitConfig,
-            selected_item_config_id: None,
-            current_item_config: None,
+            item_section: ItemConfigEditorSection {
+                selected_item_config_id: None,
+                selected_item_name: "".to_string(),
+                current_item_config: None,
+            },
             selected_unit_config: None,
             selected_floor_part: None,
             selected_fpa_config: None,
@@ -64,6 +74,7 @@ impl EditorStage {
                 );
 
                 self.atlas_texture = Some(atlas);
+                self.atlas_size = [atlas_image.width, atlas_image.height];
             }
 
             egui::SidePanel::left("Режим редактора и кнопки сохранения/выхода")

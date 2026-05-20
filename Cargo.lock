@@ -218,6 +218,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "copy_from_str"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8aa7e06968e9b7227285969ca783dec693823f141023c74e0cf45c82fa06ef40"
+
+[[package]]
 name = "copypasta"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1610,6 +1616,8 @@ checksum = "2896d95c02a80c6d6a5d6e953d479f5ddf2dfdb6a244441010e373ac0fb88971"
 name = "unholy-force"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
+ "copy_from_str",
  "egui",
  "egui-macroquad",
  "hecs",

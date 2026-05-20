@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use crate::game_config::{Config, ConfigId};
 use crate::game_config::effects::EffectMechanicConfig;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum ItemRarity {
     Generic = 0,
     Rare = 1,
@@ -14,12 +14,13 @@ impl Default for ItemRarity {
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
-pub enum ItemEffect {
+pub enum ItemKind {
     Quest,
-    Armor{ effect_mechanic: ConfigId<EffectMechanicConfig> },
-    Weapon{ range: u8, effect_mechanic: ConfigId<EffectMechanicConfig> }
+    Armor{ equip_effect: ConfigId<EffectMechanicConfig> },
+    Weapon{ attack_effect: ConfigId<EffectMechanicConfig> },
+    Consumable{ use_effect: ConfigId<EffectMechanicConfig> }
 }
-impl Default for ItemEffect {
+impl Default for ItemKind {
     fn default() -> Self {
         Self::Quest
     }
@@ -33,7 +34,7 @@ pub struct ItemConfig {
     pub sprite_pivot: [u8; 2],
     pub item_rarity: ItemRarity,
     pub is_stackable : bool,
-    pub effect: ItemEffect
+    pub kind: ItemKind
 }
 
 impl Config for ItemConfig {}

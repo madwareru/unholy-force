@@ -132,6 +132,15 @@ impl AssetDb {
         }
     }
 
+    pub fn rename_asset(&mut self, kind: AssetKind, uuid: Uuid, name: &str) {
+        if let Some(assets) = self.assets.get_mut(&kind) {
+            if let Some(asset) = assets.get_mut(&uuid) {
+                asset.0 = String::from(name);
+            }
+        }
+
+    }
+
     pub fn delete_asset(&mut self, kind: AssetKind, uuid: Uuid) {
         if self.assets.get(&kind).and_then(|x| x.get(&uuid)).is_none() {
             return;
@@ -148,8 +157,9 @@ impl AssetDb {
             remove_asset(kind, id);
         }
         for (kind, uuid) in self.changed_assets.drain() {
-            if let Some((_, bytes)) = self.assets[&kind].get(&uuid) {
+            if let Some((name, bytes)) = self.assets[&kind].get(&uuid) {
                 write_asset_bytes(kind, uuid, bytes);
+                rename_asset(kind, uuid, name);
             }
         }
     }

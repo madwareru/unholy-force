@@ -10,6 +10,20 @@ pub struct AtlasSpriteRect {
 }
 
 impl AtlasSpriteRect {
+    pub fn from_u16(
+        atlas_size: [u16; 2],
+        [x, y]: [u16; 2], 
+        [w, h]: [u16; 2]
+    ) -> Self {
+        AtlasSpriteRect {
+            atlas_size: atlas_size.map(|it| it as f32).into(),
+            rect_px: egui::Rect::from_min_max(
+                [x as f32, y as f32].into(),
+                [(x + w) as f32, (y + h) as f32].into(),
+            ),
+        }
+    }
+    
     pub fn size_px(&self) -> egui::Vec2 {
         self.rect_px.size()
     }
@@ -28,9 +42,6 @@ impl AtlasSpriteRect {
     }
 }
 
-/// pivot хранится в локальных координатах спрайта:
-/// x: 0..width-1
-/// y: 0..height-1
 pub fn pivot_editor(
     ui: &mut egui::Ui,
     texture_id: egui::TextureId,
@@ -51,7 +62,6 @@ pub fn pivot_editor(
     );
 
     if ui.is_rect_visible(rect) {
-        // Сам спрайт из атласа.
         ui.painter().image(
             texture_id,
             rect,
@@ -59,7 +69,6 @@ pub fn pivot_editor(
             egui::Color32::WHITE,
         );
 
-        // Рамка вокруг спрайта.
         ui.painter().rect_stroke(
             rect,
             egui::CornerRadius::ZERO,
@@ -67,7 +76,6 @@ pub fn pivot_editor(
             StrokeKind::Inside
         );
 
-        // Текущий pivot рисуем в центре пикселя.
         let pivot_screen_pos = egui::pos2(
             rect.left() + (pivot[0] as f32 + 0.5) * zoom,
             rect.top() + (pivot[1] as f32 + 0.5) * zoom,
@@ -75,14 +83,14 @@ pub fn pivot_editor(
 
         ui.painter().circle_filled(
             pivot_screen_pos,
-            4.0,
+            4f32,
             egui::Color32::RED,
         );
 
         ui.painter().circle_stroke(
             pivot_screen_pos,
-            5.0,
-            egui::Stroke::new(1.0, egui::Color32::WHITE),
+            5f32,
+            egui::Stroke::new(3f32, egui::Color32::WHITE),
         );
     }
 
