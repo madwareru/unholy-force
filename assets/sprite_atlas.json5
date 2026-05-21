@@ -1,19 +1,19 @@
 {
   tile_size: [16, 16],
   floor_tile_groups: {
-    Dirt: { base_coords: [4, 5] },
-    Water: { base_coords: [0, 5] },
-    Lava: { base_coords: [0, 1] },
-    Tile: { base_coords: [8, 9] },
+    Dirt: { base_coords: [4, 4] },
+    Water: { base_coords: [0, 4] },
+    Lava: { base_coords: [0, 0] },
+    Tile: { base_coords: [8, 8] },
   },
   wall_tile_groups: {
-    Rocks: { base_coords: [4, 1] },
-    Bricks: { base_coords: [8, 1] },
-    Sandstone: { base_coords: [8, 5] },
+    Rocks: { base_coords: [4, 0] },
+    Bricks: { base_coords: [8, 0] },
+    Sandstone: { base_coords: [8, 4] },
   },
   visibility_tile_groups: {
-    Unvisible: { base_coords: [12, 1] },
-    FogOfVar: { base_coords: [12, 5] }
+    Unvisible: { base_coords: [12, 0] },
+    FogOfVar: { base_coords: [12, 4] }
   },
   sprites: {
     "летучая мышь": { coords: [0, 8], size: [2, 3] },

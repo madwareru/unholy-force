@@ -1,9 +1,9 @@
 use egui::{Align2, StrokeKind, Ui};
 use crate::game_config::items::ItemConfig;
-use crate::graphics::SPRITE_ATLAS_DEF;
+use crate::graphics::{SPRITE_ATLAS_DEF};
 
 #[derive(Clone, Copy, Debug)]
-pub struct AtlasSpriteRect {
+struct AtlasSpriteRect {
     /// Размер всего атласа в пикселях.
     pub atlas_size: egui::Vec2,
 
@@ -44,13 +44,28 @@ impl AtlasSpriteRect {
     }
 }
 
-pub fn sprite_button(
+pub fn atlas_sprite_button(
     ui: &mut Ui,
     atlas_texture: egui::TextureId,
-    atlas_rect: AtlasSpriteRect,
+    atlas_size: [u16; 2],
     sprite_name: &str,
     size: f32,
 ) -> egui::Response {
+    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[sprite_name];
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
+
+    let atlas_rect = AtlasSpriteRect::from_u16(
+        atlas_size,
+        [
+            sprite_data.coords[0] as u16 * tile_size[0] as u16,
+            sprite_data.coords[1] as u16 * tile_size[1] as u16
+        ],
+        [
+            sprite_data.size[0] as u16 * tile_size[0] as u16,
+            sprite_data.size[1] as u16 * tile_size[1] as u16
+        ]
+    );
+
     let sprite_size_px = atlas_rect.size_px();
 
     let button_size = egui::vec2(size, size);
@@ -120,10 +135,25 @@ pub fn sprite_button(
 pub fn pivot_editor(
     ui: &mut Ui,
     texture_id: egui::TextureId,
-    sprite: AtlasSpriteRect,
-    pivot: &mut [u8; 2],
+    atlas_size: [u16; 2],
+    item_config: &mut ItemConfig,
     zoom: f32,
 ) -> egui::Response {
+    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[&item_config.sprite_name];
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
+
+    let sprite = AtlasSpriteRect::from_u16(
+        atlas_size,
+        [
+            sprite_data.coords[0] as u16 * tile_size[0] as u16,
+            sprite_data.coords[1] as u16 * tile_size[1] as u16
+        ],
+        [
+            sprite_data.size[0] as u16 * tile_size[0] as u16,
+            sprite_data.size[1] as u16 * tile_size[1] as u16
+        ]
+    );
+
     let sprite_size_px = sprite.size_px();
 
     let display_size = egui::vec2(
@@ -152,8 +182,8 @@ pub fn pivot_editor(
         );
 
         let pivot_screen_pos = egui::pos2(
-            rect.left() + (pivot[0] as f32 + 0.5) * zoom,
-            rect.top() + (pivot[1] as f32 + 0.5) * zoom,
+            rect.left() + (item_config.sprite_pivot[0] as f32 + 0.5) * zoom,
+            rect.top() + (item_config.sprite_pivot[1] as f32 + 0.5) * zoom,
         );
 
         ui.painter().circle_filled(
@@ -178,8 +208,8 @@ pub fn pivot_editor(
                 let max_x = sprite_size_px.x as u8 - 1;
                 let max_y = sprite_size_px.y as u8 - 1;
 
-                pivot[0] = local_x.clamp(0, max_x);
-                pivot[1] = local_y.clamp(0, max_y);
+                item_config.sprite_pivot[0] = local_x.clamp(0, max_x);
+                item_config.sprite_pivot[1] = local_y.clamp(0, max_y);
             }
         }
     }
@@ -230,14 +260,21 @@ pub fn item_selector_button(
 
         ui.painter().rect_filled(rect, rounding, fill);
         ui.painter().rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
+        let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
 
         let sprite_rect = SPRITE_ATLAS_DEF
             .sprites.get(&item_config.sprite_name)
             .map(|sprite_data| {
                 AtlasSpriteRect::from_u16(
                     atlas_size,
-                    sprite_data.coords.map(|it| it as u16 * 16),
-                    sprite_data.size.map(|it| it as u16 * 16)
+                    [
+                        sprite_data.coords[0] as u16 * tile_size[0] as u16,
+                        sprite_data.coords[1] as u16 * tile_size[1] as u16
+                    ],
+                    [
+                        sprite_data.size[0] as u16 * tile_size[0] as u16,
+                        sprite_data.size[1] as u16 * tile_size[1] as u16
+                    ]
                 )
             });
 

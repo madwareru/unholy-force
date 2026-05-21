@@ -1,4 +1,4 @@
-use crate::app::editor_stage::image_widgets::{AtlasSpriteRect, pivot_editor, item_selector_button, sprite_button};
+use crate::app::editor_stage::image_widgets::{pivot_editor, item_selector_button, atlas_sprite_button};
 use crate::app::editor_stage::{EditorStage};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::items::{ItemConfig, ItemRarity};
@@ -214,22 +214,17 @@ impl EditorStage {
                                         ui.columns(COLUMNS_COUNT, |uis| {
                                             let mut current_column = 0;
 
-                                            for (sprite, sprite_data) in crate::graphics::SPRITE_ATLAS_DEF.sprites.iter() {
+                                            for sprite in crate::graphics::SPRITE_ATLAS_DEF.sprites.keys() {
                                                 let sprite_name = sprite.as_str();
-                                                let rect = AtlasSpriteRect::from_u16(
-                                                    atlas_size,
-                                                    sprite_data.coords.map(|it| it as u16 * 16),
-                                                    sprite_data.size.map(|it| it as u16 * 16)
-                                                );
 
                                                 let ui = &mut uis[current_column];
                                                 ui.add_space(4f32);
-                                                let response = sprite_button(
+                                                let response = atlas_sprite_button(
                                                     ui,
                                                     texture_id,
-                                                    rect,
+                                                    atlas_size,
                                                     sprite_name,
-                                                    96f32
+                                                    96f32,
                                                 );
 
                                                 if response.clicked() {
@@ -261,12 +256,8 @@ impl EditorStage {
                                     pivot_editor(
                                         ui,
                                         texture_id,
-                                        AtlasSpriteRect::from_u16(
-                                            atlas_size,
-                                            sprite_data.coords.map(|it| it as u16 * 16),
-                                            sprite_data.size.map(|it| it as u16 * 16)
-                                        ),
-                                        &mut current_item_config.sprite_pivot,
+                                        atlas_size,
+                                        current_item_config,
                                         zoom,
                                     );
                                     if !old_pivot.eq(&current_item_config.sprite_pivot) {
