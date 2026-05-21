@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use crate::game_config::{Config};
 use crate::game_config::floors::LootTableEntry;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum UnitDanger {
     Harmless = 0,
     Weak = 1,
@@ -13,6 +13,18 @@ pub enum UnitDanger {
 }
 impl Default for UnitDanger {
     fn default() -> Self { UnitDanger::Harmless }
+}
+impl UnitDanger {
+    pub fn from_id(id: u8) -> Self {
+        match id {
+            0 => UnitDanger::Harmless,
+            1 => UnitDanger::Weak,
+            2 => UnitDanger::Moderate,
+            3 => UnitDanger::Challenging,
+            4 => UnitDanger::Horror,
+            _ => UnitDanger::Nightmare
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]

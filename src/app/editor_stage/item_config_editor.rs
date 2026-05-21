@@ -1,9 +1,9 @@
-use crate::app::editor_stage::reusable_image_widget::{AtlasSpriteRect, pivot_editor};
+use crate::app::editor_stage::image_widgets::{AtlasSpriteRect, pivot_editor, item_selector_button, sprite_button};
 use crate::app::editor_stage::{EditorStage};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::items::{ItemConfig, ItemRarity};
 use crate::graphics::SPRITE_ATLAS_DEF;
-use egui::{Align2, Label, PointerButton, PopupCloseBehavior, StrokeKind, TextEdit, Ui};
+use egui::{PointerButton, PopupCloseBehavior, TextEdit, Ui};
 
 #[derive(Copy, Clone, PartialEq)]
 enum UpdateState {
@@ -155,7 +155,7 @@ impl EditorStage {
         };
     }
 
-    pub(crate) fn draw_item_preview_in_level(&mut self, ui: &mut Ui) {
+    pub(crate) fn draw_item_preview_in_level(&mut self, _ui: &mut Ui) {
 
     }
 
@@ -210,20 +210,38 @@ impl EditorStage {
                                     &response,
                                     PopupCloseBehavior::CloseOnClickOutside,
                                     |ui| {
-                                        ui.set_min_width(200f32);
+                                        const COLUMNS_COUNT: usize = 6;
+                                        ui.columns(COLUMNS_COUNT, |uis| {
+                                            let mut current_column = 0;
 
-                                        let sprite_names =
-                                            crate::graphics::SPRITE_ATLAS_DEF.sprites.keys();
+                                            for (sprite, sprite_data) in crate::graphics::SPRITE_ATLAS_DEF.sprites.iter() {
+                                                let sprite_name = sprite.as_str();
+                                                let rect = AtlasSpriteRect::from_u16(
+                                                    atlas_size,
+                                                    sprite_data.coords.map(|it| it as u16 * 16),
+                                                    sprite_data.size.map(|it| it as u16 * 16)
+                                                );
 
-                                        for sprite_name in sprite_names {
-                                            if ui.button(sprite_name.as_str()).clicked() {
-                                                current_item_config.sprite_name.clear();
-                                                current_item_config.sprite_name += sprite_name;
-                                                update_state = UpdateState::Changed;
-                                                ui.memory_mut(|mem| mem.close_popup());
-                                                break;
+                                                let ui = &mut uis[current_column];
+                                                ui.add_space(4f32);
+                                                let response = sprite_button(
+                                                    ui,
+                                                    texture_id,
+                                                    rect,
+                                                    sprite_name,
+                                                    96f32
+                                                );
+
+                                                if response.clicked() {
+                                                    current_item_config.sprite_name.clear();
+                                                    current_item_config.sprite_name += sprite_name;
+                                                    update_state = UpdateState::Changed;
+                                                    ui.memory_mut(|mem| mem.close_popup());
+                                                }
+
+                                                current_column = (current_column + 1) % COLUMNS_COUNT;
                                             }
-                                        }
+                                        });
                                     },
                                 );
                             });
@@ -320,154 +338,4 @@ impl EditorStage {
             _ => {}
         };
     }
-}
-
-fn item_selector_button(
-    ui: &mut Ui,
-    selected: bool,
-    atlas_texture: egui::TextureId,
-    atlas_size: [u16; 2],
-    editor_name: &str,
-    item_config: &ItemConfig
-) -> egui::Response {
-    let desired_size = egui::vec2(
-        ui.available_width(),
-        ui.spacing().interact_size.y * 4f32,
-    );
-
-    let (rect, response) = ui.allocate_exact_size(
-        desired_size,
-        egui::Sense::click(),
-    );
-
-    if ui.is_rect_visible(rect) {
-        let visuals = ui.style().interact(&response);
-
-        let fill = if selected {
-            ui.visuals().selection.bg_fill
-        } else {
-            visuals.bg_fill
-        };
-
-        let stroke = if selected {
-            ui.visuals().selection.stroke
-        } else {
-            visuals.bg_stroke
-        };
-
-        let text_color = if selected {
-            ui.visuals().selection.stroke.color
-        } else {
-            visuals.text_color()
-        };
-
-        let rounding = egui::CornerRadius::same(4);
-
-        ui.painter().rect_filled(rect, rounding, fill);
-        ui.painter().rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
-
-        let sprite_rect = SPRITE_ATLAS_DEF
-            .sprites.get(&item_config.sprite_name)
-            .map(|sprite_data| {
-                AtlasSpriteRect::from_u16(
-                    atlas_size,
-                    sprite_data.coords.map(|it| it as u16 * 16),
-                    sprite_data.size.map(|it| it as u16 * 16)
-                )
-            });
-
-        let y_step = (rect.max.y - rect.min.y) / 3f32;
-        let editor_name_y = rect.min.y + y_step / 2f32;
-        let name_y = editor_name_y + y_step;
-        let rarity_y = name_y + y_step;
-
-        if let Some(sprite_rect) = sprite_rect {
-            let top = rect.min.y + 4f32;
-            let bottom = rect.max.y - 4f32;
-
-            let h = bottom - top;
-            let zoom = h / sprite_rect.size_px().y;
-            let w = sprite_rect.size_px().x * zoom;
-
-            let sp_rect = egui::Rect::from_min_max(
-                [rect.min.x + 4f32, rect.min.y + 4f32].into(),
-                [rect.min.x + 4f32 + w, rect.min.y + 4f32 + h].into(),
-            );
-
-            ui.painter().image(
-                atlas_texture,
-                sp_rect,
-                sprite_rect.uv_rect(),
-                egui::Color32::WHITE,
-            );
-
-            ui.painter().text(
-                egui::pos2(
-                    rect.min.x + w + 8f32,
-                    editor_name_y
-                ),
-                Align2::LEFT_CENTER,
-                editor_name,
-                egui::TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                egui::pos2(
-                    rect.min.x + w + 8f32,
-                    name_y
-                ),
-                Align2::LEFT_CENTER,
-                &item_config.name,
-                egui::TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                egui::pos2(
-                    rect.min.x + w + 8f32,
-                    rarity_y
-                ),
-                Align2::LEFT_CENTER,
-                item_config.item_rarity.display_name(),
-                egui::TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-        } else {
-            ui.painter().text(
-                egui::pos2(
-                    rect.min.x + 8f32,
-                    editor_name_y
-                ),
-                Align2::LEFT_CENTER,
-                editor_name,
-                egui::TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                egui::pos2(
-                    rect.min.x + 8f32,
-                    name_y
-                ),
-                Align2::LEFT_CENTER,
-                &item_config.name,
-                egui::TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                egui::pos2(
-                    rect.min.x + 8f32,
-                    rarity_y
-                ),
-                Align2::LEFT_CENTER,
-                item_config.item_rarity.display_name(),
-                egui::TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-        }
-    }
-
-    response
 }

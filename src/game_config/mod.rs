@@ -24,17 +24,58 @@ pub struct ConfigId<T: Config> {
     pub uuid: Uuid,
     _phantom: PhantomData<T>,
 }
+
+impl <T: Config> PartialEq for ConfigId<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.uuid == other.uuid
+    }
+}
+
 impl <T: Config> Clone for ConfigId<T> {
     fn clone(&self) -> Self {
         Self {
             uuid: self.uuid,
-            _phantom: PhantomData::default()
+            _phantom: PhantomData
         }
     }
 }
 impl <T: Config> Copy for ConfigId<T> {}
 
+impl<T: Config> ConfigId<T> {
+    pub const INVALID: ConfigId<T> = ConfigId {
+        uuid: Uuid::nil(),
+        _phantom: PhantomData
+    };
+
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self {
+            uuid,
+            _phantom: PhantomData
+        }
+    }
+}
+
+impl<T: Config> Default for ConfigId<T> {
+    fn default() -> Self {
+        Self::INVALID
+    }
+}
+
 pub trait Config {}
+
+pub trait ConfigMode {
+    type RequiredConfigId<T: Config>;
+    type OptionalConfigId<T: Config>;
+}
+
+pub struct GameConfigMode;
+pub struct EditorConfigMode;
+
+impl ConfigMode for GameConfigMode {
+    type RequiredConfigId<T: Config> = ConfigId<T>;
+    type OptionalConfigId<T: Config> = Option<ConfigId<T>>;
+}
+
 pub trait ConfigProvider<T: Config> {
     fn get_config(&self, config_id: ConfigId<T>) -> Option<&T>;
 }

@@ -1,4 +1,4 @@
-use egui::{Align, Align2, Button, Label, StrokeKind, Ui};
+use egui::{Align, Align2, Button, StrokeKind, Ui};
 use serde::Deserialize;
 use uuid::Uuid;
 use crate::app::app_stage::AppStageStatus;
@@ -6,7 +6,7 @@ use crate::assets::AssetKind;
 use crate::game_config::items::ItemConfig;
 
 pub mod item_config_editor;
-pub mod reusable_image_widget;
+pub mod image_widgets;
 
 #[derive(Copy, Clone, Deserialize)]
 pub enum EditorCommand {
@@ -78,11 +78,19 @@ impl EditorStage {
             }
 
             let screen_width = macroquad::prelude::screen_width();
-            let right_panel_width = screen_width - 750f32;
+            let preferred_central_width = match self.current_file_kind {
+                AssetKind::ItemConfig => 450f32,
+                AssetKind::UnitConfig => 450f32,
+                AssetKind::FloorPart => 450f32,
+                AssetKind::FloorPartAdjacency => 450f32,
+                AssetKind::FloorConfig => 450f32,
+                AssetKind::FloorFlowGraphConfig => 450f32,
+            };
+
+            let right_panel_width = screen_width - 300f32 - preferred_central_width;
 
             egui::SidePanel::left("Режим редактора и кнопки сохранения/выхода")
                 .exact_width(300f32)
-                .resizable(false)
                 .show(egui_ctx, |ui| {
                     ui.vertical(|ui| {
                         ui.add_space(6f32);
@@ -183,7 +191,6 @@ impl EditorStage {
 
             egui::SidePanel::right("Дополнительная информация")
                 .exact_width(right_panel_width)
-                .resizable(false)
                 .show(egui_ctx, |ui| {
                     match self.current_file_kind {
                         AssetKind::ItemConfig => self.draw_item_preview_in_level(ui),
@@ -206,19 +213,19 @@ impl EditorStage {
         // todo: render here something relevant to editor logic
     }
 
-    fn draw_unit_selector(&mut self, ui: &mut Ui) {
+    fn draw_unit_selector(&mut self, _ui: &mut Ui) {
         // todo
     }
-    fn draw_floor_part_selector(&mut self, ui: &mut Ui) {
+    fn draw_floor_part_selector(&mut self, _ui: &mut Ui) {
         // todo
     }
-    fn draw_fpa_selector(&mut self, ui: &mut Ui) {
+    fn draw_fpa_selector(&mut self, _ui: &mut Ui) {
         // todo
     }
-    fn draw_floor_selector(&mut self, ui: &mut Ui) {
+    fn draw_floor_selector(&mut self, _ui: &mut Ui) {
         // todo
     }
-    fn draw_floor_graph_selector(&mut self, ui: &mut Ui) {
+    fn draw_floor_graph_selector(&mut self, _ui: &mut Ui) {
         // todo
     }
 }
