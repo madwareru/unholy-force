@@ -2,10 +2,11 @@ use egui::{Align, Align2, Button, StrokeKind, Ui};
 use serde::Deserialize;
 use uuid::Uuid;
 use crate::app::app_stage::AppStageStatus;
+use crate::app::editor_stage::floor_part_editor::FloorPartConfigEditorSection;
+use crate::app::editor_stage::item_config_editor::ItemConfigEditorSection;
 use crate::assets::AssetKind;
-use crate::game_config::items::ItemConfig;
-
 pub mod item_config_editor;
+pub mod floor_part_editor;
 pub mod image_widgets;
 
 #[derive(Copy, Clone, Deserialize)]
@@ -13,11 +14,10 @@ pub enum EditorCommand {
     BackToMainMenu
 }
 
-pub struct ItemConfigEditorSection {
-    item_name_filter: String,
-    selected_item_config_id: Option<Uuid>,
-    selected_item_name: String,
-    current_item_config: Option<ItemConfig>,
+#[derive(Copy, Clone, PartialEq)]
+enum UpdateState {
+    Unchanged,
+    Changed,
 }
 
 pub struct EditorStage {
@@ -25,8 +25,8 @@ pub struct EditorStage {
     atlas_size: [u16; 2],
     current_file_kind: AssetKind,
     item_section: ItemConfigEditorSection,
+    floor_part_section: FloorPartConfigEditorSection,
     selected_unit_config: Option<Uuid>,
-    selected_floor_part: Option<Uuid>,
     selected_fpa_config: Option<Uuid>,
     selected_floor_config: Option<Uuid>,
     selected_floor_graph_config: Option<Uuid>
@@ -39,14 +39,9 @@ impl EditorStage {
             atlas_texture: None,
             atlas_size: [0; 2],
             current_file_kind: AssetKind::UnitConfig,
-            item_section: ItemConfigEditorSection {
-                item_name_filter: "".to_string(),
-                selected_item_config_id: None,
-                selected_item_name: "".to_string(),
-                current_item_config: None,
-            },
+            item_section: Default::default(),
+            floor_part_section: Default::default(),
             selected_unit_config: None,
-            selected_floor_part: None,
             selected_fpa_config: None,
             selected_floor_config: None,
             selected_floor_graph_config: None
@@ -81,7 +76,7 @@ impl EditorStage {
             let preferred_central_width = match self.current_file_kind {
                 AssetKind::ItemConfig => 450f32,
                 AssetKind::UnitConfig => 450f32,
-                AssetKind::FloorPart => 450f32,
+                AssetKind::FloorPart => 640f32,
                 AssetKind::FloorPartAdjacency => 450f32,
                 AssetKind::FloorConfig => 450f32,
                 AssetKind::FloorFlowGraphConfig => 450f32,
@@ -194,6 +189,7 @@ impl EditorStage {
                 .show(egui_ctx, |ui| {
                     match self.current_file_kind {
                         AssetKind::ItemConfig => self.draw_item_preview_in_level(ui),
+                        AssetKind::FloorPart => self.draw_floor_part_editor_tools(ui),
                         _ => {} // todo
                     }
                 });
@@ -202,6 +198,7 @@ impl EditorStage {
                 .show(egui_ctx, |ui| {
                 match self.current_file_kind {
                     AssetKind::ItemConfig => self.draw_item_editor(ui),
+                    AssetKind::FloorPart => self.draw_floor_part_editor(ui),
                     _ => {} // todo
                 }
             });
@@ -214,9 +211,6 @@ impl EditorStage {
     }
 
     fn draw_unit_selector(&mut self, _ui: &mut Ui) {
-        // todo
-    }
-    fn draw_floor_part_selector(&mut self, _ui: &mut Ui) {
         // todo
     }
     fn draw_fpa_selector(&mut self, _ui: &mut Ui) {

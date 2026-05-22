@@ -26,51 +26,63 @@ pub const WANG_MASK_NORTH_WEST: usize = 0b0010;
 pub const WANG_MASK_SOUTH_EAST: usize = 0b0100;
 pub const WANG_MASK_SOUTH_WEST: usize = 0b1000;
 
-const fn wang_mask_to_tile_offset_lookup() -> [[usize; 2]; 16] {
-    let mut lookup = [[3, 0]; 16];
+const fn wang_mask_to_tile_offset_lookup() -> [[u8; 2]; 16] {
+    let mut lookup = [[0, 3]; 16];
     lookup[WANG_MASK_SOUTH_EAST] = [2, 2];
-    lookup[WANG_MASK_SOUTH_WEST] = [2, 3];
-    lookup[WANG_MASK_NORTH_EAST] = [3, 2];
+    lookup[WANG_MASK_SOUTH_WEST] = [3, 2];
+    lookup[WANG_MASK_NORTH_EAST] = [2, 3];
     lookup[WANG_MASK_NORTH_WEST] = [3, 3];
     lookup[WANG_MASK_SOUTH_WEST | WANG_MASK_SOUTH_EAST] = [0, 0];
     lookup[WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_EAST] = [1, 0];
     lookup[WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_WEST] = [1, 1];
-    lookup[WANG_MASK_NORTH_EAST | WANG_MASK_NORTH_WEST] = [2, 0];
-    lookup[WANG_MASK_NORTH_WEST | WANG_MASK_SOUTH_EAST] = [2, 1];
-    lookup[WANG_MASK_NORTH_EAST | WANG_MASK_SOUTH_EAST] = [3, 1];
+    lookup[WANG_MASK_NORTH_EAST | WANG_MASK_NORTH_WEST] = [0, 2];
+    lookup[WANG_MASK_NORTH_WEST | WANG_MASK_SOUTH_EAST] = [1, 2];
+    lookup[WANG_MASK_NORTH_EAST | WANG_MASK_SOUTH_EAST] = [1, 3];
     lookup[WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_WEST | WANG_MASK_NORTH_EAST] = [2, 0];
     lookup[WANG_MASK_SOUTH_EAST | WANG_MASK_NORTH_WEST | WANG_MASK_NORTH_EAST] = [3, 0];
-    lookup[WANG_MASK_SOUTH_EAST | WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_WEST] = [1, 2];
-    lookup[WANG_MASK_SOUTH_EAST | WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_EAST] = [1, 3];
+    lookup[WANG_MASK_SOUTH_EAST | WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_WEST] = [2, 1];
+    lookup[WANG_MASK_SOUTH_EAST | WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_EAST] = [3, 1];
     lookup[WANG_MASK_SOUTH_EAST | WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_WEST | WANG_MASK_NORTH_EAST] = [0, 1];
     lookup
 }
 
-pub const WANG_MASK_LOOKUP: [[usize; 2]; 16] = wang_mask_to_tile_offset_lookup();
+pub const WANG_MASK_LOOKUP: [[u8; 2]; 16] = wang_mask_to_tile_offset_lookup();
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize, Default)]
 pub enum FloorGraphicsTileGroup {
+    #[default]
     Dirt = 0,
     Tile = 1,
     Water = 2,
     Lava = 3,
 }
-impl Default for FloorGraphicsTileGroup {
-    fn default() -> Self {
-        FloorGraphicsTileGroup::Dirt
+impl FloorGraphicsTileGroup {
+    pub fn get_name(self) -> &'static str {
+        match self {
+            FloorGraphicsTileGroup::Dirt => "Земля",
+            FloorGraphicsTileGroup::Tile => "Плитка",
+            FloorGraphicsTileGroup::Water => "Вода",
+            FloorGraphicsTileGroup::Lava => "Лава"
+        }
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize, Default)]
 pub enum WallGraphicsTileGroup {
     None = 0,
     Sandstone = 1,
+    #[default]
     Rocks = 2,
     Bricks = 3,
 }
-impl Default for WallGraphicsTileGroup {
-    fn default() -> Self {
-        WallGraphicsTileGroup::Rocks
+impl WallGraphicsTileGroup {
+    pub fn get_name(self) -> &'static str {
+        match self {
+            WallGraphicsTileGroup::None => "Свободно",
+            WallGraphicsTileGroup::Sandstone => "Песчаник",
+            WallGraphicsTileGroup::Rocks => "Камни",
+            WallGraphicsTileGroup::Bricks => "Кладка"
+        }
     }
 }
 

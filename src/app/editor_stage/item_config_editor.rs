@@ -1,14 +1,17 @@
 use crate::app::editor_stage::image_widgets::{pivot_editor, item_selector_button, atlas_sprite_button};
-use crate::app::editor_stage::{EditorStage};
+use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::items::{ItemConfig, ItemRarity};
 use crate::graphics::SPRITE_ATLAS_DEF;
 use egui::{PointerButton, PopupCloseBehavior, TextEdit, Ui};
+use uuid::Uuid;
 
-#[derive(Copy, Clone, PartialEq)]
-enum UpdateState {
-    Unchanged,
-    Changed,
+#[derive(Default)]
+pub struct ItemConfigEditorSection {
+    item_name_filter: String,
+    selected_item_config_id: Option<Uuid>,
+    selected_item_name: String,
+    current_item_config: Option<ItemConfig>,
 }
 
 impl EditorStage {
