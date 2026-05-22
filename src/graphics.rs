@@ -46,7 +46,77 @@ const fn wang_mask_to_tile_offset_lookup() -> [[u8; 2]; 16] {
     lookup
 }
 
+pub const fn wang_mask_clamp_to_north(mask: usize) -> usize {
+    mask
+        & (WANG_MASK_NORTH_EAST | WANG_MASK_NORTH_WEST)
+        | (if mask & WANG_MASK_NORTH_EAST != 0 { WANG_MASK_SOUTH_EAST } else { 0 })
+        | (if mask & WANG_MASK_NORTH_WEST != 0 { WANG_MASK_SOUTH_WEST } else { 0 })
+}
+pub const fn wang_mask_clamp_to_south(mask: usize) -> usize {
+    mask
+        & (WANG_MASK_SOUTH_EAST | WANG_MASK_SOUTH_WEST)
+        | (if mask & WANG_MASK_SOUTH_EAST != 0 { WANG_MASK_NORTH_EAST } else { 0 })
+        | (if mask & WANG_MASK_SOUTH_WEST != 0 { WANG_MASK_NORTH_WEST } else { 0 })
+}
+pub const fn wang_mask_clamp_to_east(mask: usize) -> usize {
+    mask
+        & (WANG_MASK_SOUTH_EAST | WANG_MASK_NORTH_EAST)
+        | (if mask & WANG_MASK_SOUTH_EAST != 0 { WANG_MASK_SOUTH_WEST } else { 0 })
+        | (if mask & WANG_MASK_NORTH_EAST != 0 { WANG_MASK_NORTH_WEST } else { 0 })
+}
+pub const fn wang_mask_clamp_to_west(mask: usize) -> usize {
+    mask
+        & (WANG_MASK_SOUTH_WEST | WANG_MASK_NORTH_WEST)
+        | (if mask & WANG_MASK_SOUTH_WEST != 0 { WANG_MASK_SOUTH_EAST } else { 0 })
+        | (if mask & WANG_MASK_NORTH_WEST != 0 { WANG_MASK_NORTH_EAST } else { 0 })
+}
+pub const fn wang_mask_clamp_to_north_west(mask: usize) -> usize {
+    wang_mask_clamp_to_west(wang_mask_clamp_to_north(mask))
+}
+pub const fn wang_mask_clamp_to_north_east(mask: usize) -> usize {
+    wang_mask_clamp_to_east(wang_mask_clamp_to_north(mask))
+}
+pub const fn wang_mask_clamp_to_south_west(mask: usize) -> usize {
+    wang_mask_clamp_to_west(wang_mask_clamp_to_south(mask))
+}
+pub const fn wang_mask_clamp_to_south_east(mask: usize) -> usize {
+    wang_mask_clamp_to_east(wang_mask_clamp_to_south(mask))
+}
+
+const WANG_IDS: [usize; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 pub const WANG_MASK_LOOKUP: [[u8; 2]; 16] = wang_mask_to_tile_offset_lookup();
+macro_rules! define_lookup {
+    ($LOOKUP_NAME:ident of $fn_name:ident) => {
+        pub const $LOOKUP_NAME: [[u8; 2]; 16] = {
+            [
+                WANG_MASK_LOOKUP[$fn_name(0)],
+                WANG_MASK_LOOKUP[$fn_name(1)],
+                WANG_MASK_LOOKUP[$fn_name(2)],
+                WANG_MASK_LOOKUP[$fn_name(3)],
+                WANG_MASK_LOOKUP[$fn_name(4)],
+                WANG_MASK_LOOKUP[$fn_name(5)],
+                WANG_MASK_LOOKUP[$fn_name(6)],
+                WANG_MASK_LOOKUP[$fn_name(7)],
+                WANG_MASK_LOOKUP[$fn_name(8)],
+                WANG_MASK_LOOKUP[$fn_name(9)],
+                WANG_MASK_LOOKUP[$fn_name(10)],
+                WANG_MASK_LOOKUP[$fn_name(11)],
+                WANG_MASK_LOOKUP[$fn_name(12)],
+                WANG_MASK_LOOKUP[$fn_name(13)],
+                WANG_MASK_LOOKUP[$fn_name(14)],
+                WANG_MASK_LOOKUP[$fn_name(15)],
+            ]
+        };
+    };
+}
+define_lookup!(WANG_MASK_CLAMP_NORTH_LOOKUP of wang_mask_clamp_to_north);
+define_lookup!(WANG_MASK_CLAMP_SOUTH_LOOKUP of wang_mask_clamp_to_south);
+define_lookup!(WANG_MASK_CLAMP_EAST_LOOKUP of wang_mask_clamp_to_east);
+define_lookup!(WANG_MASK_CLAMP_WEST_LOOKUP of wang_mask_clamp_to_west);
+define_lookup!(WANG_MASK_CLAMP_NORTH_WEST_LOOKUP of wang_mask_clamp_to_north_west);
+define_lookup!(WANG_MASK_CLAMP_NORTH_EAST_LOOKUP of wang_mask_clamp_to_north_east);
+define_lookup!(WANG_MASK_CLAMP_SOUTH_WEST_LOOKUP of wang_mask_clamp_to_south_west);
+define_lookup!(WANG_MASK_CLAMP_SOUTH_EAST_LOOKUP of wang_mask_clamp_to_south_east);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize, Default)]
 pub enum FloorGraphicsTileGroup {
