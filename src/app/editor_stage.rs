@@ -74,9 +74,9 @@ impl EditorStage {
 
             let screen_width = macroquad::prelude::screen_width();
             let preferred_central_width = match self.current_file_kind {
-                AssetKind::ItemConfig => 450f32,
+                AssetKind::ItemConfig => 600f32,
                 AssetKind::UnitConfig => 450f32,
-                AssetKind::FloorPart => 640f32,
+                AssetKind::FloorPart => 670f32,
                 AssetKind::FloorPartAdjacency => 450f32,
                 AssetKind::FloorConfig => 450f32,
                 AssetKind::FloorFlowGraphConfig => 450f32,

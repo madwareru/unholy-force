@@ -51,7 +51,7 @@ pub struct FloorPartConfig {
     pub floor_data: [[FloorGraphicsTileGroup; 5]; 5],
     pub wall_data: [[WallGraphicsTileGroup; 5]; 5],
     pub extra_data: [[FloorCellExtra; 5]; 5],
-    payload_count: u8,
+    pub payload_count: u8,
 }
 
 impl FloorPartConfig {

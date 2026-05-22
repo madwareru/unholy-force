@@ -1,10 +1,10 @@
-use egui::{response, Align, Align2, Button, PointerButton, PopupCloseBehavior, TextEdit, Ui};
-use uuid::Uuid;
+use crate::app::editor_stage::image_widgets::{floor_part_editor, floor_part_selector_button};
 use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
-use crate::app::editor_stage::image_widgets::{atlas_sprite_button, floor_part_editor, floor_part_selector_button, pivot_editor};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_parts::FloorPartConfig;
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
+use egui::{Align2, PointerButton, PopupCloseBehavior, TextEdit, Ui};
+use uuid::Uuid;
 
 #[derive(Default)]
 pub struct FloorPartConfigEditorSection {
@@ -55,13 +55,6 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_floor_part_selector(&mut self, ui: &mut Ui) {
-        let texture_id: egui::TextureId;
-        if let Some(handle) = &self.atlas_texture {
-            texture_id = handle.id();
-        } else {
-            unreachable!()
-        };
-        let atlas_size = self.atlas_size;
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
                 let full_width = ui.available_width();
@@ -87,56 +80,54 @@ impl EditorStage {
                             let mut offset = 0;
                             for (id, asset_name) in items {
                                 let ui = &mut uis[offset];
-                                offset = (offset + 1) % NUM_COLUMNS;
                                 let section = &mut self.floor_part_section;
                                 if !section.floor_part_name_filter.is_empty() {
                                     if !asset_name.starts_with(&section.floor_part_name_filter) {
                                         continue;
                                     }
                                 }
+                                offset = (offset + 1) % NUM_COLUMNS;
 
-                                ui.horizontal(|ui| {
-                                    let selected = section
-                                        .selected_floor_part_config_id
-                                        .map(|it| it.eq(&id))
-                                        .unwrap_or(false);
+                                let selected = section
+                                    .selected_floor_part_config_id
+                                    .map(|it| it.eq(&id))
+                                    .unwrap_or(false);
 
-                                    let config_bytes = asset_db.load_asset(AssetKind::FloorPart, id);
-                                    let floor_part_config = FloorPartConfig::load_from_slice(config_bytes)
-                                        .expect("Failed to load floor part config");
+                                let config_bytes = asset_db.load_asset(AssetKind::FloorPart, id);
+                                let floor_part_config = FloorPartConfig::load_from_slice(config_bytes)
+                                    .expect("Failed to load floor part config");
 
-                                    let response = floor_part_selector_button(
-                                        ui,
-                                        selected,
-                                        asset_name,
-                                        &floor_part_config
-                                    );
+                                let response = floor_part_selector_button(
+                                    ui,
+                                    selected,
+                                    asset_name,
+                                    &floor_part_config
+                                );
 
-                                    let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
+                                let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
 
-                                    if response.clicked_by(PointerButton::Primary) {
-                                        section.current_floor_part_config = Some(floor_part_config);
-                                        section.selected_floor_part_name.clear();
-                                        section.selected_floor_part_name += asset_name;
-                                        section.selected_floor_part_config_id = Some(id);
-                                    } else if response.clicked_by(PointerButton::Secondary) {
-                                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                                    }
+                                if response.clicked_by(PointerButton::Primary) {
+                                    section.current_floor_part_config = Some(floor_part_config);
+                                    section.selected_floor_part_name.clear();
+                                    section.selected_floor_part_name += asset_name;
+                                    section.selected_floor_part_config_id = Some(id);
+                                } else if response.clicked_by(PointerButton::Secondary) {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
 
-                                    egui::popup_below_widget(
-                                        ui,
-                                        popup_id,
-                                        &response,
-                                        PopupCloseBehavior::CloseOnClickOutside,
-                                        |ui| {
-                                            ui.set_min_width(100f32);
-                                            if ui.button("Удалить").clicked() {
-                                                to_delete = Some(id);
-                                                ui.memory_mut(|mem| mem.close_popup());
-                                            }
-                                        },
-                                    );
-                                });
+                                egui::popup_below_widget(
+                                    ui,
+                                    popup_id,
+                                    &response,
+                                    PopupCloseBehavior::CloseOnClickOutside,
+                                    |ui| {
+                                        ui.set_min_width(100f32);
+                                        if ui.button("Удалить").clicked() {
+                                            to_delete = Some(id);
+                                            ui.memory_mut(|mem| mem.close_popup());
+                                        }
+                                    },
+                                );
                             }
                         });
                         if let Some(id) = to_delete {

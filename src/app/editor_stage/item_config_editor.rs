@@ -1,9 +1,9 @@
-use crate::app::editor_stage::image_widgets::{pivot_editor, item_selector_button, atlas_sprite_button};
+use crate::app::editor_stage::image_widgets::{pivot_editor, item_selector_button, atlas_sprite_button, item_visualizer};
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::items::{ItemConfig, ItemRarity};
 use crate::graphics::SPRITE_ATLAS_DEF;
-use egui::{PointerButton, PopupCloseBehavior, TextEdit, Ui};
+use egui::{Align, Label, PointerButton, PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -158,8 +158,31 @@ impl EditorStage {
         };
     }
 
-    pub(crate) fn draw_item_preview_in_level(&mut self, _ui: &mut Ui) {
-
+    pub(crate) fn draw_item_preview_in_level(&mut self, ui: &mut Ui) {
+        let texture_id: egui::TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+        let atlas_size = self.atlas_size;
+        if let Some(item_config) = &self.item_section.current_item_config {
+            if item_config.sprite_name.is_empty() {
+                return;
+            }
+            ui.vertical(|ui| {
+                ui.add_space(6f32);
+                ui.group(|ui| {
+                    ui.label("Предпросмотр на игровом поле:");
+                    item_visualizer(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        item_config
+                    )
+                });
+            });
+        }
     }
 
     pub(crate) fn draw_item_editor(&mut self, ui: &mut Ui) {

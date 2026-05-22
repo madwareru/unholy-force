@@ -1,4 +1,4 @@
-use crate::game_config::floor_parts::FloorPartConfig;
+use crate::game_config::floor_parts::{FloorCellExtra, FloorPartConfig};
 use crate::game_config::items::ItemConfig;
 use crate::graphics::{
     FloorGraphicsTileGroup, SPRITE_ATLAS_DEF, WANG_MASK_LOOKUP, WANG_MASK_NORTH_EAST,
@@ -14,6 +14,22 @@ struct AtlasSpriteRect {
     /// Прямоугольник спрайта внутри атласа, в пикселях.
     pub rect_px: Rect,
 }
+
+const fn make_mock_floor_part_config() -> FloorPartConfig {
+    FloorPartConfig {
+        floor_data: [
+            [FloorGraphicsTileGroup::Dirt; 5],
+            [FloorGraphicsTileGroup::Dirt, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Dirt],
+            [FloorGraphicsTileGroup::Dirt, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Dirt],
+            [FloorGraphicsTileGroup::Dirt, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Dirt],
+            [FloorGraphicsTileGroup::Dirt; 5]
+        ],
+        wall_data: [[WallGraphicsTileGroup::None; 5]; 5],
+        extra_data: [[FloorCellExtra::None; 5]; 5],
+        payload_count: 0
+    }
+}
+const MOCK_FLOOR_PART_CONFIG: FloorPartConfig = make_mock_floor_part_config();
 
 impl AtlasSpriteRect {
     pub fn from_u16(atlas_size: [u16; 2], [x, y]: [u16; 2], [w, h]: [u16; 2]) -> Self {
@@ -126,6 +142,7 @@ pub fn atlas_sprite_button(
 
     response
 }
+
 pub fn pivot_editor(
     ui: &mut Ui,
     texture_id: TextureId,
@@ -198,13 +215,81 @@ pub fn pivot_editor(
     response
 }
 
-const DIRT_MASK: [[bool; 5]; 5] = [
-    [true, false, true, false, true],
-    [true, true, false, false, true],
-    [false, true, true, true, false],
-    [true, false, false, true, true],
-    [false, false, true, true, true],
-];
+pub fn item_visualizer(
+    ui: &mut Ui,
+    texture_id: TextureId,
+    atlas_size: [u16; 2],
+    item_config: &ItemConfig
+) {
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size.map(|it| it as f32);
+    let display_size = vec2(
+        tile_size[0] * MOCK_FLOOR_PART_CONFIG.floor_data[0].len() as f32,
+        tile_size[1] * MOCK_FLOOR_PART_CONFIG.floor_data.len() as f32,
+    );
+    let available_width = ui.available_width();
+    let zoom = available_width / display_size.x;
+    let display_size = display_size * zoom;
+
+    let (rect, _) = ui.allocate_exact_size(display_size, Sense::empty());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect_stroke(
+            rect,
+            CornerRadius::ZERO,
+            Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
+            StrokeKind::Inside,
+        );
+
+        draw_floors(
+            ui,
+            texture_id,
+            atlas_size,
+            &MOCK_FLOOR_PART_CONFIG,
+            zoom,
+            tile_size,
+            rect,
+        );
+
+        let central_point = rect.center();
+        let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[&item_config.sprite_name];
+        let sprite_size = [
+            sprite_data.size[0] as u16 * tile_size[0] as u16,
+            sprite_data.size[1] as u16 * tile_size[1] as u16,
+        ];
+        let sprite = AtlasSpriteRect::from_u16(
+            atlas_size,
+            [
+                sprite_data.coords[0] as u16 * tile_size[0] as u16,
+                sprite_data.coords[1] as u16 * tile_size[1] as u16,
+            ],
+            sprite_size,
+        );
+
+        let image_size = [
+            sprite_size[0] as f32 * zoom,
+            sprite_size[1] as f32 * zoom,
+        ].into();
+        let image_pos = pos2(
+            central_point.x - item_config.sprite_pivot[0] as f32 * zoom,
+            central_point.y - item_config.sprite_pivot[1] as f32 * zoom,
+        );
+
+        let image_rect = Rect::from_min_max(
+            image_pos,
+            image_pos + image_size
+        );
+        ui.painter().image(texture_id, image_rect, sprite.uv_rect(), Color32::WHITE);
+
+        draw_walls(
+            ui,
+            texture_id,
+            atlas_size,
+            &MOCK_FLOOR_PART_CONFIG,
+            zoom,
+            tile_size,
+            rect,
+        );
+    }
+}
 
 pub fn floor_part_editor(
     ui: &mut Ui,
@@ -215,9 +300,7 @@ pub fn floor_part_editor(
 ) -> Option<[usize; 2]> {
     let zoom = zoom.clamp(1, 8) as f32;
 
-    let tile_size = crate::graphics::SPRITE_ATLAS_DEF
-        .tile_size
-        .map(|it| it as f32);
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size.map(|it| it as f32);
     let display_size = vec2(
         tile_size[0] * zoom * floor_part_config.floor_data[0].len() as f32,
         tile_size[1] * zoom * floor_part_config.floor_data.len() as f32,
@@ -255,13 +338,28 @@ pub fn floor_part_editor(
 
     let mut result = None;
 
-    if response.clicked() || response.dragged() {
-        if let Some(pointer_pos) = response.interact_pointer_pos() {
-            if rect.contains(pointer_pos) {
-                let local_x =
-                    ((pointer_pos.x - rect.left()) / zoom / tile_size[0]).floor() as usize;
-                let local_y = ((pointer_pos.y - rect.top()) / zoom / tile_size[1]).floor() as usize;
+    if let Some(hover_pos) = response.hover_pos() {
+        if rect.contains(hover_pos) {
+            let local_x = ((hover_pos.x - rect.left()) / zoom / tile_size[0]).floor() as usize;
+            let local_y = ((hover_pos.y - rect.top()) / zoom / tile_size[1]).floor() as usize;
 
+            let pt = rect.min + vec2(
+                local_x as f32 * tile_size[0] * zoom,
+                local_y as f32 * tile_size[1] * zoom
+            );
+
+            let selection_rect = Rect::from_min_max(
+                pt,
+                pt + vec2(tile_size[0] * zoom, tile_size[1] * zoom)
+            );
+            ui.painter().rect_stroke(
+                selection_rect,
+                CornerRadius::same(2 * zoom as u8),
+                ui.visuals().selection.stroke,
+                StrokeKind::Inside
+            );
+
+            if response.clicked() || response.dragged() {
                 result = Some([local_x, local_y]);
             }
         }
@@ -269,6 +367,15 @@ pub fn floor_part_editor(
 
     result
 }
+
+const DIRT_MASK: [[bool; 5]; 5] = [
+    [true, false, true, false, true],
+    [true, true, false, false, true],
+    [false, true, true, true, false],
+    [true, false, false, true, true],
+    [false, false, true, true, true],
+];
+
 
 fn draw_floors(
     ui: &mut Ui,
@@ -364,8 +471,7 @@ fn draw_floors(
                     ],
                     [tile_size[0] as u16, tile_size[1] as u16],
                 );
-                ui.painter()
-                    .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
             }
         }
     }
@@ -405,6 +511,8 @@ fn draw_walls(
                 [pt.x + tile_size[0] * zoom, pt.y + tile_size[1] * zoom].into(),
             );
 
+            let tile_size = [tile_size[0] as u16, tile_size[1] as u16];
+
             for (group, base_coords) in [
                 (WallGraphicsTileGroup::Sandstone, base_sandstone_coords),
                 (WallGraphicsTileGroup::Rocks, base_rocks_coords),
@@ -428,13 +536,12 @@ fn draw_walls(
                 let atlas_rect = AtlasSpriteRect::from_u16(
                     atlas_size,
                     [
-                        coords[0] as u16 * tile_size[0] as u16,
-                        coords[1] as u16 * tile_size[1] as u16,
+                        coords[0] as u16 * tile_size[0],
+                        coords[1] as u16 * tile_size[1],
                     ],
-                    [tile_size[0] as u16, tile_size[1] as u16],
+                    tile_size,
                 );
-                ui.painter()
-                    .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
             }
         }
     }
