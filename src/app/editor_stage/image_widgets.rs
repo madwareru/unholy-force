@@ -1,7 +1,10 @@
 use crate::game_config::floor_parts::{FloorCellExtra, FloorPartConfig};
 use crate::game_config::items::ItemConfig;
-use crate::graphics::{FloorGraphicsTileGroup, SPRITE_ATLAS_DEF, WANG_MASK_LOOKUP, WANG_MASK_NORTH_EAST, WANG_MASK_NORTH_WEST, WANG_MASK_SOUTH_EAST, WANG_MASK_SOUTH_WEST, WallGraphicsTileGroup, WANG_MASK_CLAMP_NORTH_LOOKUP, WANG_MASK_CLAMP_SOUTH_LOOKUP, WANG_MASK_CLAMP_EAST_LOOKUP, WANG_MASK_CLAMP_WEST_LOOKUP};
-use egui::{Align2, Color32, Rect, Response, StrokeKind, TextureId, Ui, Vec2, vec2, Sense, CornerRadius, Stroke, pos2, TextStyle};
+use crate::graphics::{FloorGraphicsTileGroup, SPRITE_ATLAS_DEF, WANG_MASK_CLAMP_EAST_LOOKUP, WANG_MASK_CLAMP_NORTH_LOOKUP, WANG_MASK_CLAMP_SOUTH_LOOKUP, WANG_MASK_CLAMP_WEST_LOOKUP, WANG_MASK_LOOKUP, WANG_MASK_NORTH_EAST, WANG_MASK_NORTH_WEST, WANG_MASK_SOUTH_EAST, WANG_MASK_SOUTH_WEST, WallGraphicsTileGroup, WANG_MASK_CLAMP_NORTH_WEST_LOOKUP, WANG_MASK_CLAMP_NORTH_EAST_LOOKUP, WANG_MASK_CLAMP_SOUTH_EAST_LOOKUP, WANG_MASK_CLAMP_SOUTH_WEST_LOOKUP};
+use egui::{
+    Align2, Color32, CornerRadius, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId,
+    Ui, Vec2, pos2, vec2,
+};
 
 #[derive(Clone, Copy, Debug)]
 struct AtlasSpriteRect {
@@ -16,14 +19,32 @@ const fn make_mock_floor_part_config() -> FloorPartConfig {
     FloorPartConfig {
         floor_data: [
             [FloorGraphicsTileGroup::Dirt; 5],
-            [FloorGraphicsTileGroup::Dirt, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Dirt],
-            [FloorGraphicsTileGroup::Dirt, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Dirt],
-            [FloorGraphicsTileGroup::Dirt, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Tile, FloorGraphicsTileGroup::Dirt],
-            [FloorGraphicsTileGroup::Dirt; 5]
+            [
+                FloorGraphicsTileGroup::Dirt,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Dirt,
+            ],
+            [
+                FloorGraphicsTileGroup::Dirt,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Dirt,
+            ],
+            [
+                FloorGraphicsTileGroup::Dirt,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Tile,
+                FloorGraphicsTileGroup::Dirt,
+            ],
+            [FloorGraphicsTileGroup::Dirt; 5],
         ],
         wall_data: [[WallGraphicsTileGroup::None; 5]; 5],
         extra_data: [[FloorCellExtra::None; 5]; 5],
-        payload_count: 0
+        payload_count: 0,
     }
 }
 const MOCK_FLOOR_PART_CONFIG: FloorPartConfig = make_mock_floor_part_config();
@@ -187,11 +208,8 @@ pub fn pivot_editor(
         ui.painter()
             .circle_filled(pivot_screen_pos, 4f32, Color32::RED);
 
-        ui.painter().circle_stroke(
-            pivot_screen_pos,
-            5f32,
-            Stroke::new(3f32, Color32::WHITE),
-        );
+        ui.painter()
+            .circle_stroke(pivot_screen_pos, 5f32, Stroke::new(3f32, Color32::WHITE));
     }
 
     if response.clicked() || response.dragged() {
@@ -216,9 +234,11 @@ pub fn item_visualizer(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
-    item_config: &ItemConfig
+    item_config: &ItemConfig,
 ) {
-    let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size.map(|it| it as f32);
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF
+        .tile_size
+        .map(|it| it as f32);
     let display_size = vec2(
         tile_size[0] * MOCK_FLOOR_PART_CONFIG.floor_data[0].len() as f32,
         tile_size[1] * MOCK_FLOOR_PART_CONFIG.floor_data.len() as f32,
@@ -261,20 +281,15 @@ pub fn item_visualizer(
             sprite_size,
         );
 
-        let image_size = [
-            sprite_size[0] as f32 * zoom,
-            sprite_size[1] as f32 * zoom,
-        ].into();
+        let image_size = [sprite_size[0] as f32 * zoom, sprite_size[1] as f32 * zoom].into();
         let image_pos = pos2(
             central_point.x - item_config.sprite_pivot[0] as f32 * zoom,
             central_point.y - item_config.sprite_pivot[1] as f32 * zoom,
         );
 
-        let image_rect = Rect::from_min_max(
-            image_pos,
-            image_pos + image_size
-        );
-        ui.painter().image(texture_id, image_rect, sprite.uv_rect(), Color32::WHITE);
+        let image_rect = Rect::from_min_max(image_pos, image_pos + image_size);
+        ui.painter()
+            .image(texture_id, image_rect, sprite.uv_rect(), Color32::WHITE);
 
         draw_walls(
             ui,
@@ -297,7 +312,9 @@ pub fn floor_part_editor(
 ) -> Option<[usize; 2]> {
     let zoom = zoom.clamp(1, 8) as f32;
 
-    let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size.map(|it| it as f32);
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF
+        .tile_size
+        .map(|it| it as f32);
     let display_size = vec2(
         tile_size[0] * zoom * floor_part_config.floor_data[0].len() as f32,
         tile_size[1] * zoom * floor_part_config.floor_data.len() as f32,
@@ -340,22 +357,21 @@ pub fn floor_part_editor(
             let local_x = ((hover_pos.x - rect.left()) / zoom / tile_size[0]).floor() as usize;
             let local_y = ((hover_pos.y - rect.top()) / zoom / tile_size[1]).floor() as usize;
 
-            let pt = rect.min + vec2(
-                local_x as f32 * tile_size[0] * zoom,
-                local_y as f32 * tile_size[1] * zoom
-            );
+            let pt = rect.min
+                + vec2(
+                    local_x as f32 * tile_size[0] * zoom,
+                    local_y as f32 * tile_size[1] * zoom,
+                );
 
-            let selection_rect = Rect::from_min_max(
-                pt,
-                pt + vec2(tile_size[0] * zoom, tile_size[1] * zoom)
-            );
+            let selection_rect =
+                Rect::from_min_max(pt, pt + vec2(tile_size[0] * zoom, tile_size[1] * zoom));
             let mut selection_stroke = ui.visuals().selection.stroke;
             selection_stroke.width = 4.0;
             ui.painter().rect_stroke(
                 selection_rect,
                 CornerRadius::same(2 * zoom as u8),
                 selection_stroke,
-                StrokeKind::Inside
+                StrokeKind::Inside,
             );
 
             if response.clicked() || response.dragged() {
@@ -375,24 +391,16 @@ const DIRT_MASK: [[bool; 5]; 5] = [
     [false, false, true, true, true],
 ];
 
-
 fn offset_coords(base_coords: [u8; 2], offset: [u8; 2]) -> [u8; 2] {
-    [
-        base_coords[0] + offset[0],
-        base_coords[1] + offset[1],
-    ]
+    [base_coords[0] + offset[0], base_coords[1] + offset[1]]
 }
 
-fn sprite_rect(
-    atlas_size: [u16; 2],
-    tile_size: [u16; 2],
-    coords: [u8; 2]
-) -> AtlasSpriteRect {
+fn sprite_rect(atlas_size: [u16; 2], tile_size: [u16; 2], coords: [u8; 2]) -> AtlasSpriteRect {
     AtlasSpriteRect::from_u16(
         atlas_size,
         [
             coords[0] as u16 * tile_size[0],
-            coords[1] as u16 * tile_size[1]
+            coords[1] as u16 * tile_size[1],
         ],
         [tile_size[0], tile_size[1]],
     )
@@ -404,13 +412,49 @@ fn get_coords_north(
     tile_size: [f32; 2],
     mask: usize,
     mut image_rect: Rect,
-    zoom: f32
+    zoom: f32,
 ) -> (AtlasSpriteRect, Rect) {
     let coords = offset_coords(base_coords, WANG_MASK_CLAMP_NORTH_LOOKUP[mask]);
     let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
     atlas_rect.rect_px.min.y += tile_size[1] / 2f32;
-    image_rect.min.y -= tile_size[1] * zoom/ 2f32;
+    image_rect.min.y -= tile_size[1] * zoom / 2f32;
     image_rect.max.y -= tile_size[1] * zoom;
+    (atlas_rect, image_rect)
+}
+fn get_coords_north_west(
+    base_coords: [u8; 2],
+    atlas_size: [u16; 2],
+    tile_size: [f32; 2],
+    mask: usize,
+    mut image_rect: Rect,
+    zoom: f32,
+) -> (AtlasSpriteRect, Rect) {
+    let coords = offset_coords(base_coords, WANG_MASK_CLAMP_NORTH_WEST_LOOKUP[mask]);
+    let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
+    atlas_rect.rect_px.min.y += tile_size[1] / 2f32;
+    atlas_rect.rect_px.min.x += tile_size[0] / 2f32;
+    image_rect.min.y -= tile_size[1] * zoom / 2f32;
+    image_rect.max.y -= tile_size[1] * zoom;
+    image_rect.min.x -= tile_size[0] * zoom / 2f32;
+    image_rect.max.x -= tile_size[0] * zoom;
+    (atlas_rect, image_rect)
+}
+fn get_coords_north_east(
+    base_coords: [u8; 2],
+    atlas_size: [u16; 2],
+    tile_size: [f32; 2],
+    mask: usize,
+    mut image_rect: Rect,
+    zoom: f32,
+) -> (AtlasSpriteRect, Rect) {
+    let coords = offset_coords(base_coords, WANG_MASK_CLAMP_NORTH_EAST_LOOKUP[mask]);
+    let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
+    atlas_rect.rect_px.min.y += tile_size[1] / 2f32;
+    atlas_rect.rect_px.max.x -= tile_size[0] / 2f32;
+    image_rect.min.y -= tile_size[1] * zoom / 2f32;
+    image_rect.max.y -= tile_size[1] * zoom;
+    image_rect.max.x += tile_size[0] * zoom / 2f32;
+    image_rect.min.x += tile_size[0] * zoom;
     (atlas_rect, image_rect)
 }
 
@@ -420,13 +464,51 @@ fn get_coords_south(
     tile_size: [f32; 2],
     mask: usize,
     mut image_rect: Rect,
-    zoom: f32
+    zoom: f32,
 ) -> (AtlasSpriteRect, Rect) {
     let coords = offset_coords(base_coords, WANG_MASK_CLAMP_SOUTH_LOOKUP[mask]);
     let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
     atlas_rect.rect_px.max.y -= tile_size[1] / 2f32;
-    image_rect.max.y += tile_size[1] * zoom/ 2f32;
+    image_rect.max.y += tile_size[1] * zoom / 2f32;
     image_rect.min.y += tile_size[1] * zoom;
+    (atlas_rect, image_rect)
+}
+
+fn get_coords_south_west(
+    base_coords: [u8; 2],
+    atlas_size: [u16; 2],
+    tile_size: [f32; 2],
+    mask: usize,
+    mut image_rect: Rect,
+    zoom: f32,
+) -> (AtlasSpriteRect, Rect) {
+    let coords = offset_coords(base_coords, WANG_MASK_CLAMP_SOUTH_WEST_LOOKUP[mask]);
+    let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
+    atlas_rect.rect_px.max.y -= tile_size[1] / 2f32;
+    atlas_rect.rect_px.min.x += tile_size[0] / 2f32;
+    image_rect.max.y += tile_size[1] * zoom / 2f32;
+    image_rect.min.y += tile_size[1] * zoom;
+    image_rect.min.x -= tile_size[0] * zoom / 2f32;
+    image_rect.max.x -= tile_size[0] * zoom;
+    (atlas_rect, image_rect)
+}
+
+fn get_coords_south_east(
+    base_coords: [u8; 2],
+    atlas_size: [u16; 2],
+    tile_size: [f32; 2],
+    mask: usize,
+    mut image_rect: Rect,
+    zoom: f32,
+) -> (AtlasSpriteRect, Rect) {
+    let coords = offset_coords(base_coords, WANG_MASK_CLAMP_SOUTH_EAST_LOOKUP[mask]);
+    let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
+    atlas_rect.rect_px.max.y -= tile_size[1] / 2f32;
+    atlas_rect.rect_px.max.x -= tile_size[0] / 2f32;
+    image_rect.max.y += tile_size[1] * zoom / 2f32;
+    image_rect.min.y += tile_size[1] * zoom;
+    image_rect.max.x += tile_size[0] * zoom / 2f32;
+    image_rect.min.x += tile_size[0] * zoom;
     (atlas_rect, image_rect)
 }
 
@@ -436,7 +518,7 @@ fn get_coords_east(
     tile_size: [f32; 2],
     mask: usize,
     mut image_rect: Rect,
-    zoom: f32
+    zoom: f32,
 ) -> (AtlasSpriteRect, Rect) {
     let coords = offset_coords(base_coords, WANG_MASK_CLAMP_EAST_LOOKUP[mask]);
     let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
@@ -452,12 +534,12 @@ fn get_coords_west(
     tile_size: [f32; 2],
     mask: usize,
     mut image_rect: Rect,
-    zoom: f32
+    zoom: f32,
 ) -> (AtlasSpriteRect, Rect) {
     let coords = offset_coords(base_coords, WANG_MASK_CLAMP_WEST_LOOKUP[mask]);
     let mut atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
     atlas_rect.rect_px.min.x += tile_size[0] / 2f32;
-    image_rect.min.x -= tile_size[0] * zoom/ 2f32;
+    image_rect.min.x -= tile_size[0] * zoom / 2f32;
     image_rect.max.x -= tile_size[0] * zoom;
     (atlas_rect, image_rect)
 }
@@ -515,28 +597,96 @@ fn draw_floors(
             let dirt_coords = offset_coords(base_dirt_coords, WANG_MASK_LOOKUP[dirt_bitmask]);
             let atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), dirt_coords);
 
-            ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+            ui.painter()
+                .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
             if j == 0 {
-                let (atlas_rect, image_rect) = get_coords_north(
+                let (atlas_rect, image_rect_n) = get_coords_north(
                     base_dirt_coords,
                     atlas_size,
                     tile_size,
                     dirt_bitmask,
                     image_rect,
-                    zoom
+                    zoom,
                 );
-                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter()
+                    .image(texture_id, image_rect_n, atlas_rect.uv_rect(), Color32::WHITE);
+                if i == 0 {
+                    let (atlas_rect, image_rect_nw) = get_coords_north_west(
+                        base_dirt_coords,
+                        atlas_size,
+                        tile_size,
+                        dirt_bitmask,
+                        image_rect,
+                        zoom,
+                    );
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_nw,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+                }
+                if i == floor_part_config.floor_data[j].len() - 2 {
+                    let (atlas_rect, image_rect_ne) = get_coords_north_east(
+                        base_dirt_coords,
+                        atlas_size,
+                        tile_size,
+                        dirt_bitmask,
+                        image_rect,
+                        zoom,
+                    );
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_ne,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+                }
             }
             if j == floor_part_config.floor_data.len() - 2 {
-                let (atlas_rect, image_rect) = get_coords_south(
+                let (atlas_rect, image_rect_s) = get_coords_south(
                     base_dirt_coords,
                     atlas_size,
                     tile_size,
                     dirt_bitmask,
                     image_rect,
-                    zoom
+                    zoom,
                 );
-                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter()
+                    .image(texture_id, image_rect_s, atlas_rect.uv_rect(), Color32::WHITE);
+
+                if i == 0 {
+                    let (atlas_rect, image_rect_sw) = get_coords_south_west(
+                        base_dirt_coords,
+                        atlas_size,
+                        tile_size,
+                        dirt_bitmask,
+                        image_rect,
+                        zoom,
+                    );
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_sw,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+                }
+                if i == floor_part_config.floor_data[j].len() - 2 {
+                    let (atlas_rect, image_rect_se) = get_coords_south_east(
+                        base_dirt_coords,
+                        atlas_size,
+                        tile_size,
+                        dirt_bitmask,
+                        image_rect,
+                        zoom,
+                    );
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_se,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+                }
             }
             if i == 0 {
                 let (atlas_rect, image_rect) = get_coords_west(
@@ -545,9 +695,10 @@ fn draw_floors(
                     tile_size,
                     dirt_bitmask,
                     image_rect,
-                    zoom
+                    zoom,
                 );
-                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter()
+                    .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
             }
             if i == floor_part_config.floor_data[j].len() - 2 {
                 let (atlas_rect, image_rect) = get_coords_east(
@@ -556,9 +707,10 @@ fn draw_floors(
                     tile_size,
                     dirt_bitmask,
                     image_rect,
-                    zoom
+                    zoom,
                 );
-                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter()
+                    .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
             }
 
             for (group, base_coords) in [
@@ -582,29 +734,106 @@ fn draw_floors(
                 let coords = offset_coords(base_coords, WANG_MASK_LOOKUP[bitmask]);
                 let atlas_rect = sprite_rect(atlas_size, tile_size.map(|it| it as u16), coords);
 
-                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter()
+                    .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
 
                 if j == 0 {
-                    let (atlas_rect, image_rect) = get_coords_north(
+                    let (atlas_rect, image_rect_n) = get_coords_north(
                         base_coords,
                         atlas_size,
                         tile_size,
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_n,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+
+                    if i == 0 {
+                        let (atlas_rect, image_rect_nw) = get_coords_north_west(
+                            base_coords,
+                            atlas_size,
+                            tile_size,
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_nw,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
+                    if i == floor_part_config.floor_data[j].len() - 2 {
+                        let (atlas_rect, image_rect_ne) = get_coords_north_east(
+                            base_coords,
+                            atlas_size,
+                            tile_size,
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_ne,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
                 }
-                if j == floor_part_config.floor_data.len() - 2  {
-                    let (atlas_rect, image_rect) = get_coords_south(
+                if j == floor_part_config.floor_data.len() - 2 {
+                    let (atlas_rect, image_rect_s) = get_coords_south(
                         base_coords,
                         atlas_size,
                         tile_size,
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_s,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+
+                    if i == 0 {
+                        let (atlas_rect, image_rect_sw) = get_coords_south_west(
+                            base_coords,
+                            atlas_size,
+                            tile_size,
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_sw,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
+                    if i == floor_part_config.floor_data[j].len() - 2 {
+                        let (atlas_rect, image_rect_se) = get_coords_south_east(
+                            base_coords,
+                            atlas_size,
+                            tile_size,
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_se,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
                 }
                 if i == 0 {
                     let (atlas_rect, image_rect) = get_coords_west(
@@ -613,9 +842,14 @@ fn draw_floors(
                         tile_size,
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
                 }
                 if i == floor_part_config.floor_data[j].len() - 2 {
                     let (atlas_rect, image_rect) = get_coords_east(
@@ -624,9 +858,14 @@ fn draw_floors(
                         tile_size,
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
                 }
             }
         }
@@ -689,28 +928,105 @@ fn draw_walls(
                 }
                 let coords = offset_coords(base_coords, WANG_MASK_LOOKUP[bitmask]);
                 let atlas_rect = sprite_rect(atlas_size, tile_size, coords);
-                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                ui.painter()
+                    .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
                 if j == 0 {
-                    let (atlas_rect, image_rect) = get_coords_north(
+                    let (atlas_rect, image_rect_n) = get_coords_north(
                         base_coords,
                         atlas_size,
                         tile_size.map(|it| it as f32),
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_n,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+
+                    if i == 0 {
+                        let (atlas_rect, image_rect_nw) = get_coords_north_west(
+                            base_coords,
+                            atlas_size,
+                            tile_size.map(|it| it as f32),
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_nw,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
+                    if i == floor_part_config.floor_data[j].len() - 2 {
+                        let (atlas_rect, image_rect_ne) = get_coords_north_east(
+                            base_coords,
+                            atlas_size,
+                            tile_size.map(|it| it as f32),
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_ne,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
                 }
-                if j == floor_part_config.floor_data.len() - 2  {
-                    let (atlas_rect, image_rect) = get_coords_south(
+                if j == floor_part_config.floor_data.len() - 2 {
+                    let (atlas_rect, image_rect_s) = get_coords_south(
                         base_coords,
                         atlas_size,
                         tile_size.map(|it| it as f32),
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect_s,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
+
+                    if i == 0 {
+                        let (atlas_rect, image_rect_sw) = get_coords_south_west(
+                            base_coords,
+                            atlas_size,
+                            tile_size.map(|it| it as f32),
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_sw,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
+                    if i == floor_part_config.floor_data[j].len() - 2 {
+                        let (atlas_rect, image_rect_se) = get_coords_south_east(
+                            base_coords,
+                            atlas_size,
+                            tile_size.map(|it| it as f32),
+                            bitmask,
+                            image_rect,
+                            zoom,
+                        );
+                        ui.painter().image(
+                            texture_id,
+                            image_rect_se,
+                            atlas_rect.uv_rect(),
+                            Color32::WHITE,
+                        );
+                    }
                 }
                 if i == 0 {
                     let (atlas_rect, image_rect) = get_coords_west(
@@ -719,9 +1035,14 @@ fn draw_walls(
                         tile_size.map(|it| it as f32),
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
                 }
                 if i == floor_part_config.floor_data[j].len() - 2 {
                     let (atlas_rect, image_rect) = get_coords_east(
@@ -730,9 +1051,14 @@ fn draw_walls(
                         tile_size.map(|it| it as f32),
                         bitmask,
                         image_rect,
-                        zoom
+                        zoom,
                     );
-                    ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+                    ui.painter().image(
+                        texture_id,
+                        image_rect,
+                        atlas_rect.uv_rect(),
+                        Color32::WHITE,
+                    );
                 }
             }
         }
