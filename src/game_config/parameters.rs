@@ -779,6 +779,25 @@ mod tests {
         compile_expression_parameter(source, &mut cache)
     }
 
+
+
+    fn parse_for_tests(source: &str) -> ParsedExpressionParameter {
+        let mut cache = parameter_cache_for_tests();
+        parse_expression_parameter(source, &mut cache)
+    }
+
+    fn assert_error_contains(source: &str, expected_part: &str) {
+        match compile_for_tests(source) {
+            Error { compile_error } => {
+                assert!(
+                    compile_error.contains(expected_part),
+                    "source: {source}, expected error part: {expected_part}, actual error: {compile_error}",
+                );
+            }
+            compiled => panic!("expected compile error for `{source}`, got {compiled:?}"),
+        }
+    }
+
     fn assert_operator_arity_is_ok(
         source: &str,
         expected_operator: ParameterOperator,
@@ -939,4 +958,165 @@ mod tests {
             assert_operator_arity_is_error(source, "rand", arity);
         }
     }
+
+    #[test]
+    fn test_unknown_parameter_name_is_error_and_uses_invalid_id() {
+        let source = "(+ {неизвестная_черта} 1)";
+        let parsed = parse_for_tests(source);
+
+        assert!(parsed.has_errors(), "source: {source}");
+        assert!(
+            parsed.errors.contains("Неизвестная черта `неизвестная_черта`"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert_eq!(
+            Operator(
+                Plus,
+                vec![
+                    ParameterValue(ConfigId::INVALID),
+                    Constant(1.0),
+                ],
+            ),
+            parsed.node,
+        );
+
+        assert_error_contains(source, "Неизвестная черта `неизвестная_черта`");
+    }
+
+    #[test]
+    fn test_unknown_tag_name_is_error_and_uses_invalid_id() {
+        let source = "(+ [неизвестная_лычка] 1)";
+        let parsed = parse_for_tests(source);
+
+        assert!(parsed.has_errors(), "source: {source}");
+        assert!(
+            parsed.errors.contains("Неизвестная лычка `неизвестная_лычка`"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert_eq!(
+            Operator(
+                Plus,
+                vec![
+                    TagCount(ConfigId::INVALID),
+                    Constant(1.0),
+                ],
+            ),
+            parsed.node,
+        );
+
+        assert_error_contains(source, "Неизвестная лычка `неизвестная_лычка`");
+    }
+
+    #[test]
+    fn test_invalid_atom_tokens_are_skipped_and_parser_continues() {
+        let source = "(+ 1 мусор 2 @ 3)";
+        let parsed = parse_for_tests(source);
+
+        assert!(parsed.has_errors(), "source: {source}");
+        assert!(
+            parsed.errors.contains("Некорректный токен `мусор`"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert!(
+            parsed.errors.contains("Некорректный токен `@`"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert_eq!(
+            Operator(
+                Plus,
+                vec![
+                    Constant(1.0),
+                    Constant(2.0),
+                    Constant(3.0),
+                ],
+            ),
+            parsed.node,
+        );
+    }
+
+    #[test]
+    fn test_invalid_reference_tokens_are_skipped_and_parser_continues() {
+        let source = "(+ {битая 1 [ 2 3)";
+        let parsed = parse_for_tests(source);
+
+        assert!(parsed.has_errors(), "source: {source}");
+        assert!(
+            parsed.errors.contains("Некорректный токен `{битая`"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert!(
+            parsed.errors.contains("Некорректный токен `[`"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert_eq!(
+            Operator(
+                Plus,
+                vec![
+                    Constant(1.0),
+                    Constant(2.0),
+                    Constant(3.0),
+                ],
+            ),
+            parsed.node,
+        );
+    }
+
+    #[test]
+    fn test_unfinished_expression_is_error_but_partial_ast_is_returned() {
+        let source = "(* 2 (+ 3 4)";
+        let parsed = parse_for_tests(source);
+
+        assert!(parsed.has_errors(), "source: {source}");
+        assert!(
+            parsed.errors.contains("Незавершённое выражение"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert_eq!(
+            Operator(
+                Mul,
+                vec![
+                    Constant(2.0),
+                    Operator(
+                        Plus,
+                        vec![
+                            Constant(3.0),
+                            Constant(4.0),
+                        ],
+                    ),
+                ],
+            ),
+            parsed.node,
+        );
+    }
+
+    #[test]
+    fn test_trailing_text_after_complete_expression_is_error() {
+        let source = "(+ 1 2) (* 3 4)";
+        let parsed = parse_for_tests(source);
+
+        assert!(parsed.has_errors(), "source: {source}");
+        assert!(
+            parsed.errors.contains("После завершённого выражения остался лишний текст"),
+            "source: {source}, error: {}",
+            parsed.errors,
+        );
+        assert_eq!(
+            Operator(
+                Plus,
+                vec![
+                    Constant(1.0),
+                    Constant(2.0),
+                ],
+            ),
+            parsed.node,
+        );
+    }
+
 }
