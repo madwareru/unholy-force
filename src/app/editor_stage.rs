@@ -26,10 +26,6 @@ pub struct EditorStage {
     current_file_kind: AssetKind,
     item_section: ItemConfigEditorSection,
     floor_part_section: FloorPartConfigEditorSection,
-    selected_unit_config: Option<Uuid>,
-    selected_fpa_config: Option<Uuid>,
-    selected_floor_config: Option<Uuid>,
-    selected_floor_graph_config: Option<Uuid>
 }
 
 impl EditorStage {
@@ -41,10 +37,6 @@ impl EditorStage {
             current_file_kind: AssetKind::UnitConfig,
             item_section: Default::default(),
             floor_part_section: Default::default(),
-            selected_unit_config: None,
-            selected_fpa_config: None,
-            selected_floor_config: None,
-            selected_floor_graph_config: None
         }
     }
 
@@ -80,6 +72,8 @@ impl EditorStage {
                 AssetKind::FloorPartAdjacency => 450f32,
                 AssetKind::FloorConfig => 450f32,
                 AssetKind::FloorFlowGraphConfig => 450f32,
+                AssetKind::ParameterConfig => 450f32,
+                AssetKind::TagConfig => 450f32,
             };
 
             let right_panel_width = screen_width - 300f32 - preferred_central_width;
@@ -90,63 +84,33 @@ impl EditorStage {
                     ui.vertical(|ui| {
                         ui.add_space(6f32);
                         ui.group(|ui| {
-                            ui.columns(2, |ui| {
-                                ui[0].vertical(|ui| {
+                            const COLUMN_COUNT: usize = 2;
+                            
+                            
+                            
+                            ui.columns(COLUMN_COUNT, |ui| {
+                                let mut offset = 0;
+                                for kind in [
+                                    AssetKind::UnitConfig,
+                                    AssetKind::ItemConfig,
+                                    AssetKind::FloorPart,
+                                    AssetKind::FloorPartAdjacency,
+                                    AssetKind::FloorConfig,
+                                    AssetKind::FloorFlowGraphConfig,
+                                    AssetKind::ParameterConfig,
+                                    AssetKind::TagConfig,
+                                ] {
+                                    let ui = &mut ui[offset];
+                                    offset = (offset + 1) % COLUMN_COUNT;
                                     if thick_selector_button(
                                         ui,
-                                        self.current_file_kind == AssetKind::UnitConfig,
+                                        self.current_file_kind == kind,
                                         Align2::CENTER_CENTER,
-                                        "Персонажи"
+                                        kind.editor_label()
                                     ).clicked() {
-                                        self.current_file_kind = AssetKind::UnitConfig;
+                                        self.current_file_kind = kind;
                                     };
-                                    ui.add_space(4f32);
-                                    if thick_selector_button(
-                                        ui,
-                                        self.current_file_kind == AssetKind::FloorPart,
-                                        Align2::CENTER_CENTER,
-                                        "Части уровней"
-                                    ).clicked() {
-                                        self.current_file_kind = AssetKind::FloorPart;
-                                    };
-                                    ui.add_space(4f32);
-                                    if thick_selector_button(
-                                        ui,
-                                        self.current_file_kind == AssetKind::FloorConfig,
-                                        Align2::CENTER_CENTER,
-                                        "Этажи"
-                                    ).clicked() {
-                                        self.current_file_kind = AssetKind::FloorConfig;
-                                    };
-                                });
-                                ui[1].vertical(|ui| {
-                                    if thick_selector_button(
-                                        ui,
-                                        self.current_file_kind == AssetKind::ItemConfig,
-                                        Align2::CENTER_CENTER,
-                                        "Предметы"
-                                    ).clicked() {
-                                        self.current_file_kind = AssetKind::ItemConfig;
-                                    };
-                                    ui.add_space(4f32);
-                                    if thick_selector_button(
-                                        ui,
-                                        self.current_file_kind == AssetKind::FloorPartAdjacency,
-                                        Align2::CENTER_CENTER,
-                                        "Связи частей"
-                                    ).clicked() {
-                                        self.current_file_kind = AssetKind::FloorPartAdjacency;
-                                    };
-                                    ui.add_space(4f32);
-                                    if thick_selector_button(
-                                        ui,
-                                        self.current_file_kind == AssetKind::FloorFlowGraphConfig,
-                                        Align2::CENTER_CENTER,
-                                        "Граф этажей"
-                                    ).clicked() {
-                                        self.current_file_kind = AssetKind::FloorFlowGraphConfig;
-                                    };
-                                });
+                                }
                             });
                         });
 
@@ -158,6 +122,8 @@ impl EditorStage {
                                 AssetKind::FloorPartAdjacency => self.draw_fpa_selector(ui),
                                 AssetKind::FloorConfig => self.draw_floor_selector(ui),
                                 AssetKind::FloorFlowGraphConfig => self.draw_floor_graph_selector(ui),
+                                AssetKind::ParameterConfig => todo!(),
+                                AssetKind::TagConfig => todo!()
                             }
                         });
 

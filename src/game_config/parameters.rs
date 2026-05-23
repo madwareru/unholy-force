@@ -1,0 +1,751 @@
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use crate::assets::{AssetKind};
+use crate::game_config::{Config, ConfigId};
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub enum ParameterType {
+    #[default]
+    Constant,
+    Expression(String)
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub enum ParameterOperator {
+    Plus,
+    Minus,
+    Mul,
+    Div,
+    Clamp,
+    Min,
+    Max,
+    Round,
+    Rand
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub enum ExpressionParameterNode {
+    /// `{имя_черты}`
+    ParameterValue(ConfigId<ParameterConfig>),
+    /// `[имя_лычки]`
+    TagCount(ConfigId<TagConfig>),
+    /// `123.456789`
+    Constant(f32),
+    /// `(+ 123.456789 {x} [y] (* 2.0 6.0))`
+    Operator(ParameterOperator, Vec<ExpressionParameterNode>)
+}
+impl Default for ExpressionParameterNode {
+    fn default() -> Self { ExpressionParameterNode::Constant(0.0) }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq)]
+pub enum CompiledExpressionParameterNode {
+    #[default]
+    None,
+    Error { compile_error: String },
+    Ok(ExpressionParameterNode)
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct ParameterConfig {
+    /// Имя для формул
+    pub bound_name: String,
+    /// Название в игре
+    pub name: String,
+    /// Описание в игре
+    pub description: String,
+    pub sprite_name : String,
+    pub parameter_type: ParameterType,
+    compiled_expression: CompiledExpressionParameterNode
+}
+
+impl Config for ParameterConfig {}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct TagConfig {
+    /// Имя для формул
+    pub bound_name: String,
+    /// Название в игре
+    pub name: String,
+    /// Описание в игре
+    pub description: String,
+    pub sprite_name : String
+}
+
+impl Config for TagConfig {}
+
+pub struct ExpressionParameterIdCache {
+    tags: HashMap<String, ConfigId<TagConfig>>,
+    parameters: HashMap<String, ConfigId<ParameterConfig>>,
+    is_test: bool,
+}
+impl ExpressionParameterIdCache {
+    pub fn new() -> Self {
+        Self {
+            tags: HashMap::new(),
+            parameters: HashMap::new(),
+            is_test: false,
+        }
+    }
+
+    fn resolve_tag_id(&mut self, tag_name: &str)  {
+        if self.is_test {
+            // в тестах ассетов нет и разрешать нечего
+            return;
+        }
+        if let Ok(asset_db) = crate::assets::ASSET_DATABASE.lock() {
+            for (uuid, _) in asset_db.list_all_assets(AssetKind::TagConfig) {
+                let asset_text = asset_db.load_json5_asset(AssetKind::TagConfig, uuid);
+                let tag_config = json5::from_str::<TagConfig>(&asset_text).ok()
+                    .expect("Failed to parse tag config");
+                if tag_name == tag_config.bound_name {
+                    self.tags.insert(tag_name.to_string(), ConfigId::from_uuid(uuid));
+                    break;
+                }
+            }
+        }
+    }
+
+    fn resolve_parameter_id(&mut self, parameter_name: &str)  {
+        if self.is_test {
+            // в тестах ассетов нет и разрешать нечего
+            return;
+        }
+        if let Ok(asset_db) = crate::assets::ASSET_DATABASE.lock() {
+            for (uuid, _) in asset_db.list_all_assets(AssetKind::ParameterConfig) {
+                let asset_text = asset_db.load_json5_asset(AssetKind::ParameterConfig, uuid);
+                let parameter_config = json5::from_str::<ParameterConfig>(&asset_text).ok()
+                    .expect("Failed to parse parameter config");
+                if parameter_name == parameter_config.bound_name {
+                    self.parameters.insert(parameter_name.to_string(), ConfigId::from_uuid(uuid));
+                    break;
+                }
+            }
+        }
+    }
+
+    pub fn flush_tag_id(&mut self, tag_name: &str) {
+        self.tags.remove(tag_name);
+    }
+
+    pub fn flush_parameter_id(&mut self, parameter_name: &str) {
+        self.parameters.remove(parameter_name);
+    }
+
+    pub fn get_tag_id(&mut self, tag_name: &str) -> Option<ConfigId<TagConfig>> {
+        if !self.tags.contains_key(tag_name) {
+            self.resolve_tag_id(tag_name);
+        }
+        self.tags.get(tag_name).copied()
+    }
+    pub fn get_parameter_id(&mut self, parameter_name: &str) -> Option<ConfigId<ParameterConfig>> {
+        if !self.parameters.contains_key(parameter_name) {
+            self.resolve_parameter_id(parameter_name);
+        }
+        self.parameters.get(parameter_name).copied()
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct ParsedExpressionParameter {
+    /// AST is still returned even if `errors` is non-empty.
+    /// This is useful for editor UI: unknown ids are represented as `ConfigId::INVALID`.
+    node: ExpressionParameterNode,
+    /// Empty string means that parsing and name resolution succeeded.
+    /// Several errors are separated by newlines.
+    errors: String,
+}
+
+impl ParsedExpressionParameter {
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn into_compiled(self) -> CompiledExpressionParameterNode {
+        let ParsedExpressionParameter { node, errors } = self;
+        if errors.is_empty() {
+            CompiledExpressionParameterNode::Ok(node)
+        } else {
+            CompiledExpressionParameterNode::Error { compile_error: errors }
+        }
+    }
+}
+
+impl ParameterOperator {
+    fn from_prefix_token(token: &str) -> Option<Self> {
+        match token {
+            "+" => Some(Self::Plus),
+            "-" => Some(Self::Minus),
+            "*" => Some(Self::Mul),
+            "/" => Some(Self::Div),
+            "clamp" => Some(Self::Clamp),
+            "min" => Some(Self::Min),
+            "max" => Some(Self::Max),
+            "round" => Some(Self::Round),
+            "rand" => Some(Self::Rand),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum ExpressionToken {
+    LParen { byte: usize },
+    RParen { byte: usize },
+    Atom { text: String, byte: usize },
+    Parameter { name: String, raw: String, byte: usize },
+    Tag { name: String, raw: String, byte: usize },
+    Invalid { raw: String, reason: String, byte: usize },
+}
+
+impl ExpressionToken {
+    fn byte(&self) -> usize {
+        match self {
+            Self::LParen { byte }
+            | Self::RParen { byte }
+            | Self::Atom { byte, .. }
+            | Self::Parameter { byte, .. }
+            | Self::Tag { byte, .. }
+            | Self::Invalid { byte, .. } => *byte,
+        }
+    }
+
+    fn raw_text(&self) -> &str {
+        match self {
+            Self::LParen { .. } => "(",
+            Self::RParen { .. } => ")",
+            Self::Atom { text, .. } => text,
+            Self::Parameter { raw, .. } => raw,
+            Self::Tag { raw, .. } => raw,
+            Self::Invalid { raw, .. } => raw,
+        }
+    }
+}
+
+struct ExpressionTokenizer<'a> {
+    text: &'a str,
+    cursor: usize,
+}
+
+impl<'a> ExpressionTokenizer<'a> {
+    fn new(text: &'a str) -> Self {
+        Self { text, cursor: 0 }
+    }
+
+    fn peek_char(&self) -> Option<char> {
+        self.text[self.cursor..].chars().next()
+    }
+
+    fn bump_char(&mut self) -> Option<char> {
+        let ch = self.peek_char()?;
+        self.cursor += ch.len_utf8();
+        Some(ch)
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self.peek_char().is_some_and(char::is_whitespace) {
+            self.bump_char();
+        }
+    }
+
+    fn read_plain_atom(&mut self, start: usize) -> ExpressionToken {
+        while let Some(ch) = self.peek_char() {
+            if ch.is_whitespace() || matches!(ch, '(' | ')' | '{' | '}' | '[' | ']') {
+                break;
+            }
+            self.bump_char();
+        }
+
+        ExpressionToken::Atom {
+            text: self.text[start..self.cursor].to_string(),
+            byte: start,
+        }
+    }
+
+    fn read_braced_name(
+        &mut self,
+        start: usize,
+        close: char,
+        make_token: impl FnOnce(String, String, usize) -> ExpressionToken,
+        kind_name: &'static str,
+    ) -> ExpressionToken {
+        // consume opening bracket
+        self.bump_char();
+        let name_start = self.cursor;
+
+        while let Some(ch) = self.peek_char() {
+            if ch == close {
+                let name = self.text[name_start..self.cursor].to_string();
+                self.bump_char();
+                let raw = self.text[start..self.cursor].to_string();
+
+                if name.is_empty() {
+                    return ExpressionToken::Invalid {
+                        raw,
+                        reason: format!("пустое имя {}", kind_name),
+                        byte: start,
+                    };
+                }
+
+                return make_token(name, raw, start);
+            }
+
+            if ch.is_whitespace() || matches!(ch, '(' | ')' | '{' | '[' | '}' | ']') {
+                return ExpressionToken::Invalid {
+                    raw: self.text[start..self.cursor].to_string(),
+                    reason: format!("незавершённая ссылка на {}", kind_name),
+                    byte: start,
+                };
+            }
+
+            self.bump_char();
+        }
+
+        ExpressionToken::Invalid {
+            raw: self.text[start..self.cursor].to_string(),
+            reason: format!("незавершённая ссылка на {}", kind_name),
+            byte: start,
+        }
+    }
+}
+
+impl Iterator for ExpressionTokenizer<'_> {
+    type Item = ExpressionToken;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.skip_whitespace();
+
+        let start = self.cursor;
+        let ch = self.peek_char()?;
+
+        match ch {
+            '(' => {
+                self.bump_char();
+                Some(ExpressionToken::LParen { byte: start })
+            }
+            ')' => {
+                self.bump_char();
+                Some(ExpressionToken::RParen { byte: start })
+            }
+            '{' => Some(self.read_braced_name(
+                start,
+                '}',
+                |name, raw, byte| ExpressionToken::Parameter { name, raw, byte },
+                "черту",
+            )),
+            '[' => Some(self.read_braced_name(
+                start,
+                ']',
+                |name, raw, byte| ExpressionToken::Tag { name, raw, byte },
+                "лычку",
+            )),
+            '}' | ']' => {
+                self.bump_char();
+                Some(ExpressionToken::Invalid {
+                    raw: ch.to_string(),
+                    reason: "закрывающая скобка без открывающей".to_string(),
+                    byte: start,
+                })
+            }
+            _ => Some(self.read_plain_atom(start)),
+        }
+    }
+}
+
+struct ExpressionFrame {
+    operator: Option<ParameterOperator>,
+    args: Vec<ExpressionParameterNode>,
+    open_byte: usize,
+}
+
+impl ExpressionFrame {
+    fn new(open_byte: usize) -> Self {
+        Self {
+            operator: None,
+            args: Vec::new(),
+            open_byte,
+        }
+    }
+}
+
+fn push_parse_error(errors: &mut String, message: impl AsRef<str>) {
+    if !errors.is_empty() {
+        errors.push('\n');
+    }
+    errors.push_str(message.as_ref());
+}
+
+fn escaped_token(token: &str) -> String {
+    token.escape_debug().to_string()
+}
+
+fn short_tail_from(source: &str, byte: usize) -> String {
+    const LIMIT: usize = 80;
+
+    let tail = source[byte..].trim();
+    let mut result = String::new();
+
+    for ch in tail.chars().take(LIMIT) {
+        result.push(ch);
+    }
+
+    if tail.chars().count() > LIMIT {
+        result.push_str("...");
+    }
+
+    escaped_token(&result)
+}
+
+fn receive_expression_node(
+    node: ExpressionParameterNode,
+    stack: &mut Vec<ExpressionFrame>,
+    root: &mut Option<ExpressionParameterNode>,
+    errors: &mut String,
+) {
+    if let Some(parent) = stack.last_mut() {
+        if parent.operator.is_some() {
+            parent.args.push(node);
+        } else {
+            push_parse_error(
+                errors,
+                format!(
+                    "В выражении, начатом на байте {}, ожидался оператор; вложенное выражение проигнорировано.",
+                    parent.open_byte
+                ),
+            );
+        }
+    } else if root.is_none() {
+        *root = Some(node);
+    }
+}
+
+fn close_expression_frame(
+    stack: &mut Vec<ExpressionFrame>,
+    root: &mut Option<ExpressionParameterNode>,
+    errors: &mut String,
+    close_byte: usize,
+) {
+    let Some(frame) = stack.pop() else {
+        push_parse_error(
+            errors,
+            format!("Некорректный токен `)` на байте {}: закрывающая скобка без открывающей.", close_byte),
+        );
+        return;
+    };
+
+    let Some(operator) = frame.operator else {
+        push_parse_error(
+            errors,
+            format!("В выражении, начатом на байте {}, отсутствует оператор.", frame.open_byte),
+        );
+        return;
+    };
+
+    receive_expression_node(
+        ExpressionParameterNode::Operator(operator, frame.args),
+        stack,
+        root,
+        errors,
+    );
+}
+
+fn collapse_unfinished_frames(
+    stack: &mut Vec<ExpressionFrame>,
+    root: &mut Option<ExpressionParameterNode>,
+    errors: &mut String,
+) {
+    while let Some(frame) = stack.pop() {
+        push_parse_error(
+            errors,
+            format!("Незавершённое выражение: не закрыта `(`, открытая на байте {}.", frame.open_byte),
+        );
+
+        let Some(operator) = frame.operator else {
+            push_parse_error(
+                errors,
+                format!("В незавершённом выражении, начатом на байте {}, отсутствует оператор.", frame.open_byte),
+            );
+            continue;
+        };
+
+        receive_expression_node(
+            ExpressionParameterNode::Operator(operator, frame.args),
+            stack,
+            root,
+            errors,
+        );
+    }
+}
+
+fn resolve_parameter_reference(
+    cache: &mut ExpressionParameterIdCache,
+    name: &str,
+    byte: usize,
+    errors: &mut String,
+) -> ConfigId<ParameterConfig> {
+    if let Some(id) = cache.get_parameter_id(name) {
+        id
+    } else {
+        push_parse_error(
+            errors,
+            format!("Неизвестная черта `{}` на байте {}.", escaped_token(name), byte),
+        );
+        ConfigId::INVALID
+    }
+}
+
+fn resolve_tag_reference(
+    cache: &mut ExpressionParameterIdCache,
+    name: &str,
+    byte: usize,
+    errors: &mut String,
+) -> ConfigId<TagConfig> {
+    if let Some(id) = cache.get_tag_id(name) {
+        id
+    } else {
+        push_parse_error(
+            errors,
+            format!("Неизвестная лычка `{}` на байте {}.", escaped_token(name), byte),
+        );
+        ConfigId::INVALID
+    }
+}
+
+fn value_token_to_node(
+    token: ExpressionToken,
+    cache: &mut ExpressionParameterIdCache,
+    errors: &mut String,
+) -> Option<ExpressionParameterNode> {
+    match token {
+        ExpressionToken::Atom { text, byte } => match text.parse::<f32>() {
+            Ok(value) => Some(ExpressionParameterNode::Constant(value)),
+            Err(_) => {
+                push_parse_error(
+                    errors,
+                    format!("Некорректный токен `{}` на байте {}: ожидалось число, ссылка или s-expression.", escaped_token(&text), byte),
+                );
+                None
+            }
+        },
+        ExpressionToken::Parameter { name, byte, .. } => Some(ExpressionParameterNode::ParameterValue(
+            resolve_parameter_reference(cache, &name, byte, errors),
+        )),
+        ExpressionToken::Tag { name, byte, .. } => Some(ExpressionParameterNode::TagCount(
+            resolve_tag_reference(cache, &name, byte, errors),
+        )),
+        ExpressionToken::Invalid { raw, reason, byte } => {
+            push_parse_error(
+                errors,
+                format!("Некорректный токен `{}` на байте {}: {}.", escaped_token(&raw), byte, reason),
+            );
+            None
+        }
+        ExpressionToken::LParen { .. } | ExpressionToken::RParen { .. } => None,
+    }
+}
+
+/// Parses an expression based on prefix s-expressions:
+///
+/// - `{hp}`: parameter value;
+/// - `[poisoned]`: tag count;
+/// - `123.0`: constant;
+/// - `(+ 123.0 {hp} [poisoned] (* 2.0 6.0))`: operator expression.
+///
+/// The parser intentionally tries to recover after errors:
+/// unknown names become `ConfigId::INVALID`, invalid tokens are skipped,
+/// unfinished operator expressions are collapsed into partial AST nodes.
+pub fn parse_expression_parameter(
+    source: &str,
+    cache: &mut ExpressionParameterIdCache,
+) -> ParsedExpressionParameter {
+    let mut stack = Vec::<ExpressionFrame>::new();
+    let mut root = None::<ExpressionParameterNode>;
+    let mut errors = String::new();
+    let mut reported_trailing_text = false;
+
+    for token in ExpressionTokenizer::new(source) {
+        if root.is_some() && stack.is_empty() {
+            if !reported_trailing_text {
+                push_parse_error(
+                    &mut errors,
+                    format!(
+                        "После завершённого выражения остался лишний текст, начиная с байта {}: `{}`.",
+                        token.byte(),
+                        short_tail_from(source, token.byte())
+                    ),
+                );
+                reported_trailing_text = true;
+            }
+
+            if let ExpressionToken::Invalid { raw, reason, byte } = token {
+                push_parse_error(
+                    &mut errors,
+                    format!("Некорректный токен `{}` на байте {}: {}.", escaped_token(&raw), byte, reason),
+                );
+            }
+
+            continue;
+        }
+
+        match token {
+            ExpressionToken::LParen { byte } => {
+                stack.push(ExpressionFrame::new(byte));
+            }
+            ExpressionToken::RParen { byte } => {
+                close_expression_frame(&mut stack, &mut root, &mut errors, byte);
+            }
+            ExpressionToken::Atom { text, byte } if stack.last().is_some_and(|frame| frame.operator.is_none()) => {
+                if let Some(operator) = ParameterOperator::from_prefix_token(&text) {
+                    if let Some(frame) = stack.last_mut() {
+                        frame.operator = Some(operator);
+                    }
+                } else {
+                    push_parse_error(
+                        &mut errors,
+                        format!(
+                            "Некорректный токен `{}` на байте {}: после `(` ожидался оператор.",
+                            escaped_token(&text),
+                            byte
+                        ),
+                    );
+                }
+            }
+            token if stack.last().is_some_and(|frame| frame.operator.is_none()) => {
+                push_parse_error(
+                    &mut errors,
+                    format!(
+                        "Некорректный токен `{}` на байте {}: после `(` ожидался оператор.",
+                        escaped_token(token.raw_text()),
+                        token.byte()
+                    ),
+                );
+            }
+            token => {
+                if let Some(node) = value_token_to_node(token, cache, &mut errors) {
+                    receive_expression_node(node, &mut stack, &mut root, &mut errors);
+                }
+            }
+        }
+    }
+
+    collapse_unfinished_frames(&mut stack, &mut root, &mut errors);
+
+    let node = match root {
+        Some(node) => node,
+        None => {
+            push_parse_error(
+                &mut errors,
+                "Выражение пустое или не содержит ни одного разбираемого узла.",
+            );
+            ExpressionParameterNode::default()
+        }
+    };
+
+    ParsedExpressionParameter { node, errors }
+}
+
+pub fn compile_expression_parameter(
+    source: &str,
+    cache: &mut ExpressionParameterIdCache,
+) -> CompiledExpressionParameterNode {
+    parse_expression_parameter(source, cache).into_compiled()
+}
+
+impl ParameterConfig {
+    pub fn compile_expression(&mut self, cache: &mut ExpressionParameterIdCache) {
+        self.compiled_expression = match &self.parameter_type {
+            ParameterType::Constant => CompiledExpressionParameterNode::None,
+            ParameterType::Expression(source) => compile_expression_parameter(source, cache),
+        };
+    }
+
+    pub fn compiled_expression(&self) -> &CompiledExpressionParameterNode {
+        &self.compiled_expression
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::CompiledExpressionParameterNode::*;
+    use super::ParameterOperator::*;
+    use super::ExpressionParameterNode::*;
+
+    fn test_damage_tag() -> ConfigId<TagConfig> {
+        ConfigId::from_uuid(uuid::Uuid::from_bytes([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]))
+    }
+    fn test_health_grown_tag() -> ConfigId<TagConfig> {
+        ConfigId::from_uuid(uuid::Uuid::from_bytes([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]))
+    }
+
+    fn test_base_hp_parameter() -> ConfigId<ParameterConfig> {
+        ConfigId::from_uuid(uuid::Uuid::from_bytes([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3]))
+    }
+
+    fn test_hp_growth_multiplier_parameter() -> ConfigId<ParameterConfig> {
+        ConfigId::from_uuid(uuid::Uuid::from_bytes([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4]))
+    }
+
+    fn parameter_cache_for_tests() -> ExpressionParameterIdCache {
+        let mut tags = HashMap::new();
+        let mut parameters = HashMap::new();
+
+        tags.insert(
+            "урон".to_string(),
+            test_damage_tag()
+        );
+        tags.insert(
+            "здоровье_развил".to_string(),
+            test_health_grown_tag()
+        );
+
+        parameters.insert(
+            "базовое_здоровье".to_string(),
+            test_base_hp_parameter()
+        );
+        parameters.insert(
+            "здоровье_прирост".to_string(),
+            test_hp_growth_multiplier_parameter()
+        );
+
+        ExpressionParameterIdCache {
+            tags,
+            parameters,
+            is_test: true
+        }
+    }
+
+    #[test]
+    fn test_parsing() {
+        let source = "(- (+ {базовое_здоровье} (* [здоровье_развил] {здоровье_прирост})) [урон])";
+        let mut cache = parameter_cache_for_tests();
+        let mut parameter_config = ParameterConfig::default();
+        parameter_config.parameter_type = ParameterType::Expression(source.to_string());
+        parameter_config.compile_expression(&mut cache);
+        assert_eq!(
+            &Ok(
+                Operator(
+                    Minus,
+                    vec![
+                        Operator(
+                            Plus,
+                            vec![
+                                ParameterValue(test_base_hp_parameter()),
+                                Operator(
+                                    Mul,
+                                    vec![
+                                        TagCount(test_health_grown_tag()),
+                                        ParameterValue(test_hp_growth_multiplier_parameter()),
+                                    ]
+                                )
+                            ]
+                        ),
+                        TagCount(test_damage_tag())
+                    ]
+                )
+            ),
+            parameter_config.compiled_expression()
+        )
+    }
+}

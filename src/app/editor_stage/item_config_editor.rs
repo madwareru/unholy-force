@@ -3,8 +3,10 @@ use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::items::{ItemConfig, ItemRarity};
 use crate::graphics::SPRITE_ATLAS_DEF;
-use egui::{Align, Label, PointerButton, PopupCloseBehavior, TextEdit, Ui};
+use egui::{PointerButton, PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
+
+const STACK_INFO_TEXT: &str = "При значении 1 предмет не складывается в стопку";
 
 #[derive(Default)]
 pub struct ItemConfigEditorSection {
@@ -321,32 +323,38 @@ impl EditorStage {
                                             update_state = UpdateState::Changed;
                                         }
                                     });
-                                    ui.horizontal(|ui| {
-                                        ui.label("Редкость:");
-                                        let full_width = ui.available_width();
-
-                                        egui::ComboBox::from_id_salt("rarity")
-                                            .width(full_width)
-                                            .selected_text(current_item_config.item_rarity.display_name())
-                                            .show_ui(ui, |ui| {
-                                                for v in [
-                                                    ItemRarity::Generic,
-                                                    ItemRarity::Rare,
-                                                    ItemRarity::Unique,
-                                                    ItemRarity::Legendary
-                                                ] {
-                                                    if ui.selectable_value(
-                                                        &mut current_item_config.item_rarity,
-                                                        v,
-                                                        v.display_name()
-                                                    ).clicked() {
-                                                        update_state = UpdateState::Changed;
-                                                    }
-                                                }
-                                            });
-                                    });
                                 }
                             }
+
+                            ui.horizontal(|ui| {
+                                ui.label("Редкость:");
+
+                                egui::ComboBox::from_id_salt("rarity")
+                                    .selected_text(current_item_config.item_rarity.display_name())
+                                    .show_ui(ui, |ui| {
+                                        for v in [
+                                            ItemRarity::Generic,
+                                            ItemRarity::Rare,
+                                            ItemRarity::Unique,
+                                            ItemRarity::Legendary
+                                        ] {
+                                            if ui.selectable_value(
+                                                &mut current_item_config.item_rarity,
+                                                v,
+                                                v.display_name()
+                                            ).clicked() {
+                                                update_state = UpdateState::Changed;
+                                            }
+                                        }
+                                    });
+
+                                ui.label("Максимум в стопке:");
+                                if ui.add(
+                                    egui::Slider::new(&mut current_item_config.stack_limit, 1..=100)
+                                ).on_hover_text(STACK_INFO_TEXT).changed() {
+                                    update_state = UpdateState::Changed
+                                }
+                            });
                         });
                     });
                     update_state

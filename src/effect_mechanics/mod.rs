@@ -113,6 +113,7 @@ pub trait EffectMechanic {
     fn tick(
         &self,
         game_world: &mut GameWorld,
-        effect_id: EntityId, delayed_effect_queue: &mut DelayedEffectQueue
+        effect_id: EntityId,
+        delayed_effect_queue: &mut DelayedEffectQueue
     ) -> EffectMechanicFlow;
 }

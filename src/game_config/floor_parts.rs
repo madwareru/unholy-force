@@ -46,7 +46,7 @@ impl Default for FloorCellExtra {
     fn default() -> Self { FloorCellExtra::None }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FloorPartConfig {
     pub floor_data: [[FloorGraphicsTileGroup; 5]; 5],
     pub wall_data: [[WallGraphicsTileGroup; 5]; 5],

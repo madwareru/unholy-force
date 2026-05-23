@@ -27,7 +27,7 @@ impl UnitDanger {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct UnitConfig {
     pub name: String,
     pub description: String,

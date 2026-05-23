@@ -17,7 +17,23 @@ pub enum AssetKind {
     FloorPart,
     FloorPartAdjacency,
     FloorConfig,
-    FloorFlowGraphConfig
+    FloorFlowGraphConfig,
+    ParameterConfig,
+    TagConfig
+}
+impl AssetKind {
+    pub fn editor_label(&self) -> &'static str {
+        match self {
+            AssetKind::UnitConfig => "Персонажи",
+            AssetKind::ItemConfig => "Предметы",
+            AssetKind::FloorPart => "Части этажей",
+            AssetKind::FloorPartAdjacency => "Связи частей",
+            AssetKind::FloorConfig => "Этажи",
+            AssetKind::FloorFlowGraphConfig => "Граф этажей",
+            AssetKind::ParameterConfig => "Черты",
+            AssetKind::TagConfig => "Лычки"
+        }
+    }
 }
 
 pub struct AssetDb {
@@ -34,6 +50,8 @@ impl AssetDb {
         let mut floor_part_adjacency_assets = HashMap::new();
         let mut floor_assets = HashMap::new();
         let mut floor_flow_graph_assets = HashMap::new();
+        let mut parameter_assets = HashMap::new();
+        let mut tag_assets = HashMap::new();
 
         for (kind, map, ext) in [
             (AssetKind::UnitConfig, &mut unit_assets, ".json5"),
@@ -42,6 +60,8 @@ impl AssetDb {
             (AssetKind::FloorPartAdjacency, &mut floor_part_adjacency_assets, ".json5"),
             (AssetKind::FloorConfig, &mut floor_assets, ".json5"),
             (AssetKind::FloorFlowGraphConfig, &mut floor_flow_graph_assets, ".json5"),
+            (AssetKind::ParameterConfig, &mut parameter_assets, ".json5"),
+            (AssetKind::TagConfig, &mut tag_assets, ".json5"),
         ] {
             let asset_dir = get_or_create_asset_dir(kind);
             if let Ok(dir) = std::fs::read_dir(asset_dir) {
@@ -81,6 +101,8 @@ impl AssetDb {
         assets.insert(AssetKind::FloorPartAdjacency, floor_part_adjacency_assets);
         assets.insert(AssetKind::FloorConfig, floor_assets);
         assets.insert(AssetKind::FloorFlowGraphConfig, floor_flow_graph_assets);
+        assets.insert(AssetKind::ParameterConfig, parameter_assets);
+        assets.insert(AssetKind::TagConfig, tag_assets);
 
         Self {
             assets,
@@ -113,10 +135,10 @@ impl AssetDb {
         str::from_utf8(&self.assets[&kind][&uuid].1)
             .expect("Failed to load json5 asset")
     }
-    
+
     pub fn load_asset(&self, kind: AssetKind, uuid: Uuid) -> &[u8] {
         &self.assets[&kind][&uuid].1
-    }   
+    }
 
     pub fn update_asset(&mut self, kind: AssetKind, uuid: Uuid, data: &[u8]) {
         if let Some(assets) = self.assets.get_mut(&kind) {
@@ -185,7 +207,9 @@ fn asset_dir(kind: AssetKind) -> PathBuf {
             AssetKind::FloorPart => "floor_parts",
             AssetKind::FloorPartAdjacency => "floor_part_adjacency",
             AssetKind::FloorConfig => "floors",
-            AssetKind::FloorFlowGraphConfig => "floor_flow_graph"
+            AssetKind::FloorFlowGraphConfig => "floor_flow_graph",
+            AssetKind::ParameterConfig => "parameters",
+            AssetKind::TagConfig => "tags",
         }
     )
 }

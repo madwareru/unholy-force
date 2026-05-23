@@ -7,6 +7,8 @@ use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use crate::game_config::floor_parts::FloorPartConfig;
 use crate::game_config::floors::FloorConfig;
 use crate::game_config::items::ItemConfig;
+use crate::game_config::parameters::ParameterConfig;
+use crate::game_config::parameters::TagConfig;
 use crate::game_config::units::UnitConfig;
 
 pub mod units;
@@ -16,7 +18,6 @@ pub mod floor_part_adjacency;
 pub mod floors;
 pub mod floor_flow_graph;
 pub mod parameters;
-pub mod tags;
 pub mod effects;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -61,20 +62,7 @@ impl<T: Config> Default for ConfigId<T> {
     }
 }
 
-pub trait Config {}
-
-pub trait ConfigMode {
-    type RequiredConfigId<T: Config>;
-    type OptionalConfigId<T: Config>;
-}
-
-pub struct GameConfigMode;
-pub struct EditorConfigMode;
-
-impl ConfigMode for GameConfigMode {
-    type RequiredConfigId<T: Config> = ConfigId<T>;
-    type OptionalConfigId<T: Config> = Option<ConfigId<T>>;
-}
+pub trait Config : Clone {}
 
 pub trait ConfigProvider<T: Config> {
     fn get_config(&self, config_id: ConfigId<T>) -> Option<&T>;
@@ -87,6 +75,8 @@ pub struct GameConfigProvider {
     floor_parts_adjacency: HashMap<Uuid, FloorPartAdjacencyConfig>,
     floors: HashMap<Uuid, FloorConfig>,
     effect_mechanics: HashMap<Uuid, EffectMechanicConfig>,
+    parameters: HashMap<Uuid, ParameterConfig>,
+    tags: HashMap<Uuid, TagConfig>,
 }
 
 macro_rules! impl_provider {
@@ -105,3 +95,5 @@ impl_provider!(FloorPartConfig <- floor_parts);
 impl_provider!(FloorPartAdjacencyConfig <- floor_parts_adjacency);
 impl_provider!(FloorConfig <- floors);
 impl_provider!(EffectMechanicConfig <- effect_mechanics);
+impl_provider!(ParameterConfig <- parameters);
+impl_provider!(TagConfig <- tags);

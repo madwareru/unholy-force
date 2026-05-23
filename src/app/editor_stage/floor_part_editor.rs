@@ -189,6 +189,11 @@ impl EditorStage {
                                     update_state = UpdateState::Changed;
                                 }
                             });
+
+                            let full_width = ui.available_width();
+                            let full_height = ui.available_height();
+                            let padding = (full_height - full_width) / 2f32;
+                            ui.add_space(padding);
                             if let Some([x, y]) = floor_part_editor(
                                 ui,
                                 texture_id,
@@ -208,6 +213,7 @@ impl EditorStage {
                                 }
                                 update_state = UpdateState::Changed;
                             }
+                            ui.add_space(padding);
                         });
                     });
                     update_state

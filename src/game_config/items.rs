@@ -2,15 +2,13 @@ use serde::{Deserialize, Serialize};
 use crate::game_config::{Config, ConfigId};
 use crate::game_config::effects::EffectMechanicConfig;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Default)]
 pub enum ItemRarity {
+    #[default]
     Generic = 0,
     Rare = 1,
     Unique = 2,
     Legendary = 3
-}
-impl Default for ItemRarity {
-    fn default() -> Self { Self::Generic }
 }
 impl ItemRarity {
     pub fn display_name(self) -> &'static str {
@@ -36,15 +34,30 @@ impl Default for ItemKind {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ItemConfig {
     pub name: String,
     pub description: String,
     pub sprite_name : String,
     pub sprite_pivot: [u8; 2],
     pub item_rarity: ItemRarity,
-    pub is_stackable : bool,
+    #[serde(default = "default_stack_limit")]
+    pub stack_limit : u8,
     pub kind: ItemKind
 }
+impl Default for ItemConfig {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            description: String::new(),
+            sprite_name: String::new(),
+            sprite_pivot: [0, 0],
+            item_rarity: ItemRarity::default(),
+            stack_limit: default_stack_limit(),
+            kind: ItemKind::default()
+        }
+    }
+}
+fn default_stack_limit() -> u8 { 1 }
 
 impl Config for ItemConfig {}
