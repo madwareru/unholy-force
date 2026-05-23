@@ -187,6 +187,20 @@ impl ParameterOperator {
             _ => None,
         }
     }
+
+    fn prefix_token(self) -> &'static str {
+        match self {
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Mul => "*",
+            Self::Div => "/",
+            Self::Clamp => "clamp",
+            Self::Min => "min",
+            Self::Max => "max",
+            Self::Round => "round",
+            Self::Rand => "rand",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -380,6 +394,46 @@ fn escaped_token(token: &str) -> String {
     token.escape_debug().to_string()
 }
 
+fn validate_operator_arity(
+    operator: ParameterOperator,
+    actual_arity: usize,
+    errors: &mut String,
+) {
+    let expected = match operator {
+        ParameterOperator::Plus | ParameterOperator::Minus if actual_arity == 0 => {
+            Some("ожидался хотя бы 1 аргумент")
+        }
+        ParameterOperator::Mul | ParameterOperator::Div if actual_arity < 2 => {
+            Some("ожидалось хотя бы 2 аргумента")
+        }
+        ParameterOperator::Min | ParameterOperator::Max if actual_arity != 2 => {
+            Some("ожидалось ровно 2 аргумента")
+        }
+        ParameterOperator::Clamp if actual_arity != 3 => {
+            Some("ожидалось ровно 3 аргумента")
+        }
+        ParameterOperator::Round if actual_arity != 1 => {
+            Some("ожидался ровно 1 аргумент")
+        }
+        ParameterOperator::Rand if actual_arity != 2 => {
+            Some("ожидалось ровно 2 аргумента")
+        }
+        _ => None,
+    };
+
+    if let Some(expected) = expected {
+        push_parse_error(
+            errors,
+            format!(
+                "Некорректная арность оператора `{}`: {}, получено {}.",
+                operator.prefix_token(),
+                expected,
+                actual_arity,
+            ),
+        );
+    }
+}
+
 fn short_tail_from(source: &str, byte: usize) -> String {
     const LIMIT: usize = 80;
 
@@ -442,6 +496,8 @@ fn close_expression_frame(
         return;
     };
 
+    validate_operator_arity(operator, frame.args.len(), errors);
+
     receive_expression_node(
         ExpressionParameterNode::Operator(operator, frame.args),
         stack,
@@ -468,6 +524,8 @@ fn collapse_unfinished_frames(
             );
             continue;
         };
+
+        validate_operator_arity(operator, frame.args.len(), errors);
 
         receive_expression_node(
             ExpressionParameterNode::Operator(operator, frame.args),
@@ -716,6 +774,45 @@ mod tests {
         }
     }
 
+    fn compile_for_tests(source: &str) -> CompiledExpressionParameterNode {
+        let mut cache = parameter_cache_for_tests();
+        compile_expression_parameter(source, &mut cache)
+    }
+
+    fn assert_operator_arity_is_ok(
+        source: &str,
+        expected_operator: ParameterOperator,
+        expected_arity: usize,
+    ) {
+        match compile_for_tests(source) {
+            Ok(Operator(operator, args)) => {
+                assert_eq!(expected_operator, operator, "source: {source}");
+                assert_eq!(expected_arity, args.len(), "source: {source}");
+            }
+            compiled => panic!("expected valid operator expression for `{source}`, got {compiled:?}"),
+        }
+    }
+
+    fn assert_operator_arity_is_error(source: &str, operator_token: &str, actual_arity: usize) {
+        match compile_for_tests(source) {
+            Error { compile_error } => {
+                assert!(
+                    compile_error.contains("Некорректная арность оператора"),
+                    "source: {source}, error: {compile_error}",
+                );
+                assert!(
+                    compile_error.contains(&format!("оператора `{operator_token}`")),
+                    "source: {source}, error: {compile_error}",
+                );
+                assert!(
+                    compile_error.contains(&format!("получено {actual_arity}")),
+                    "source: {source}, error: {compile_error}",
+                );
+            }
+            compiled => panic!("expected arity error for `{source}`, got {compiled:?}"),
+        }
+    }
+
     #[test]
     fn test_parsing() {
         let source = "(- (+ {базовое_здоровье} (* [здоровье_развил] {здоровье_прирост})) [урон])";
@@ -747,5 +844,99 @@ mod tests {
             ),
             parameter_config.compiled_expression()
         )
+    }
+
+    #[test]
+    fn test_plus_and_minus_arity() {
+        for (source, operator, arity) in [
+            ("(+ 1)", Plus, 1),
+            ("(+ 1 2)", Plus, 2),
+            ("(+ 1 2 3)", Plus, 3),
+            ("(- 1)", Minus, 1),
+            ("(- 1 2)", Minus, 2),
+            ("(- 1 2 3)", Minus, 3),
+        ] {
+            assert_operator_arity_is_ok(source, operator, arity);
+        }
+
+        assert_operator_arity_is_error("(+)", "+", 0);
+        assert_operator_arity_is_error("(-)", "-", 0);
+    }
+
+    #[test]
+    fn test_mul_and_div_arity() {
+        for (source, operator, arity) in [
+            ("(* 1 2)", Mul, 2),
+            ("(* 1 2 3)", Mul, 3),
+            ("(/ 1 2)", Div, 2),
+            ("(/ 1 2 3)", Div, 3),
+        ] {
+            assert_operator_arity_is_ok(source, operator, arity);
+        }
+
+        for (source, operator_token, arity) in [
+            ("(*)", "*", 0),
+            ("(* 1)", "*", 1),
+            ("(/)", "/", 0),
+            ("(/ 1)", "/", 1),
+        ] {
+            assert_operator_arity_is_error(source, operator_token, arity);
+        }
+    }
+
+    #[test]
+    fn test_min_and_max_arity() {
+        assert_operator_arity_is_ok("(min 1 2)", Min, 2);
+        assert_operator_arity_is_ok("(max 1 2)", Max, 2);
+
+        for (source, operator_token, arity) in [
+            ("(min)", "min", 0),
+            ("(min 1)", "min", 1),
+            ("(min 1 2 3)", "min", 3),
+            ("(max)", "max", 0),
+            ("(max 1)", "max", 1),
+            ("(max 1 2 3)", "max", 3),
+        ] {
+            assert_operator_arity_is_error(source, operator_token, arity);
+        }
+    }
+
+    #[test]
+    fn test_clamp_arity() {
+        assert_operator_arity_is_ok("(clamp 1 2 3)", Clamp, 3);
+
+        for (source, arity) in [
+            ("(clamp)", 0),
+            ("(clamp 1)", 1),
+            ("(clamp 1 2)", 2),
+            ("(clamp 1 2 3 4)", 4),
+        ] {
+            assert_operator_arity_is_error(source, "clamp", arity);
+        }
+    }
+
+    #[test]
+    fn test_round_arity() {
+        assert_operator_arity_is_ok("(round 1)", Round, 1);
+
+        for (source, arity) in [
+            ("(round)", 0),
+            ("(round 1 2)", 2),
+        ] {
+            assert_operator_arity_is_error(source, "round", arity);
+        }
+    }
+
+    #[test]
+    fn test_rand_arity() {
+        assert_operator_arity_is_ok("(rand 1 2)", Rand, 2);
+
+        for (source, arity) in [
+            ("(rand)", 0),
+            ("(rand 1)", 1),
+            ("(rand 1 2 3)", 3),
+        ] {
+            assert_operator_arity_is_error(source, "rand", arity);
+        }
     }
 }
