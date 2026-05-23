@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::app::game_stage::{EntityId, GameWorld};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
-pub enum EffectMechanicTag {
+pub enum EffectMechanicSetting {
     SimpleAttack
 }
 
@@ -16,22 +16,22 @@ pub struct EffectMechanicRegistry {
 
 #[derive(Default)]
 pub struct EffectMechanicProvider {
-    mechanics: HashMap<EffectMechanicTag, Box<dyn EffectMechanic>>
+    mechanics: HashMap<EffectMechanicSetting, Box<dyn EffectMechanic>>
 }
 impl EffectMechanicProvider {
     fn get_or_create_effect_mechanic(
         &mut self,
-        tag: EffectMechanicTag
+        setting: EffectMechanicSetting
     ) -> &dyn EffectMechanic {
-        if !self.mechanics.contains_key(&tag) {
+        if !self.mechanics.contains_key(&setting) {
             self.mechanics.insert(
-                tag,
-                match tag {
-                    EffectMechanicTag::SimpleAttack => todo!()
+                setting,
+                match setting {
+                    EffectMechanicSetting::SimpleAttack => todo!()
                 }
             );
         }
-        let Some(mechanic) = self.mechanics.get(&tag).map(|it| it.as_ref()) else {
+        let Some(mechanic) = self.mechanics.get(&setting).map(|it| it.as_ref()) else {
             unreachable!()
         };
         mechanic
@@ -42,11 +42,11 @@ impl EffectMechanicRegistry {
     pub fn create_effect(
         &mut self,
         game_world: &mut GameWorld,
-        tag: EffectMechanicTag,
+        setting: EffectMechanicSetting,
         effect_context: EffectContext
     ) {
-        let mechanic = self.provider.get_or_create_effect_mechanic(tag);
-        let effect_id = game_world.spawn((tag, effect_context));
+        let mechanic = self.provider.get_or_create_effect_mechanic(setting);
+        let effect_id = game_world.spawn((setting, effect_context));
         mechanic.setup(game_world, effect_id);
     }
 
@@ -56,22 +56,22 @@ impl EffectMechanicRegistry {
         game_world: &mut GameWorld
     ) {
         let bump = &self.bump;
-        let tag = {
-            match game_world.get::<&EffectMechanicTag>(effect_id) {
-                Ok(tag) => *tag,
+        let mechanic_setting = {
+            match game_world.get::<&EffectMechanicSetting>(effect_id) {
+                Ok(mechanic_setting) => *mechanic_setting,
                 _ => panic!("No effect found for {:?}", effect_id)
             }
         };
 
         let mut queue = DelayedEffectQueue(Vec::new_in(bump));
-        let mechanic = self.provider.get_or_create_effect_mechanic(tag);
+        let mechanic = self.provider.get_or_create_effect_mechanic(mechanic_setting);
         if let EffectMechanicFlow::Complete = mechanic.tick(game_world, effect_id, &mut queue) {
             mechanic.on_destroy(game_world, effect_id);
             game_world.despawn(effect_id).expect("Failed to despawn effect");
         }
-        for DelayedEffect { tag, effect_context } in queue.drain() {
-            let effect_id = game_world.spawn((tag, effect_context));
-            let mechanic = self.provider.get_or_create_effect_mechanic(tag);
+        for DelayedEffect { mechanic_setting, effect_context } in queue.drain() {
+            let effect_id = game_world.spawn((mechanic_setting, effect_context));
+            let mechanic = self.provider.get_or_create_effect_mechanic(mechanic_setting);
             mechanic.setup(game_world, effect_id);
         }
     }
@@ -79,14 +79,14 @@ impl EffectMechanicRegistry {
 
 #[derive(Copy, Clone, Debug)]
 struct DelayedEffect {
-    tag: EffectMechanicTag,
+    mechanic_setting: EffectMechanicSetting,
     effect_context: EffectContext
 }
 
 pub struct DelayedEffectQueue<'a>(Vec<'a, DelayedEffect>);
 impl<'a> DelayedEffectQueue<'a> {
-    pub fn push(&mut self, tag: EffectMechanicTag, effect_context: EffectContext) {
-        self.0.push(DelayedEffect { tag, effect_context } );
+    pub fn push(&mut self, mechanic_setting: EffectMechanicSetting, effect_context: EffectContext) {
+        self.0.push(DelayedEffect { mechanic_setting, effect_context } );
     }
 
     fn drain(&mut self) -> impl Iterator<Item = DelayedEffect> + '_ {

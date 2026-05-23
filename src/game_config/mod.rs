@@ -64,11 +64,11 @@ impl<T: Config> Default for ConfigId<T> {
 
 pub trait Config : Clone {}
 
-pub trait ConfigProvider<T: Config> {
+pub trait ConfigProviderImpl<T: Config> {
     fn get_config(&self, config_id: ConfigId<T>) -> Option<&T>;
 }
 
-pub struct GameConfigProvider {
+pub struct ConfigProvider {
     units: HashMap<Uuid, UnitConfig>,
     items: HashMap<Uuid, ItemConfig>,
     floor_parts: HashMap<Uuid, FloorPartConfig>,
@@ -77,11 +77,17 @@ pub struct GameConfigProvider {
     effect_mechanics: HashMap<Uuid, EffectMechanicConfig>,
     parameters: HashMap<Uuid, ParameterConfig>,
     tags: HashMap<Uuid, TagConfig>,
+    game_config: GameConfig
+}
+impl ConfigProvider {
+    pub fn get_game_config(&self) -> &GameConfig {
+        &self.game_config
+    }
 }
 
 macro_rules! impl_provider {
     ($x:ident <- $y:ident) => {
-        impl ConfigProvider<$x> for GameConfigProvider {
+        impl ConfigProviderImpl<$x> for ConfigProvider {
             fn get_config(&self, config_id: ConfigId<$x>) -> Option<&$x> {
                 self.$y.get(&config_id.uuid)
             }
@@ -97,3 +103,17 @@ impl_provider!(FloorConfig <- floors);
 impl_provider!(EffectMechanicConfig <- effect_mechanics);
 impl_provider!(ParameterConfig <- parameters);
 impl_provider!(TagConfig <- tags);
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct GameConfig{
+    unit_configs: Vec<ConfigId<UnitConfig>>,
+    item_configs: Vec<ConfigId<ItemConfig>>,
+    floor_part_configs: Vec<ConfigId<FloorPartConfig>>,
+    floor_part_adjacency_configs: Vec<ConfigId<FloorPartAdjacencyConfig>>,
+    floor_configs: Vec<ConfigId<FloorConfig>>,
+    effect_mechanic_configs: Vec<ConfigId<EffectMechanicConfig>>,
+    parameter_configs: Vec<ConfigId<ParameterConfig>>,
+    tag_configs: Vec<ConfigId<TagConfig>>,
+}
+
+impl Config for GameConfig {}

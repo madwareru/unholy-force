@@ -15,4 +15,4 @@ uuid = { version = "1.23.1", features = ["serde"] }
 rand = "0.10.1"
 hecs = "0.11.0"
 bumpalo = { version = "3.20.2", features = ["collections"] }
-copy_from_str = "1.0.6"
+egui-snarl = { version = "0.7.1", features = ["serde"] }
