@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use crate::assets::{AssetKind};
 use crate::game_config::{Config, ConfigId};
+use crate::game_config::effects::EffectMechanicConfig;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub enum ParameterType {
@@ -54,8 +55,12 @@ pub struct ParameterConfig {
     pub name: String,
     /// Описание в игре
     pub description: String,
+    /// Иконка для информационных окон
     pub sprite_name : String,
+    /// Тип черты
     pub parameter_type: ParameterType,
+    /// В случае если черта вычисляемая, содержит скомпилированное выражение
+    /// (или ошибку, если не удалось скомпилировать)
     compiled_expression: CompiledExpressionParameterNode
 }
 
@@ -69,7 +74,10 @@ pub struct TagConfig {
     pub name: String,
     /// Описание в игре
     pub description: String,
-    pub sprite_name : String
+    /// Иконка для информационных окон
+    pub sprite_name : String,
+    /// Эффект, который может быть создан при наложении лычки
+    pub effect_mechanic: Option<ConfigId<EffectMechanicConfig>>,
 }
 
 impl Config for TagConfig {}
@@ -149,11 +157,7 @@ impl ExpressionParameterIdCache {
 
 #[derive(Clone, Debug)]
 pub struct ParsedExpressionParameter {
-    /// AST is still returned even if `errors` is non-empty.
-    /// This is useful for editor UI: unknown ids are represented as `ConfigId::INVALID`.
     node: ExpressionParameterNode,
-    /// Empty string means that parsing and name resolution succeeded.
-    /// Several errors are separated by newlines.
     errors: String,
 }
 
@@ -778,8 +782,6 @@ mod tests {
         let mut cache = parameter_cache_for_tests();
         compile_expression_parameter(source, &mut cache)
     }
-
-
 
     fn parse_for_tests(source: &str) -> ParsedExpressionParameter {
         let mut cache = parameter_cache_for_tests();
