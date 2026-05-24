@@ -5,6 +5,7 @@ use egui::{
     Align2, Color32, CornerRadius, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId,
     Ui, Vec2, pos2, vec2,
 };
+use crate::game_config::units::UnitConfig;
 
 #[derive(Clone, Copy, Debug)]
 struct AtlasSpriteRect {
@@ -161,14 +162,19 @@ pub fn atlas_sprite_button(
     response
 }
 
-pub fn pivot_editor(
+pub trait SpriteHolder {
+    fn sprite_name(&self) -> &str;
+    fn sprite_pivot(&mut self) -> &mut [u8; 2];
+}
+
+pub fn pivot_editor<Holder: SpriteHolder>(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
-    item_config: &mut ItemConfig,
+    sprite_holder: &mut Holder,
     zoom: f32,
 ) -> Response {
-    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[&item_config.sprite_name];
+    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[sprite_holder.sprite_name()];
     let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
 
     let sprite = AtlasSpriteRect::from_u16(
@@ -199,10 +205,10 @@ pub fn pivot_editor(
             Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
             StrokeKind::Inside,
         );
-
+        
         let pivot_screen_pos = pos2(
-            rect.left() + (item_config.sprite_pivot[0] as f32 + 0.5) * zoom,
-            rect.top() + (item_config.sprite_pivot[1] as f32 + 0.5) * zoom,
+            rect.left() + (sprite_holder.sprite_pivot()[0] as f32 + 0.5) * zoom,
+            rect.top() + (sprite_holder.sprite_pivot()[1] as f32 + 0.5) * zoom,
         );
 
         ui.painter()
@@ -221,8 +227,8 @@ pub fn pivot_editor(
                 let max_x = sprite_size_px.x as u8 - 1;
                 let max_y = sprite_size_px.y as u8 - 1;
 
-                item_config.sprite_pivot[0] = local_x.clamp(0, max_x);
-                item_config.sprite_pivot[1] = local_y.clamp(0, max_y);
+                sprite_holder.sprite_pivot()[0] = local_x.clamp(0, max_x);
+                sprite_holder.sprite_pivot()[1] = local_y.clamp(0, max_y);
             }
         }
     }
@@ -285,6 +291,79 @@ pub fn item_visualizer(
         let image_pos = pos2(
             central_point.x - item_config.sprite_pivot[0] as f32 * zoom,
             central_point.y - item_config.sprite_pivot[1] as f32 * zoom,
+        );
+
+        let image_rect = Rect::from_min_max(image_pos, image_pos + image_size);
+        ui.painter()
+            .image(texture_id, image_rect, sprite.uv_rect(), Color32::WHITE);
+
+        draw_walls(
+            ui,
+            texture_id,
+            atlas_size,
+            &MOCK_FLOOR_PART_CONFIG,
+            zoom,
+            tile_size,
+            rect,
+        );
+    }
+}
+
+pub fn unit_visualizer(
+    ui: &mut Ui,
+    texture_id: TextureId,
+    atlas_size: [u16; 2],
+    unit_config: &UnitConfig,
+) {
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF
+        .tile_size
+        .map(|it| it as f32);
+    let display_size = vec2(
+        tile_size[0] * MOCK_FLOOR_PART_CONFIG.floor_data[0].len() as f32,
+        tile_size[1] * MOCK_FLOOR_PART_CONFIG.floor_data.len() as f32,
+    );
+    let available_width = ui.available_width();
+    let zoom = available_width / display_size.x;
+    let display_size = display_size * zoom;
+
+    let (rect, _) = ui.allocate_exact_size(display_size, Sense::empty());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect_stroke(
+            rect,
+            CornerRadius::ZERO,
+            Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
+            StrokeKind::Inside,
+        );
+
+        draw_floors(
+            ui,
+            texture_id,
+            atlas_size,
+            &MOCK_FLOOR_PART_CONFIG,
+            zoom,
+            tile_size,
+            rect,
+        );
+
+        let central_point = rect.center();
+        let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[&unit_config.sprite_name];
+        let sprite_size = [
+            sprite_data.size[0] as u16 * tile_size[0] as u16,
+            sprite_data.size[1] as u16 * tile_size[1] as u16,
+        ];
+        let sprite = AtlasSpriteRect::from_u16(
+            atlas_size,
+            [
+                sprite_data.coords[0] as u16 * tile_size[0] as u16,
+                sprite_data.coords[1] as u16 * tile_size[1] as u16,
+            ],
+            sprite_size,
+        );
+
+        let image_size = [sprite_size[0] as f32 * zoom, sprite_size[1] as f32 * zoom].into();
+        let image_pos = pos2(
+            central_point.x - unit_config.sprite_pivot[0] as f32 * zoom,
+            central_point.y - unit_config.sprite_pivot[1] as f32 * zoom,
         );
 
         let image_rect = Rect::from_min_max(image_pos, image_pos + image_size);
@@ -1291,6 +1370,142 @@ pub fn item_selector_button(
                 pos2(rect.min.x + 8f32, rarity_y),
                 Align2::LEFT_CENTER,
                 item_config.item_rarity.display_name(),
+                TextStyle::Button.resolve(ui.style()),
+                text_color,
+            );
+        }
+    }
+
+    response
+}
+
+pub fn unit_selector_button(
+    ui: &mut Ui,
+    selected: bool,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    editor_name: &str,
+    unit_config: &UnitConfig,
+) -> Response {
+    let desired_size = vec2(ui.available_width(), ui.spacing().interact_size.y * 4f32);
+
+    let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+
+        let fill = if selected {
+            ui.visuals().selection.bg_fill
+        } else {
+            visuals.bg_fill
+        };
+
+        let stroke = if selected {
+            ui.visuals().selection.stroke
+        } else {
+            visuals.bg_stroke
+        };
+
+        let text_color = if selected {
+            ui.visuals().selection.stroke.color
+        } else {
+            visuals.text_color()
+        };
+
+        let rounding = CornerRadius::same(4);
+
+        ui.painter().rect_filled(rect, rounding, fill);
+        ui.painter()
+            .rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
+        let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
+
+        let sprite_rect =
+            SPRITE_ATLAS_DEF
+                .sprites
+                .get(&unit_config.sprite_name)
+                .map(|sprite_data| {
+                    AtlasSpriteRect::from_u16(
+                        atlas_size,
+                        [
+                            sprite_data.coords[0] as u16 * tile_size[0] as u16,
+                            sprite_data.coords[1] as u16 * tile_size[1] as u16,
+                        ],
+                        [
+                            sprite_data.size[0] as u16 * tile_size[0] as u16,
+                            sprite_data.size[1] as u16 * tile_size[1] as u16,
+                        ],
+                    )
+                });
+
+        let y_step = (rect.max.y - rect.min.y) / 3f32;
+        let editor_name_y = rect.min.y + y_step / 2f32;
+        let name_y = editor_name_y + y_step;
+        let rarity_y = name_y + y_step;
+
+        if let Some(sprite_rect) = sprite_rect {
+            let top = rect.min.y + 4f32;
+            let bottom = rect.max.y - 4f32;
+
+            let h = bottom - top;
+            let zoom = h / sprite_rect.size_px().y;
+            let w = sprite_rect.size_px().x * zoom;
+
+            let sp_rect = Rect::from_min_max(
+                [rect.min.x + 4f32, rect.min.y + 4f32].into(),
+                [rect.min.x + 4f32 + w, rect.min.y + 4f32 + h].into(),
+            );
+
+            ui.painter().image(
+                atlas_texture,
+                sp_rect,
+                sprite_rect.uv_rect(),
+                Color32::WHITE,
+            );
+
+            ui.painter().text(
+                pos2(rect.min.x + w + 8f32, editor_name_y),
+                Align2::LEFT_CENTER,
+                editor_name,
+                TextStyle::Button.resolve(ui.style()),
+                text_color,
+            );
+
+            ui.painter().text(
+                pos2(rect.min.x + w + 8f32, name_y),
+                Align2::LEFT_CENTER,
+                &unit_config.name,
+                TextStyle::Button.resolve(ui.style()),
+                text_color,
+            );
+
+            ui.painter().text(
+                pos2(rect.min.x + w + 8f32, rarity_y),
+                Align2::LEFT_CENTER,
+                unit_config.danger.display_name(),
+                TextStyle::Button.resolve(ui.style()),
+                text_color,
+            );
+        } else {
+            ui.painter().text(
+                pos2(rect.min.x + 8f32, editor_name_y),
+                Align2::LEFT_CENTER,
+                editor_name,
+                TextStyle::Button.resolve(ui.style()),
+                text_color,
+            );
+
+            ui.painter().text(
+                pos2(rect.min.x + 8f32, name_y),
+                Align2::LEFT_CENTER,
+                &unit_config.name,
+                TextStyle::Button.resolve(ui.style()),
+                text_color,
+            );
+
+            ui.painter().text(
+                pos2(rect.min.x + 8f32, rarity_y),
+                Align2::LEFT_CENTER,
+                unit_config.danger.display_name(),
                 TextStyle::Button.resolve(ui.style()),
                 text_color,
             );

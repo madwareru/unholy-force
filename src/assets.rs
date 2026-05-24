@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
 use uuid::Uuid;
+use crate::game_config::{ConfigId, GameConfig};
 
 type SharedAssetDb = Arc<Mutex<AssetDb>>;
 
@@ -14,24 +16,28 @@ lazy_static!(
 pub enum AssetKind {
     UnitConfig,
     ItemConfig,
-    FloorPart,
-    FloorPartAdjacency,
+    FloorPartConfig,
+    FloorPartAdjacencyConfig,
     FloorConfig,
     FloorFlowGraphConfig,
     ParameterConfig,
-    TagConfig
+    TagConfig,
+    EffectMechanicConfig,
+    GameGonfig
 }
 impl AssetKind {
     pub fn editor_label(&self) -> &'static str {
         match self {
             AssetKind::UnitConfig => "Персонажи",
             AssetKind::ItemConfig => "Предметы",
-            AssetKind::FloorPart => "Части этажей",
-            AssetKind::FloorPartAdjacency => "Связи частей",
+            AssetKind::FloorPartConfig => "Части этажей",
+            AssetKind::FloorPartAdjacencyConfig => "Связи частей",
             AssetKind::FloorConfig => "Этажи",
             AssetKind::FloorFlowGraphConfig => "Граф этажей",
             AssetKind::ParameterConfig => "Черты",
-            AssetKind::TagConfig => "Лычки"
+            AssetKind::TagConfig => "Лычки",
+            AssetKind::EffectMechanicConfig => "Механики эффектов",
+            AssetKind::GameGonfig => "Игры"
         }
     }
 }
@@ -56,8 +62,8 @@ impl AssetDb {
         for (kind, map, ext) in [
             (AssetKind::UnitConfig, &mut unit_assets, ".json5"),
             (AssetKind::ItemConfig, &mut item_assets, ".json5"),
-            (AssetKind::FloorPart, &mut floor_part_assets, ".part"),
-            (AssetKind::FloorPartAdjacency, &mut floor_part_adjacency_assets, ".json5"),
+            (AssetKind::FloorPartConfig, &mut floor_part_assets, ".part"),
+            (AssetKind::FloorPartAdjacencyConfig, &mut floor_part_adjacency_assets, ".json5"),
             (AssetKind::FloorConfig, &mut floor_assets, ".json5"),
             (AssetKind::FloorFlowGraphConfig, &mut floor_flow_graph_assets, ".json5"),
             (AssetKind::ParameterConfig, &mut parameter_assets, ".json5"),
@@ -97,8 +103,8 @@ impl AssetDb {
         let mut assets = HashMap::new();
         assets.insert(AssetKind::UnitConfig, unit_assets);
         assets.insert(AssetKind::ItemConfig, item_assets);
-        assets.insert(AssetKind::FloorPart, floor_part_assets);
-        assets.insert(AssetKind::FloorPartAdjacency, floor_part_adjacency_assets);
+        assets.insert(AssetKind::FloorPartConfig, floor_part_assets);
+        assets.insert(AssetKind::FloorPartAdjacencyConfig, floor_part_adjacency_assets);
         assets.insert(AssetKind::FloorConfig, floor_assets);
         assets.insert(AssetKind::FloorFlowGraphConfig, floor_flow_graph_assets);
         assets.insert(AssetKind::ParameterConfig, parameter_assets);
@@ -204,14 +210,20 @@ fn asset_dir(kind: AssetKind) -> PathBuf {
         match kind {
             AssetKind::UnitConfig => "units",
             AssetKind::ItemConfig => "items",
-            AssetKind::FloorPart => "floor_parts",
-            AssetKind::FloorPartAdjacency => "floor_part_adjacency",
+            AssetKind::FloorPartConfig => "floor_parts",
+            AssetKind::FloorPartAdjacencyConfig => "floor_part_adjacency",
             AssetKind::FloorConfig => "floors",
             AssetKind::FloorFlowGraphConfig => "floor_flow_graph",
             AssetKind::ParameterConfig => "parameters",
             AssetKind::TagConfig => "tags",
+            AssetKind::EffectMechanicConfig => "effect_mechanics",
+            AssetKind::GameGonfig => "games"
         }
     )
+}
+
+fn project_dir() -> PathBuf {
+    executable_dir().join("project")
 }
 
 fn get_or_create_asset_dir(kind: AssetKind) -> PathBuf {
@@ -223,6 +235,26 @@ fn get_or_create_asset_dir(kind: AssetKind) -> PathBuf {
     asset_dir
 }
 
+fn get_or_create_project_dir() -> PathBuf {
+    let project_dir = project_dir();
+    if !project_dir.exists() {
+        std::fs::create_dir_all(&project_dir)
+            .unwrap_or_else(|_| panic!("Failed to create project dir: {:?}", &project_dir));
+        update_project_game_config_id(ConfigId::INVALID);
+    }
+    project_dir
+}
+
+fn update_project_game_config_id(game_config_id: ConfigId<GameConfig>) {
+    let game_setting_path = get_or_create_project_dir()
+        .join("game.settings");
+    let mut buffer: Vec<u8> = Vec::new();
+    buffer.write(game_config_id.uuid.as_bytes())
+        .expect("Failed to write game config id into a buffer");
+    std::fs::write(game_setting_path, buffer)
+        .expect("Failed to write game config id into a file");
+}
+
 fn asset_name_file_name(kind: AssetKind, id: Uuid) -> PathBuf {
     asset_dir(kind).join(format!("{}.name", id))
 }
@@ -230,7 +262,7 @@ fn asset_name_file_name(kind: AssetKind, id: Uuid) -> PathBuf {
 fn asset_file_name(kind: AssetKind, id: Uuid) -> PathBuf {
     asset_dir(kind)
         .join(match kind {
-            AssetKind::FloorPart => format!("{id}.part"),
+            AssetKind::FloorPartConfig => format!("{id}.part"),
             _ => format!("{id}.json5")
         })
 }

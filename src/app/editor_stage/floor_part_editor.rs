@@ -45,8 +45,8 @@ impl EditorStage {
                         let mut buffer: Vec<u8> = Vec::new();
                         current_floor_part_config.write(&mut buffer)
                             .expect("Failed to serialize floor part config");
-                        asset_db.update_asset(AssetKind::FloorPart, id, &buffer);
-                        asset_db.rename_asset(AssetKind::FloorPart, id, &name);
+                        asset_db.update_asset(AssetKind::FloorPartConfig, id, &buffer);
+                        asset_db.rename_asset(AssetKind::FloorPartConfig, id, &name);
                     }
                     _ => {}
                 }
@@ -76,7 +76,7 @@ impl EditorStage {
                         const NUM_COLUMNS: usize = 3;
                         let mut to_delete = None;
                         ui.columns(NUM_COLUMNS, |uis| {
-                            let items = asset_db.list_all_assets(AssetKind::FloorPart);
+                            let items = asset_db.list_all_assets(AssetKind::FloorPartConfig);
                             let mut offset = 0;
                             for (id, asset_name) in items {
                                 let ui = &mut uis[offset];
@@ -93,7 +93,7 @@ impl EditorStage {
                                     .map(|it| it.eq(&id))
                                     .unwrap_or(false);
 
-                                let config_bytes = asset_db.load_asset(AssetKind::FloorPart, id);
+                                let config_bytes = asset_db.load_asset(AssetKind::FloorPartConfig, id);
                                 let floor_part_config = FloorPartConfig::load_from_slice(config_bytes)
                                     .expect("Failed to load floor part config");
 
@@ -139,7 +139,7 @@ impl EditorStage {
                                 }
                                 _ => {}
                             }
-                            asset_db.delete_asset(AssetKind::FloorPart, id);
+                            asset_db.delete_asset(AssetKind::FloorPartConfig, id);
                         }
                     });
 
@@ -156,7 +156,7 @@ impl EditorStage {
                     section.current_floor_part_config = Some(default_floor_part_config);
 
                     let id = asset_db.create_asset(
-                        AssetKind::FloorPart,
+                        AssetKind::FloorPartConfig,
                         "",
                         &buffer,
                     );

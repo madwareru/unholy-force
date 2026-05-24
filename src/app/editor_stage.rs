@@ -1,10 +1,17 @@
 use egui::{Align, Align2, Button, StrokeKind, Ui};
 use serde::Deserialize;
-use uuid::Uuid;
-use crate::app::app_stage::AppStageStatus;
-use crate::app::editor_stage::floor_part_editor::FloorPartConfigEditorSection;
-use crate::app::editor_stage::item_config_editor::ItemConfigEditorSection;
-use crate::assets::AssetKind;
+use crate::{
+    app::{
+        app_stage::AppStageStatus,
+        editor_stage::{
+            floor_part_editor::FloorPartConfigEditorSection,
+            item_config_editor::ItemConfigEditorSection,
+            unit_config_editor::UnitConfigEditorSection
+        }
+    },
+    assets::AssetKind
+};
+pub mod unit_config_editor;
 pub mod item_config_editor;
 pub mod floor_part_editor;
 pub mod image_widgets;
@@ -24,6 +31,7 @@ pub struct EditorStage {
     atlas_texture: Option<egui::TextureHandle>,
     atlas_size: [u16; 2],
     current_file_kind: AssetKind,
+    unit_section: UnitConfigEditorSection,
     item_section: ItemConfigEditorSection,
     floor_part_section: FloorPartConfigEditorSection,
 }
@@ -35,6 +43,7 @@ impl EditorStage {
             atlas_texture: None,
             atlas_size: [0; 2],
             current_file_kind: AssetKind::UnitConfig,
+            unit_section: Default::default(),
             item_section: Default::default(),
             floor_part_section: Default::default(),
         }
@@ -68,12 +77,14 @@ impl EditorStage {
             let preferred_central_width = match self.current_file_kind {
                 AssetKind::ItemConfig => 600f32,
                 AssetKind::UnitConfig => 450f32,
-                AssetKind::FloorPart => 670f32,
-                AssetKind::FloorPartAdjacency => 450f32,
+                AssetKind::FloorPartConfig => 670f32,
+                AssetKind::FloorPartAdjacencyConfig => 450f32,
                 AssetKind::FloorConfig => 450f32,
                 AssetKind::FloorFlowGraphConfig => 450f32,
                 AssetKind::ParameterConfig => 450f32,
                 AssetKind::TagConfig => 450f32,
+                AssetKind::EffectMechanicConfig => 450f32,
+                AssetKind::GameGonfig => 450f32,
             };
 
             let right_panel_width = screen_width - 300f32 - preferred_central_width;
@@ -85,16 +96,14 @@ impl EditorStage {
                         ui.add_space(6f32);
                         ui.group(|ui| {
                             const COLUMN_COUNT: usize = 2;
-                            
-                            
-                            
+
                             ui.columns(COLUMN_COUNT, |ui| {
                                 let mut offset = 0;
                                 for kind in [
                                     AssetKind::UnitConfig,
                                     AssetKind::ItemConfig,
-                                    AssetKind::FloorPart,
-                                    AssetKind::FloorPartAdjacency,
+                                    AssetKind::FloorPartConfig,
+                                    AssetKind::FloorPartAdjacencyConfig,
                                     AssetKind::FloorConfig,
                                     AssetKind::FloorFlowGraphConfig,
                                     AssetKind::ParameterConfig,
@@ -118,12 +127,14 @@ impl EditorStage {
                             match self.current_file_kind {
                                 AssetKind::ItemConfig => self.draw_item_selector(ui),
                                 AssetKind::UnitConfig => self.draw_unit_selector(ui),
-                                AssetKind::FloorPart => self.draw_floor_part_selector(ui),
-                                AssetKind::FloorPartAdjacency => self.draw_fpa_selector(ui),
+                                AssetKind::FloorPartConfig => self.draw_floor_part_selector(ui),
+                                AssetKind::FloorPartAdjacencyConfig => self.draw_fpa_selector(ui),
                                 AssetKind::FloorConfig => self.draw_floor_selector(ui),
                                 AssetKind::FloorFlowGraphConfig => self.draw_floor_graph_selector(ui),
                                 AssetKind::ParameterConfig => todo!(),
-                                AssetKind::TagConfig => todo!()
+                                AssetKind::TagConfig => todo!(),
+                                AssetKind::EffectMechanicConfig => todo!(),
+                                AssetKind::GameGonfig => todo!()
                             }
                         });
 
@@ -154,8 +165,9 @@ impl EditorStage {
                 .exact_width(right_panel_width)
                 .show(egui_ctx, |ui| {
                     match self.current_file_kind {
+                        AssetKind::UnitConfig => self.draw_unit_preview_in_level(ui),
                         AssetKind::ItemConfig => self.draw_item_preview_in_level(ui),
-                        AssetKind::FloorPart => self.draw_floor_part_editor_tools(ui),
+                        AssetKind::FloorPartConfig => self.draw_floor_part_editor_tools(ui),
                         _ => {} // todo
                     }
                 });
@@ -163,8 +175,9 @@ impl EditorStage {
             egui::CentralPanel::default()
                 .show(egui_ctx, |ui| {
                 match self.current_file_kind {
+                    AssetKind::UnitConfig => self.draw_unit_editor(ui),
                     AssetKind::ItemConfig => self.draw_item_editor(ui),
-                    AssetKind::FloorPart => self.draw_floor_part_editor(ui),
+                    AssetKind::FloorPartConfig => self.draw_floor_part_editor(ui),
                     _ => {} // todo
                 }
             });
@@ -176,9 +189,6 @@ impl EditorStage {
         // todo: render here something relevant to editor logic
     }
 
-    fn draw_unit_selector(&mut self, _ui: &mut Ui) {
-        // todo
-    }
     fn draw_fpa_selector(&mut self, _ui: &mut Ui) {
         // todo
     }

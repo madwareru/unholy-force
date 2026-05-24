@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::app::editor_stage::image_widgets::SpriteHolder;
 use crate::game_config::{Config, ConfigId};
 use crate::game_config::effects::EffectMechanicConfig;
 
@@ -59,5 +60,14 @@ impl Default for ItemConfig {
     }
 }
 fn default_stack_limit() -> u8 { 1 }
+
+impl SpriteHolder for ItemConfig {
+    fn sprite_name(&self) -> &str {
+        &self.sprite_name
+    }
+    fn sprite_pivot(&mut self) -> &mut [u8; 2] {
+        &mut self.sprite_pivot
+    }
+}
 
 impl Config for ItemConfig {}

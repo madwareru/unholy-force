@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::app::editor_stage::image_widgets::SpriteHolder;
 use crate::game_config::{Config};
 use crate::game_config::floors::LootTableEntry;
 
@@ -25,6 +26,16 @@ impl UnitDanger {
             _ => UnitDanger::Nightmare
         }
     }
+    pub fn display_name(&self) -> &str {
+        match self {
+            UnitDanger::Harmless => "Безобидный",
+            UnitDanger::Weak => "Слабый",
+            UnitDanger::Moderate => "Рядовой",
+            UnitDanger::Challenging => "Непростой",
+            UnitDanger::Horror => "Устрашающий",
+            UnitDanger::Nightmare => "Кошмарный"
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
@@ -34,7 +45,17 @@ pub struct UnitConfig {
     pub sprite_name: String,
     pub sprite_pivot: [u8; 2],
     pub danger: UnitDanger,
-    pub loot_table: Vec<LootTableEntry>
+    #[serde(default)]
+    pub is_catchable: bool,
+}
+
+impl SpriteHolder for UnitConfig {
+    fn sprite_name(&self) -> &str {
+        &self.sprite_name
+    }
+    fn sprite_pivot(&mut self) -> &mut [u8; 2] {
+        &mut self.sprite_pivot
+    }
 }
 
 impl Config for UnitConfig {}
