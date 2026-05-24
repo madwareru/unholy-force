@@ -36,9 +36,7 @@ impl App {
             },
             AppStage::Game => todo!(),
             AppStage::OldGame => todo!(),
-            AppStage::Editor => {
-                self.editor_stage.render();
-            }
+            AppStage::Editor => {}
         }
     }
 

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use serde::{Deserialize, Serialize};
@@ -32,6 +33,27 @@ impl <T: Config> PartialEq for ConfigId<T> {
         self.uuid == other.uuid
     }
 }
+
+impl <T: Config> PartialOrd for ConfigId<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.uuid.partial_cmp(&other.uuid)
+    }
+}
+
+impl <T: Config> Eq for ConfigId<T> {}
+
+impl <T: Config> Ord for ConfigId<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.uuid.cmp(&other.uuid)
+    }
+}
+
+impl <T: Config> std::hash::Hash for ConfigId<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uuid.hash(state);
+    }
+}
+
 
 impl <T: Config> Clone for ConfigId<T> {
     fn clone(&self) -> Self {

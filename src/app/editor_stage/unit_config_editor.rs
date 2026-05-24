@@ -23,6 +23,7 @@ impl EditorStage {
         let section = &mut self.unit_section;
         let name = &mut section.selected_unit_name;
         let cur_unit = &mut section.current_unit_config;
+        
         if let Some(current_unit_config) = cur_unit {
             if foo(name, current_unit_config) == UpdateState::Changed {
                 match section.selected_unit_config_id {
@@ -147,6 +148,7 @@ impl EditorStage {
                         "",
                         &config_text
                     );
+                    section.selected_unit_name.clear();
                     section.selected_unit_config_id = Some(id);
                 }
 

@@ -11,9 +11,12 @@ use crate::{
     },
     assets::AssetKind
 };
+use crate::app::editor_stage::floor_part_adjacency_config_editor::FloorPartAdjacencyConfigEditorSection;
+
 pub mod unit_config_editor;
 pub mod item_config_editor;
 pub mod floor_part_editor;
+pub mod floor_part_adjacency_config_editor;
 pub mod image_widgets;
 
 #[derive(Copy, Clone, Deserialize)]
@@ -34,6 +37,7 @@ pub struct EditorStage {
     unit_section: UnitConfigEditorSection,
     item_section: ItemConfigEditorSection,
     floor_part_section: FloorPartConfigEditorSection,
+    floor_part_adjacency_section: FloorPartAdjacencyConfigEditorSection,
 }
 
 impl EditorStage {
@@ -46,6 +50,7 @@ impl EditorStage {
             unit_section: Default::default(),
             item_section: Default::default(),
             floor_part_section: Default::default(),
+            floor_part_adjacency_section: Default::default(),
         }
     }
 
@@ -53,6 +58,7 @@ impl EditorStage {
         let mut result_status = AppStageStatus::Continue;
 
         egui_macroquad::ui(|egui_ctx| {
+            egui_ctx.set_zoom_factor(2f32);
             if self.atlas_texture.is_none() {
                 let atlas_image = crate::graphics::SPRITE_ATLAS_TEXTURE.get_texture_data();
 
@@ -168,6 +174,7 @@ impl EditorStage {
                         AssetKind::UnitConfig => self.draw_unit_preview_in_level(ui),
                         AssetKind::ItemConfig => self.draw_item_preview_in_level(ui),
                         AssetKind::FloorPartConfig => self.draw_floor_part_editor_tools(ui),
+                        AssetKind::FloorPartAdjacencyConfig => self.draw_adjacency_visualizer(ui),
                         _ => {} // todo
                     }
                 });
@@ -178,6 +185,7 @@ impl EditorStage {
                     AssetKind::UnitConfig => self.draw_unit_editor(ui),
                     AssetKind::ItemConfig => self.draw_item_editor(ui),
                     AssetKind::FloorPartConfig => self.draw_floor_part_editor(ui),
+                    AssetKind::FloorPartAdjacencyConfig => self.draw_floor_part_adjacency_editor(ui),
                     _ => {} // todo
                 }
             });
@@ -185,13 +193,6 @@ impl EditorStage {
         result_status
     }
 
-    pub fn render(&self) {
-        // todo: render here something relevant to editor logic
-    }
-
-    fn draw_fpa_selector(&mut self, _ui: &mut Ui) {
-        // todo
-    }
     fn draw_floor_selector(&mut self, _ui: &mut Ui) {
         // todo
     }

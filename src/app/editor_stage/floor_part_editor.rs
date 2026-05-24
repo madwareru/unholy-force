@@ -1,10 +1,11 @@
-use crate::app::editor_stage::image_widgets::{floor_part_editor, floor_part_selector_button};
+use crate::app::editor_stage::image_widgets::{floor_part_editor, floor_part_id_button};
 use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_parts::FloorPartConfig;
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
 use egui::{Align2, PointerButton, PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
+use crate::game_config::ConfigId;
 
 #[derive(Default)]
 pub struct FloorPartConfigEditorSection {
@@ -38,6 +39,7 @@ impl EditorStage {
         let section = &mut self.floor_part_section;
         let name = &mut section.selected_floor_part_name;
         let cur_part = &mut section.current_floor_part_config;
+
         if let Some(current_floor_part_config) = cur_part {
             if foo(name, current_floor_part_config) == UpdateState::Changed {
                 match section.selected_floor_part_config_id {
@@ -55,6 +57,9 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_floor_part_selector(&mut self, ui: &mut Ui) {
+        const FLOOR_PART_SELECTOR_BUTTON_SIZE: f32 = 85f32;
+        const FLOOR_PART_SELECTOR_BUTTON_PADDING: f32 = 5f32;
+
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
                 let full_width = ui.available_width();
@@ -93,21 +98,19 @@ impl EditorStage {
                                     .map(|it| it.eq(&id))
                                     .unwrap_or(false);
 
-                                let config_bytes = asset_db.load_asset(AssetKind::FloorPartConfig, id);
-                                let floor_part_config = FloorPartConfig::load_from_slice(config_bytes)
-                                    .expect("Failed to load floor part config");
-
-                                let response = floor_part_selector_button(
+                                let (response, floor_part_config) = floor_part_id_button(
                                     ui,
                                     selected,
-                                    asset_name,
-                                    &floor_part_config
+                                    &asset_db,
+                                    ConfigId::from_uuid(id),
+                                    FLOOR_PART_SELECTOR_BUTTON_SIZE,
+                                    FLOOR_PART_SELECTOR_BUTTON_PADDING
                                 );
 
                                 let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
 
                                 if response.clicked_by(PointerButton::Primary) {
-                                    section.current_floor_part_config = Some(floor_part_config);
+                                    section.current_floor_part_config = floor_part_config;
                                     section.selected_floor_part_name.clear();
                                     section.selected_floor_part_name += asset_name;
                                     section.selected_floor_part_config_id = Some(id);
@@ -160,6 +163,7 @@ impl EditorStage {
                         "",
                         &buffer,
                     );
+                    section.selected_floor_part_name.clear();
                     section.selected_floor_part_config_id = Some(id);
                 }
             }

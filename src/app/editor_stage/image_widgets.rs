@@ -5,6 +5,9 @@ use egui::{
     Align2, Color32, CornerRadius, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId,
     Ui, Vec2, pos2, vec2,
 };
+use uuid::Uuid;
+use crate::assets::{AssetDb, AssetKind};
+use crate::game_config::ConfigId;
 use crate::game_config::units::UnitConfig;
 
 #[derive(Clone, Copy, Debug)]
@@ -205,7 +208,7 @@ pub fn pivot_editor<Holder: SpriteHolder>(
             Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
             StrokeKind::Inside,
         );
-        
+
         let pivot_screen_pos = pos2(
             rect.left() + (sprite_holder.sprite_pivot()[0] as f32 + 0.5) * zoom,
             rect.top() + (sprite_holder.sprite_pivot()[1] as f32 + 0.5) * zoom,
@@ -1144,11 +1147,13 @@ fn draw_walls(
     }
 }
 
-pub fn floor_part_selector_button(
+fn floor_part_button(
     ui: &mut Ui,
     selected: bool,
     editor_name: &str,
     floor_part_config: &FloorPartConfig,
+    button_size: f32,
+    button_padding: f32,
 ) -> Response {
     fn get_floor_color(group: FloorGraphicsTileGroup) -> Color32 {
         match group {
@@ -1168,12 +1173,7 @@ pub fn floor_part_selector_button(
         }
     }
 
-    const BUTTON_SIZE: f32 = 85f32;
-    const BUTTON_PADDING: f32 = 5f32;
-
-    let button_size = vec2(BUTTON_SIZE, BUTTON_SIZE);
-
-    let (rect, response) = ui.allocate_exact_size(button_size, Sense::click());
+    let (rect, response) = ui.allocate_exact_size(vec2(button_size, button_size), Sense::click());
 
     if ui.is_rect_visible(rect) {
         let visuals = ui.style().interact(&response);
@@ -1202,10 +1202,10 @@ pub fn floor_part_selector_button(
         ui.painter()
             .rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
 
-        let mut point = rect.min + vec2(BUTTON_PADDING, BUTTON_PADDING);
+        let mut point = rect.min + vec2(button_padding, button_padding);
         let cell_size = vec2(
-            (BUTTON_SIZE - BUTTON_PADDING * 2f32) / 5f32,
-            (BUTTON_SIZE - BUTTON_PADDING * 2f32) / 5f32,
+            (button_size - button_padding * 2f32) / 5f32,
+            (button_size - button_padding * 2f32) / 5f32,
         );
         for j in 0..5 {
             for i in 0..5 {
@@ -1231,13 +1231,182 @@ pub fn floor_part_selector_button(
         let text_x = rect.center().x;
         let text_y = rect.max.y - ui.spacing().interact_size.y * 0.5f32;
 
+        // Контрастная обводка:
+        for j in -1..=1 {
+            for i in -1..=1 {
+                if i * j == 0 { continue; }
+                let added_vec = vec2(i as f32, j as f32);
+                ui.painter().text(
+                    pos2(text_x, text_y) + added_vec,
+                    Align2::CENTER_CENTER,
+                    editor_name,
+                    TextStyle::Small.resolve(ui.style()),
+                    Color32::BLACK,
+                );
+            }
+        }
+
         ui.painter().text(
             pos2(text_x, text_y),
             Align2::CENTER_CENTER,
             editor_name,
             TextStyle::Small.resolve(ui.style()),
-            text_color,
+            Color32::WHITE,
         );
+    }
+
+    response
+}
+
+pub fn floor_part_id_button(
+    ui: &mut Ui,
+    selected: bool,
+    asset_db: &AssetDb,
+    floor_part_config_id: ConfigId<FloorPartConfig>,
+    button_size: f32,
+    button_padding: f32,
+)-> (Response, Option<FloorPartConfig>) {
+    if asset_db.has_asset(AssetKind::FloorPartConfig, floor_part_config_id.uuid) {
+        let editor_name = asset_db.asset_name(AssetKind::FloorPartConfig, floor_part_config_id.uuid);
+        let config_bytes = asset_db.load_asset(AssetKind::FloorPartConfig, floor_part_config_id.uuid);
+        let floor_part_config = FloorPartConfig::load_from_slice(config_bytes)
+            .expect("Failed to load floor part config");
+
+        let response = floor_part_button(
+            ui,
+            selected,
+            editor_name,
+            &floor_part_config,
+            button_size,
+            button_padding,
+        );
+
+        (
+            response,
+            Some(floor_part_config)
+        )
+    } else {
+        (
+            broken_uuid_button(ui, [button_size, button_size], floor_part_config_id.uuid),
+            None
+        )
+    }
+}
+
+pub fn broken_uuid_button(
+    ui: &mut Ui,
+    button_size: [f32; 2],
+    uuid: Uuid
+) -> Response {
+    let (rect, response) = ui.allocate_exact_size(button_size.into(), Sense::click());
+    if ui.is_rect_visible(rect) {
+        let rounding = CornerRadius::same(4);
+
+        ui.painter().rect_filled(
+            rect,
+            rounding,
+            if uuid.is_nil() {
+                Color32::DARK_GRAY
+            } else {
+                Color32::MAGENTA
+            },
+        );
+
+        ui.painter().rect_stroke(
+            rect,
+            rounding,
+            ui.style().interact(&response).bg_stroke,
+            StrokeKind::Inside
+        );
+
+        let text = if uuid.is_nil() {
+            "Нет ссылки"
+        } else {
+            "Битая ссылка"
+        };
+
+        let text_width = rect.width() * 0.9;
+
+        let mut job = egui::text::LayoutJob::simple(
+            text.to_owned(),
+            TextStyle::Small.resolve(ui.style()),
+            Color32::WHITE,
+            text_width,
+        );
+
+        job.halign = egui::Align::Center;
+
+        let galley = ui.painter().layout_job(job);
+
+
+        let text_rect = Rect::from_center_size(
+            rect.center(),
+            vec2(text_width, galley.size().y),
+        );
+
+        // Текст внутри galley выровнян таким образом, что минимум у него
+        // имеет отрицательные координаты по `x`, но минимум по `y` это 0, то
+        // есть по сути там лежит [-`w`/2..`w`/2, 0..`h`], по этой причине мы для
+        // `y` берём просто минимальную координату внутри text_rect, в то время
+        // как для `x` приходится делать поправку на `w`/2, таким образом текст
+        // корректно выравнивается
+        let galley_position = [text_rect.center().x, text_rect.min.y].into();
+
+        ui.painter().galley(galley_position, galley, Color32::WHITE);
+    }
+    response
+}
+
+pub fn broken_uuid_button2(
+    ui: &mut Ui,
+    button_size: [f32; 2],
+    uuid: Uuid,
+) -> Response {
+    let (rect, response) = ui.allocate_exact_size(button_size.into(), Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let rounding = CornerRadius::same(4);
+
+        ui.painter().rect_filled(
+            rect,
+            rounding,
+            if uuid.is_nil() {
+                Color32::DARK_GRAY
+            } else {
+                Color32::MAGENTA
+            },
+        );
+
+        ui.painter().rect_stroke(
+            rect,
+            rounding,
+            ui.style().interact(&response).bg_stroke,
+            StrokeKind::Inside,
+        );
+
+        let text = if uuid.is_nil() {
+            "Не назначено"
+        } else {
+            "Битая ссылка"
+        };
+
+        let mut job = egui::text::LayoutJob::simple(
+            text.to_owned(),
+            TextStyle::Body.resolve(ui.style()),
+            Color32::WHITE,
+            button_size[0] * 0.8,
+        );
+
+        job.halign = egui::Align::Center;
+
+        let galley = ui.painter().layout_job(job);
+
+        let text_rect = Align2::CENTER_CENTER.anchor_size(
+            rect.center(),
+            galley.size(),
+        );
+
+        ui.painter().galley(text_rect.min, galley, Color32::WHITE);
     }
 
     response

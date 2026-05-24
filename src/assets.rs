@@ -142,6 +142,14 @@ impl AssetDb {
             .expect("Failed to load json5 asset")
     }
 
+    pub fn has_asset(&self, kind: AssetKind, uuid: Uuid) -> bool {
+        self.assets[&kind].contains_key(&uuid)
+    }
+
+    pub fn asset_name(&self, kind: AssetKind, uuid: Uuid) -> &str {
+        &self.assets[&kind][&uuid].0
+    }
+    
     pub fn load_asset(&self, kind: AssetKind, uuid: Uuid) -> &[u8] {
         &self.assets[&kind][&uuid].1
     }
