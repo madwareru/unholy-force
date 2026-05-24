@@ -409,8 +409,9 @@ fn shared_floor_part_closure(
         ui,
         popup_id,
         response,
-        PopupCloseBehavior::CloseOnClickOutside,
+        PopupCloseBehavior::IgnoreClicks,
         |ui| {
+            ui.label("Для отмены выбора нажмите ESC");
             const COLUMNS_COUNT: usize = 5;
             ui.columns(COLUMNS_COUNT, |uis| {
                 let mut current_column = 0;
