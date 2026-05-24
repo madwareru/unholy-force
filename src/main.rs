@@ -16,7 +16,7 @@ fn window_conf() -> Conf {
     };
     let conf = Conf {
         window_title: "Нечистая сила".to_owned(),
-        high_dpi: true,
+        high_dpi: false,
         window_width: w,
         window_height: h,
         ..Default::default()

@@ -58,7 +58,6 @@ impl EditorStage {
         let mut result_status = AppStageStatus::Continue;
 
         egui_macroquad::ui(|egui_ctx| {
-            egui_ctx.set_zoom_factor(2f32);
             if self.atlas_texture.is_none() {
                 let atlas_image = crate::graphics::SPRITE_ATLAS_TEXTURE.get_texture_data();
 
