@@ -1,4 +1,4 @@
-use crate::app::editor_stage::image_widgets::{atlas_sprite_button, floor_part_id_button};
+use crate::app::editor_stage::image_widgets::{floor_part_id_button};
 use crate::app::editor_stage::{EditorStage, UpdateState, thick_selector_button};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
@@ -60,7 +60,7 @@ impl EditorStage {
                     )
                 });
                 ui.add_space(4f32);
-                egui::ScrollArea::vertical()
+                ScrollArea::vertical()
                     .max_height(available_height)
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
@@ -94,12 +94,12 @@ impl EditorStage {
 
                             let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
 
-                            if response.clicked_by(egui::PointerButton::Primary) {
+                            if response.clicked_by(PointerButton::Primary) {
                                 section.current_config = Some(fpa_config);
                                 section.selected_config_name.clear();
                                 section.selected_config_name += config_name;
                                 section.selected_config_id = Some(id);
-                            } else if response.clicked_by(egui::PointerButton::Secondary) {
+                            } else if response.clicked_by(PointerButton::Secondary) {
                                 ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                             }
 
@@ -240,11 +240,11 @@ impl EditorStage {
                                         });
                                     });
 
+                                let popup_id = ui.make_persistent_id("Добавление связи с севера");
                                 let response = ui.button("Добавить связь");
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                let popup_id = ui.make_persistent_id("Добавление связи с севера");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.north_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
@@ -286,11 +286,11 @@ impl EditorStage {
                                             }
                                         });
                                     });
+                                let popup_id = ui.make_persistent_id("Добавление связи с юга");
                                 let response = ui.button("Добавить связь");
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                let popup_id = ui.make_persistent_id("Добавление связи с юга");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.south_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
@@ -333,11 +333,11 @@ impl EditorStage {
                                             }
                                         });
                                     });
+                                let popup_id = ui.make_persistent_id("Добавление связи с запада");
                                 let response = ui.button("Добавить связь");
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                let popup_id = ui.make_persistent_id("Добавление связи с запада");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.west_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
@@ -380,11 +380,11 @@ impl EditorStage {
                                             }
                                         });
                                     });
+                                let popup_id = ui.make_persistent_id("Добавление связи с востока");
                                 let response = ui.button("Добавить связь");
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                let popup_id = ui.make_persistent_id("Добавление связи с востока");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.east_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
