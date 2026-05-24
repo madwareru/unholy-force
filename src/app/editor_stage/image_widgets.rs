@@ -1231,7 +1231,7 @@ fn floor_part_button(
         let text_x = rect.center().x;
         let text_y = rect.max.y - ui.spacing().interact_size.y * 0.5f32;
 
-        // Контрастная обводка:
+        // Контрастная обводка для текста:
         for j in -1..=1 {
             for i in -1..=1 {
                 if i * j == 0 { continue; }
@@ -1354,61 +1354,6 @@ pub fn broken_uuid_button(
 
         ui.painter().galley(galley_position, galley, Color32::WHITE);
     }
-    response
-}
-
-pub fn broken_uuid_button2(
-    ui: &mut Ui,
-    button_size: [f32; 2],
-    uuid: Uuid,
-) -> Response {
-    let (rect, response) = ui.allocate_exact_size(button_size.into(), Sense::click());
-
-    if ui.is_rect_visible(rect) {
-        let rounding = CornerRadius::same(4);
-
-        ui.painter().rect_filled(
-            rect,
-            rounding,
-            if uuid.is_nil() {
-                Color32::DARK_GRAY
-            } else {
-                Color32::MAGENTA
-            },
-        );
-
-        ui.painter().rect_stroke(
-            rect,
-            rounding,
-            ui.style().interact(&response).bg_stroke,
-            StrokeKind::Inside,
-        );
-
-        let text = if uuid.is_nil() {
-            "Не назначено"
-        } else {
-            "Битая ссылка"
-        };
-
-        let mut job = egui::text::LayoutJob::simple(
-            text.to_owned(),
-            TextStyle::Body.resolve(ui.style()),
-            Color32::WHITE,
-            button_size[0] * 0.8,
-        );
-
-        job.halign = egui::Align::Center;
-
-        let galley = ui.painter().layout_job(job);
-
-        let text_rect = Align2::CENTER_CENTER.anchor_size(
-            rect.center(),
-            galley.size(),
-        );
-
-        ui.painter().galley(text_rect.min, galley, Color32::WHITE);
-    }
-
     response
 }
 
