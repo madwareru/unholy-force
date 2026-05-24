@@ -239,10 +239,12 @@ impl EditorStage {
                                             }
                                         });
                                     });
-                                let popup_id = ui.make_persistent_id("Добавление связи с севера");
-                                if ui.button("Добавить связь").clicked() {
+
+                                let response = ui.button("Добавить связь");
+                                if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
+                                let popup_id = ui.make_persistent_id("Добавление связи с севера");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.north_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
@@ -284,10 +286,11 @@ impl EditorStage {
                                             }
                                         });
                                     });
-                                let popup_id = ui.make_persistent_id("Добавление связи с юга");
-                                if ui.button("Добавить связь").clicked() {
+                                let response = ui.button("Добавить связь");
+                                if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
+                                let popup_id = ui.make_persistent_id("Добавление связи с юга");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.south_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
@@ -330,10 +333,11 @@ impl EditorStage {
                                             }
                                         });
                                     });
-                                let popup_id = ui.make_persistent_id("Добавление связи с запада");
-                                if ui.button("Добавить связь").clicked() {
+                                let response = ui.button("Добавить связь");
+                                if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
+                                let popup_id = ui.make_persistent_id("Добавление связи с запада");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.west_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
@@ -376,10 +380,11 @@ impl EditorStage {
                                             }
                                         });
                                     });
-                                let popup_id = ui.make_persistent_id("Добавление связи с востока");
-                                if ui.button("Добавить связь").clicked() {
+                                let response = ui.button("Добавить связь");
+                                if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
+                                let popup_id = ui.make_persistent_id("Добавление связи с востока");
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
                                     fpa_config.east_adjacent_parts.insert(config_id);
                                     update_state = UpdateState::Changed;
@@ -404,9 +409,8 @@ fn shared_floor_part_closure(
         ui,
         popup_id,
         response,
-        PopupCloseBehavior::IgnoreClicks,
+        PopupCloseBehavior::CloseOnClickOutside,
         |ui| {
-            ui.label("Для отмены выбора нажмите ESC");
             const COLUMNS_COUNT: usize = 5;
             ui.columns(COLUMNS_COUNT, |uis| {
                 let mut current_column = 0;
