@@ -1,6 +1,23 @@
-use crate::game_config::floor_parts::{FloorCellExtra, FloorPartConfig};
+use crate::game_config::floor_parts::{FloorPartConfig};
 use crate::game_config::items::ItemConfig;
-use crate::graphics::{FloorGraphicsTileGroup, SPRITE_ATLAS_DEF, WANG_MASK_CLAMP_EAST_LOOKUP, WANG_MASK_CLAMP_NORTH_LOOKUP, WANG_MASK_CLAMP_SOUTH_LOOKUP, WANG_MASK_CLAMP_WEST_LOOKUP, WANG_MASK_LOOKUP, WANG_MASK_NORTH_EAST, WANG_MASK_NORTH_WEST, WANG_MASK_SOUTH_EAST, WANG_MASK_SOUTH_WEST, WallGraphicsTileGroup, WANG_MASK_CLAMP_NORTH_WEST_LOOKUP, WANG_MASK_CLAMP_NORTH_EAST_LOOKUP, WANG_MASK_CLAMP_SOUTH_EAST_LOOKUP, WANG_MASK_CLAMP_SOUTH_WEST_LOOKUP};
+use crate::graphics::{
+    FloorGraphicsTileGroup,
+    WallGraphicsTileGroup,
+    SPRITE_ATLAS_DEF,
+    WANG_MASK_CLAMP_EAST_LOOKUP,
+    WANG_MASK_CLAMP_NORTH_LOOKUP,
+    WANG_MASK_CLAMP_SOUTH_LOOKUP,
+    WANG_MASK_CLAMP_WEST_LOOKUP,
+    WANG_MASK_LOOKUP,
+    WANG_MASK_NORTH_EAST,
+    WANG_MASK_NORTH_WEST,
+    WANG_MASK_SOUTH_EAST,
+    WANG_MASK_SOUTH_WEST,
+    WANG_MASK_CLAMP_NORTH_WEST_LOOKUP,
+    WANG_MASK_CLAMP_NORTH_EAST_LOOKUP,
+    WANG_MASK_CLAMP_SOUTH_EAST_LOOKUP,
+    WANG_MASK_CLAMP_SOUTH_WEST_LOOKUP
+};
 use egui::{
     Align2, Color32, CornerRadius, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId,
     Ui, Vec2, pos2, vec2,
@@ -8,6 +25,7 @@ use egui::{
 use uuid::Uuid;
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::ConfigId;
+use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use crate::game_config::units::UnitConfig;
 
 #[derive(Clone, Copy, Debug)]
@@ -19,39 +37,23 @@ struct AtlasSpriteRect {
     pub rect_px: Rect,
 }
 
-const fn make_mock_floor_part_config() -> FloorPartConfig {
-    FloorPartConfig {
-        floor_data: [
-            [FloorGraphicsTileGroup::Dirt; 5],
-            [
-                FloorGraphicsTileGroup::Dirt,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Dirt,
-            ],
-            [
-                FloorGraphicsTileGroup::Dirt,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Dirt,
-            ],
-            [
-                FloorGraphicsTileGroup::Dirt,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Tile,
-                FloorGraphicsTileGroup::Dirt,
-            ],
-            [FloorGraphicsTileGroup::Dirt; 5],
-        ],
-        wall_data: [[WallGraphicsTileGroup::None; 5]; 5],
-        extra_data: [[FloorCellExtra::None; 5]; 5],
-        payload_count: 0,
-    }
-}
-const MOCK_FLOOR_PART_CONFIG: FloorPartConfig = make_mock_floor_part_config();
+const MOCK_FLOOR_DATA: [[FloorGraphicsTileGroup; 5]; 5] = {
+    const ALL_DIRT: [FloorGraphicsTileGroup; 5] = [FloorGraphicsTileGroup::Dirt; 5];
+    const TILES_INSIDE: [FloorGraphicsTileGroup; 5] = [
+        FloorGraphicsTileGroup::Dirt,
+        FloorGraphicsTileGroup::Tile,
+        FloorGraphicsTileGroup::Tile,
+        FloorGraphicsTileGroup::Tile,
+        FloorGraphicsTileGroup::Dirt,
+    ];
+    [
+        ALL_DIRT,
+        TILES_INSIDE,
+        TILES_INSIDE,
+        TILES_INSIDE,
+        ALL_DIRT,
+    ]
+};
 
 impl AtlasSpriteRect {
     pub fn from_u16(atlas_size: [u16; 2], [x, y]: [u16; 2], [w, h]: [u16; 2]) -> Self {
@@ -167,10 +169,11 @@ pub fn atlas_sprite_button(
 
 pub trait SpriteHolder {
     fn sprite_name(&self) -> &str;
-    fn sprite_pivot(&mut self) -> &mut [u8; 2];
+    fn sprite_pivot(&self) -> &[u8; 2];
+    fn sprite_pivot_mut(&mut self) -> &mut [u8; 2];
 }
 
-pub fn pivot_editor<Holder: SpriteHolder>(
+pub fn sprite_pivot_editor<Holder: SpriteHolder>(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
@@ -210,8 +213,8 @@ pub fn pivot_editor<Holder: SpriteHolder>(
         );
 
         let pivot_screen_pos = pos2(
-            rect.left() + (sprite_holder.sprite_pivot()[0] as f32 + 0.5) * zoom,
-            rect.top() + (sprite_holder.sprite_pivot()[1] as f32 + 0.5) * zoom,
+            rect.left() + (sprite_holder.sprite_pivot_mut()[0] as f32 + 0.5) * zoom,
+            rect.top() + (sprite_holder.sprite_pivot_mut()[1] as f32 + 0.5) * zoom,
         );
 
         ui.painter()
@@ -230,8 +233,8 @@ pub fn pivot_editor<Holder: SpriteHolder>(
                 let max_x = sprite_size_px.x as u8 - 1;
                 let max_y = sprite_size_px.y as u8 - 1;
 
-                sprite_holder.sprite_pivot()[0] = local_x.clamp(0, max_x);
-                sprite_holder.sprite_pivot()[1] = local_y.clamp(0, max_y);
+                sprite_holder.sprite_pivot_mut()[0] = local_x.clamp(0, max_x);
+                sprite_holder.sprite_pivot_mut()[1] = local_y.clamp(0, max_y);
             }
         }
     }
@@ -239,18 +242,18 @@ pub fn pivot_editor<Holder: SpriteHolder>(
     response
 }
 
-pub fn item_visualizer(
+pub fn sprite_holder_visualizer<Holder: SpriteHolder>(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
-    item_config: &ItemConfig,
+    sprite_holder: &Holder,
 ) {
     let tile_size = crate::graphics::SPRITE_ATLAS_DEF
         .tile_size
         .map(|it| it as f32);
     let display_size = vec2(
-        tile_size[0] * MOCK_FLOOR_PART_CONFIG.floor_data[0].len() as f32,
-        tile_size[1] * MOCK_FLOOR_PART_CONFIG.floor_data.len() as f32,
+        tile_size[0] * MOCK_FLOOR_DATA[0].len() as f32,
+        tile_size[1] * MOCK_FLOOR_DATA.len() as f32,
     );
     let available_width = ui.available_width();
     let zoom = available_width / display_size.x;
@@ -265,18 +268,18 @@ pub fn item_visualizer(
             StrokeKind::Inside,
         );
 
-        draw_floors(
+        draw_floors_w_h(
             ui,
             texture_id,
             atlas_size,
-            &MOCK_FLOOR_PART_CONFIG,
+            &MOCK_FLOOR_DATA,
             zoom,
             tile_size,
             rect,
         );
 
         let central_point = rect.center();
-        let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[&item_config.sprite_name];
+        let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[sprite_holder.sprite_name()];
         let sprite_size = [
             sprite_data.size[0] as u16 * tile_size[0] as u16,
             sprite_data.size[1] as u16 * tile_size[1] as u16,
@@ -292,96 +295,13 @@ pub fn item_visualizer(
 
         let image_size = [sprite_size[0] as f32 * zoom, sprite_size[1] as f32 * zoom].into();
         let image_pos = pos2(
-            central_point.x - item_config.sprite_pivot[0] as f32 * zoom,
-            central_point.y - item_config.sprite_pivot[1] as f32 * zoom,
+            central_point.x - sprite_holder.sprite_pivot()[0] as f32 * zoom,
+            central_point.y - sprite_holder.sprite_pivot()[1] as f32 * zoom,
         );
 
         let image_rect = Rect::from_min_max(image_pos, image_pos + image_size);
         ui.painter()
             .image(texture_id, image_rect, sprite.uv_rect(), Color32::WHITE);
-
-        draw_walls(
-            ui,
-            texture_id,
-            atlas_size,
-            &MOCK_FLOOR_PART_CONFIG,
-            zoom,
-            tile_size,
-            rect,
-        );
-    }
-}
-
-pub fn unit_visualizer(
-    ui: &mut Ui,
-    texture_id: TextureId,
-    atlas_size: [u16; 2],
-    unit_config: &UnitConfig,
-) {
-    let tile_size = crate::graphics::SPRITE_ATLAS_DEF
-        .tile_size
-        .map(|it| it as f32);
-    let display_size = vec2(
-        tile_size[0] * MOCK_FLOOR_PART_CONFIG.floor_data[0].len() as f32,
-        tile_size[1] * MOCK_FLOOR_PART_CONFIG.floor_data.len() as f32,
-    );
-    let available_width = ui.available_width();
-    let zoom = available_width / display_size.x;
-    let display_size = display_size * zoom;
-
-    let (rect, _) = ui.allocate_exact_size(display_size, Sense::empty());
-    if ui.is_rect_visible(rect) {
-        ui.painter().rect_stroke(
-            rect,
-            CornerRadius::ZERO,
-            Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
-            StrokeKind::Inside,
-        );
-
-        draw_floors(
-            ui,
-            texture_id,
-            atlas_size,
-            &MOCK_FLOOR_PART_CONFIG,
-            zoom,
-            tile_size,
-            rect,
-        );
-
-        let central_point = rect.center();
-        let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[&unit_config.sprite_name];
-        let sprite_size = [
-            sprite_data.size[0] as u16 * tile_size[0] as u16,
-            sprite_data.size[1] as u16 * tile_size[1] as u16,
-        ];
-        let sprite = AtlasSpriteRect::from_u16(
-            atlas_size,
-            [
-                sprite_data.coords[0] as u16 * tile_size[0] as u16,
-                sprite_data.coords[1] as u16 * tile_size[1] as u16,
-            ],
-            sprite_size,
-        );
-
-        let image_size = [sprite_size[0] as f32 * zoom, sprite_size[1] as f32 * zoom].into();
-        let image_pos = pos2(
-            central_point.x - unit_config.sprite_pivot[0] as f32 * zoom,
-            central_point.y - unit_config.sprite_pivot[1] as f32 * zoom,
-        );
-
-        let image_rect = Rect::from_min_max(image_pos, image_pos + image_size);
-        ui.painter()
-            .image(texture_id, image_rect, sprite.uv_rect(), Color32::WHITE);
-
-        draw_walls(
-            ui,
-            texture_id,
-            atlas_size,
-            &MOCK_FLOOR_PART_CONFIG,
-            zoom,
-            tile_size,
-            rect,
-        );
     }
 }
 
@@ -412,20 +332,20 @@ pub fn floor_part_editor(
             StrokeKind::Inside,
         );
 
-        draw_floors(
+        draw_floors_w_h(
             ui,
             texture_id,
             atlas_size,
-            floor_part_config,
+            &floor_part_config.floor_data,
             zoom,
             tile_size,
             rect,
         );
-        draw_walls(
+        draw_walls_w_h(
             ui,
             texture_id,
             atlas_size,
-            floor_part_config,
+            &floor_part_config.wall_data,
             zoom,
             tile_size,
             rect,
@@ -473,7 +393,7 @@ const DIRT_MASK: [[bool; 5]; 5] = [
     [false, false, true, true, true],
 ];
 
-fn offset_coords(base_coords: [u8; 2], offset: [u8; 2]) -> [u8; 2] {
+const fn offset_coords(base_coords: [u8; 2], offset: [u8; 2]) -> [u8; 2] {
     [base_coords[0] + offset[0], base_coords[1] + offset[1]]
 }
 
@@ -626,11 +546,314 @@ fn get_coords_west(
     (atlas_rect, image_rect)
 }
 
-fn draw_floors(
+#[derive(Copy, Clone, Debug)]
+pub enum NeighbourData<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPartConfig>> + Copy> {
+    SingleFocus(ConfigId<FloorPartConfig>),
+    Multiple(TNeighbours),
+}
+
+pub fn visualize_floor_part_adjacency<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPartConfig>> + Copy>(
+    ui: &'a mut Ui,
+    asset_db: &AssetDb,
+    texture_id: TextureId,
+    atlas_size: [u16; 2],
+    central_part: ConfigId<FloorPartConfig>,
+    north_neighbours: NeighbourData<'a, TNeighbours>,
+    south_neighbours: NeighbourData<'a, TNeighbours>,
+    west_neighbours: NeighbourData<'a, TNeighbours>,
+    east_neighbours: NeighbourData<'a, TNeighbours>,
+    zoom: f32
+) {
+    fn square_side(count: usize) -> usize {
+        if count == 0 {
+            return 0;
+        }
+
+        let mut side = 1;
+
+        while side * side < count {
+            side += 1;
+        }
+
+        side
+    }
+
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF
+        .tile_size
+        .map(|it| it as f32);
+
+    if !asset_db.has_asset(AssetKind::FloorPartConfig, central_part.uuid) {
+        return;
+    }
+
+    let north_neighbour_count = match north_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(north_neighbours) => {
+            north_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let north_sides = square_side(north_neighbour_count);
+
+    let south_neighbour_count = match south_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(south_neighbours) => {
+            south_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let south_sides = square_side(south_neighbour_count);
+
+    let west_neighbour_count = match west_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(west_neighbours) => {
+            west_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let west_sides = square_side(west_neighbour_count);
+
+    let east_neighbour_count = match east_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(east_neighbours) => {
+            east_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let east_sides = square_side(east_neighbour_count);
+
+    let bytes = asset_db.load_asset(AssetKind::FloorPartConfig, central_part.uuid);
+    let central_part = FloorPartConfig::load_from_slice(bytes)
+        .expect("Failed to load floor part config");
+
+    // Мы будем рисовать часть уровня в центре и наборы частей по краям от неё,
+    // вписанные в квадраты равного с ней размера
+    let display_size = vec2(
+        tile_size[0] * central_part.floor_data[0].len() as f32 * 3f32 * zoom,
+        tile_size[1] * central_part.floor_data.len() as f32 * 3f32 * zoom,
+    );
+
+    let (rect, _) = ui.allocate_exact_size(display_size, Sense::empty());
+    if ui.is_rect_visible(rect) {
+        let central_rect = Rect::from_min_max(
+            rect.min + rect.size() / 3f32,
+            rect.max - rect.size() / 3f32
+        );
+
+        let north_rect = Rect::from_min_max(
+            central_rect.min - vec2(0f32, central_rect.height()),
+            central_rect.max - vec2(0f32, central_rect.height())
+        );
+        let north_sub_rect_size = if north_sides <= 1 {
+            north_rect.size()
+        } else {
+            north_rect.size() / north_sides as f32
+        };
+
+        let south_rect = Rect::from_min_max(
+            central_rect.min + vec2(0f32, central_rect.height()),
+            central_rect.max + vec2(0f32, central_rect.height())
+        );
+        let south_sub_rect_size = if south_sides <= 1 {
+            south_rect.size()
+        } else {
+            south_rect.size() / south_sides as f32
+        };
+
+        let west_rect = Rect::from_min_max(
+            central_rect.min - vec2(central_rect.width(), 0f32),
+            central_rect.max - vec2(central_rect.width(), 0f32)
+        );
+        let west_sub_rect_size = if west_sides <= 1 {
+            west_rect.size()
+        } else {
+            west_rect.size() / west_sides as f32
+        };
+
+        let east_rect = Rect::from_min_max(
+            central_rect.min + vec2(central_rect.width(), 0f32),
+            central_rect.max + vec2(central_rect.width(), 0f32)
+        );
+        let east_sub_rect_size = if east_sides <= 1 {
+            east_rect.size()
+        } else {
+            east_rect.size() / east_sides as f32
+        };
+
+        draw_floors_w_h(
+            ui,
+            texture_id,
+            atlas_size,
+            &central_part.floor_data,
+            zoom,
+            tile_size,
+            central_rect
+        );
+        draw_walls_w_h(
+            ui,
+            texture_id,
+            atlas_size,
+            &central_part.wall_data,
+            zoom,
+            tile_size,
+            central_rect
+        );
+
+        let north_sub_rect = Rect::from_min_max(
+            pos2(north_rect.min.x, north_rect.max.y - north_sub_rect_size.y),
+            pos2(north_rect.min.x + north_sub_rect_size.x, north_rect.max.y)
+        );
+        let north_sub_rect_step_small = vec2(north_sub_rect_size.x, 0f32);
+        let north_sub_rect_step_big = vec2(
+            -north_sub_rect_size.x * north_sides as f32,
+            -north_sub_rect_size.y
+        );
+
+        let south_sub_rect = Rect::from_min_max(
+            pos2(south_rect.min.x, south_rect.min.y),
+            pos2(south_rect.min.x + south_sub_rect_size.x, south_rect.max.y + south_sub_rect_size.y)
+        );
+        let south_sub_rect_step_small = vec2(south_sub_rect_size.x, 0f32);
+        let south_sub_rect_step_big = vec2(
+            -south_sub_rect_size.x * south_sides as f32,
+            south_sub_rect_size.y
+        );
+
+        let west_sub_rect = Rect::from_min_max(
+            pos2(west_rect.max.x - west_sub_rect_size.x, west_rect.min.y),
+            pos2(west_rect.max.x, west_rect.min.y + west_sub_rect_size.y)
+        );
+        let west_sub_rect_step_small = vec2(0f32, west_sub_rect_size.y);
+        let west_sub_rect_step_big = vec2(
+            -west_sub_rect_size.x,
+            -west_sub_rect_size.y * west_sides as f32
+        );
+
+        let east_sub_rect = Rect::from_min_max(
+            pos2(east_rect.min.x, east_rect.min.y),
+            pos2(east_rect.min.x + east_sub_rect_size.x, east_rect.min.y + east_sub_rect_size.y)
+        );
+        let east_sub_rect_step_small = vec2(0f32, east_sub_rect_size.y);
+        let east_sub_rect_step_big = vec2(
+            east_sub_rect_size.x,
+            -east_sub_rect_size.y * east_sides as f32
+        );
+
+        for (mut sub_rect, step_small, step_big, neighbours, sides) in [
+            (north_sub_rect, north_sub_rect_step_small, north_sub_rect_step_big, north_neighbours, north_sides ),
+            (south_sub_rect, south_sub_rect_step_small, south_sub_rect_step_big, south_neighbours, south_sides ),
+            (west_sub_rect, west_sub_rect_step_small, west_sub_rect_step_big, west_neighbours, west_sides ),
+            (east_sub_rect, east_sub_rect_step_small, east_sub_rect_step_big, east_neighbours, east_sides ),
+        ] {
+            let mut offset = 0;
+            match neighbours {
+                NeighbourData::SingleFocus(cfg_id) => {
+                    if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                        let bytes = asset_db.load_asset(AssetKind::FloorPartConfig, cfg_id.uuid);
+                        let side_part = FloorPartConfig::load_from_slice(bytes).expect("Failed to load FloorPartConfig");
+
+                        draw_floors_w_h(
+                            ui,
+                            texture_id,
+                            atlas_size,
+                            &side_part.floor_data,
+                            zoom,
+                            tile_size,
+                            sub_rect
+                        );
+                        draw_walls_w_h(
+                            ui,
+                            texture_id,
+                            atlas_size,
+                            &side_part.wall_data,
+                            zoom,
+                            tile_size,
+                            sub_rect
+                        );
+                    }
+                }
+                NeighbourData::Multiple(neighbours) => {
+                    for side_part in neighbours
+                        .into_iter()
+                        .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                        .map(|cfg_id| asset_db.load_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                        .map(|bytes| FloorPartConfig::load_from_slice(bytes).expect("Failed to load FloorPartConfig")) {
+
+                        draw_floors_w_h(
+                            ui,
+                            texture_id,
+                            atlas_size,
+                            &side_part.floor_data,
+                            zoom / sides as f32,
+                            tile_size,
+                            sub_rect
+                        );
+                        draw_walls_w_h(
+                            ui,
+                            texture_id,
+                            atlas_size,
+                            &side_part.wall_data,
+                            zoom / sides as f32,
+                            tile_size,
+                            sub_rect
+                        );
+
+                        sub_rect = Rect::from_min_max(
+                            sub_rect.min + step_small,
+                            sub_rect.max + step_small
+                        );
+                        offset += 1;
+                        if offset == sides {
+                            offset = 0;
+                            sub_rect = Rect::from_min_max(
+                                sub_rect.min + step_big,
+                                sub_rect.max + step_big
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn draw_floors_w_h<const W: usize, const H: usize>(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
-    floor_part_config: &FloorPartConfig,
+    floor_data: &[[FloorGraphicsTileGroup; H]; W],
     zoom: f32,
     tile_size: [f32; 2],
     rect: Rect,
@@ -655,8 +878,8 @@ fn draw_floors(
         [&FloorGraphicsTileGroup::Water]
         .base_coords;
 
-    for j in 0..floor_part_config.floor_data.len() - 1 {
-        for i in 0..floor_part_config.floor_data[j].len() - 1 {
+    for j in 0..H - 1 {
+        for i in 0..W - 1 {
             let pt = point_on_rect(i, j);
             let image_rect = Rect::from_min_max(
                 pt,
@@ -664,16 +887,16 @@ fn draw_floors(
             );
 
             let mut dirt_bitmask = 0;
-            if DIRT_MASK[j][i] {
+            if DIRT_MASK[j % 5][i % 5] {
                 dirt_bitmask = dirt_bitmask | WANG_MASK_NORTH_WEST;
             }
-            if DIRT_MASK[j][i + 1] {
+            if DIRT_MASK[j % 5][(i + 1) % 5] {
                 dirt_bitmask = dirt_bitmask | WANG_MASK_NORTH_EAST;
             }
-            if DIRT_MASK[j + 1][i] {
+            if DIRT_MASK[(j + 1) % 5][i % 5] {
                 dirt_bitmask = dirt_bitmask | WANG_MASK_SOUTH_WEST;
             }
-            if DIRT_MASK[j + 1][i + 1] {
+            if DIRT_MASK[(j + 1) % 5][(i + 1) % 5] {
                 dirt_bitmask = dirt_bitmask | WANG_MASK_SOUTH_EAST;
             }
             let dirt_coords = offset_coords(base_dirt_coords, WANG_MASK_LOOKUP[dirt_bitmask]);
@@ -708,7 +931,7 @@ fn draw_floors(
                         Color32::WHITE,
                     );
                 }
-                if i == floor_part_config.floor_data[j].len() - 2 {
+                if i == W - 2 {
                     let (atlas_rect, image_rect_ne) = get_coords_north_east(
                         base_dirt_coords,
                         atlas_size,
@@ -725,7 +948,7 @@ fn draw_floors(
                     );
                 }
             }
-            if j == floor_part_config.floor_data.len() - 2 {
+            if j == H - 2 {
                 let (atlas_rect, image_rect_s) = get_coords_south(
                     base_dirt_coords,
                     atlas_size,
@@ -753,7 +976,7 @@ fn draw_floors(
                         Color32::WHITE,
                     );
                 }
-                if i == floor_part_config.floor_data[j].len() - 2 {
+                if i == W - 2 {
                     let (atlas_rect, image_rect_se) = get_coords_south_east(
                         base_dirt_coords,
                         atlas_size,
@@ -782,7 +1005,7 @@ fn draw_floors(
                 ui.painter()
                     .image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
             }
-            if i == floor_part_config.floor_data[j].len() - 2 {
+            if i == W - 2 {
                 let (atlas_rect, image_rect) = get_coords_east(
                     base_dirt_coords,
                     atlas_size,
@@ -801,16 +1024,16 @@ fn draw_floors(
                 (FloorGraphicsTileGroup::Tile, base_tile_coords),
             ] {
                 let mut bitmask = 0;
-                if floor_part_config.floor_data[j][i] == group {
+                if floor_data[j][i] == group {
                     bitmask = bitmask | WANG_MASK_NORTH_WEST;
                 }
-                if floor_part_config.floor_data[j][i + 1] == group {
+                if floor_data[j][i + 1] == group {
                     bitmask = bitmask | WANG_MASK_NORTH_EAST;
                 }
-                if floor_part_config.floor_data[j + 1][i] == group {
+                if floor_data[j + 1][i] == group {
                     bitmask = bitmask | WANG_MASK_SOUTH_WEST;
                 }
-                if floor_part_config.floor_data[j + 1][i + 1] == group {
+                if floor_data[j + 1][i + 1] == group {
                     bitmask = bitmask | WANG_MASK_SOUTH_EAST;
                 }
                 let coords = offset_coords(base_coords, WANG_MASK_LOOKUP[bitmask]);
@@ -851,7 +1074,7 @@ fn draw_floors(
                             Color32::WHITE,
                         );
                     }
-                    if i == floor_part_config.floor_data[j].len() - 2 {
+                    if i == W - 2 {
                         let (atlas_rect, image_rect_ne) = get_coords_north_east(
                             base_coords,
                             atlas_size,
@@ -868,7 +1091,7 @@ fn draw_floors(
                         );
                     }
                 }
-                if j == floor_part_config.floor_data.len() - 2 {
+                if j == H - 2 {
                     let (atlas_rect, image_rect_s) = get_coords_south(
                         base_coords,
                         atlas_size,
@@ -900,7 +1123,7 @@ fn draw_floors(
                             Color32::WHITE,
                         );
                     }
-                    if i == floor_part_config.floor_data[j].len() - 2 {
+                    if i == W - 2 {
                         let (atlas_rect, image_rect_se) = get_coords_south_east(
                             base_coords,
                             atlas_size,
@@ -933,7 +1156,7 @@ fn draw_floors(
                         Color32::WHITE,
                     );
                 }
-                if i == floor_part_config.floor_data[j].len() - 2 {
+                if i == W - 2 {
                     let (atlas_rect, image_rect) = get_coords_east(
                         base_coords,
                         atlas_size,
@@ -954,11 +1177,11 @@ fn draw_floors(
     }
 }
 
-fn draw_walls(
+fn draw_walls_w_h<const W: usize, const H: usize>(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
-    floor_part_config: &FloorPartConfig,
+    wall_data: &[[WallGraphicsTileGroup; H]; W],
     zoom: f32,
     tile_size: [f32; 2],
     rect: Rect,
@@ -980,8 +1203,8 @@ fn draw_walls(
         [&WallGraphicsTileGroup::Bricks]
         .base_coords;
 
-    for j in 0..floor_part_config.floor_data.len() - 1 {
-        for i in 0..floor_part_config.floor_data[j].len() - 1 {
+    for j in 0..H - 1 {
+        for i in 0..W - 1 {
             let pt = point_on_rect(i, j);
             let image_rect = Rect::from_min_max(
                 pt,
@@ -996,16 +1219,16 @@ fn draw_walls(
                 (WallGraphicsTileGroup::Bricks, base_bricks_coords),
             ] {
                 let mut bitmask = 0;
-                if floor_part_config.wall_data[j][i] == group {
+                if wall_data[j][i] == group {
                     bitmask = bitmask | WANG_MASK_NORTH_WEST;
                 }
-                if floor_part_config.wall_data[j][i + 1] == group {
+                if wall_data[j][i + 1] == group {
                     bitmask = bitmask | WANG_MASK_NORTH_EAST;
                 }
-                if floor_part_config.wall_data[j + 1][i] == group {
+                if wall_data[j + 1][i] == group {
                     bitmask = bitmask | WANG_MASK_SOUTH_WEST;
                 }
-                if floor_part_config.wall_data[j + 1][i + 1] == group {
+                if wall_data[j + 1][i + 1] == group {
                     bitmask = bitmask | WANG_MASK_SOUTH_EAST;
                 }
                 let coords = offset_coords(base_coords, WANG_MASK_LOOKUP[bitmask]);
@@ -1044,7 +1267,7 @@ fn draw_walls(
                             Color32::WHITE,
                         );
                     }
-                    if i == floor_part_config.floor_data[j].len() - 2 {
+                    if i == W - 2 {
                         let (atlas_rect, image_rect_ne) = get_coords_north_east(
                             base_coords,
                             atlas_size,
@@ -1061,7 +1284,7 @@ fn draw_walls(
                         );
                     }
                 }
-                if j == floor_part_config.floor_data.len() - 2 {
+                if j == H - 2 {
                     let (atlas_rect, image_rect_s) = get_coords_south(
                         base_coords,
                         atlas_size,
@@ -1093,7 +1316,7 @@ fn draw_walls(
                             Color32::WHITE,
                         );
                     }
-                    if i == floor_part_config.floor_data[j].len() - 2 {
+                    if i == W - 2 {
                         let (atlas_rect, image_rect_se) = get_coords_south_east(
                             base_coords,
                             atlas_size,
@@ -1126,7 +1349,7 @@ fn draw_walls(
                         Color32::WHITE,
                     );
                 }
-                if i == floor_part_config.floor_data[j].len() - 2 {
+                if i == W - 2 {
                     let (atlas_rect, image_rect) = get_coords_east(
                         base_coords,
                         atlas_size,
@@ -1188,12 +1411,6 @@ fn floor_part_button(
             ui.visuals().selection.stroke
         } else {
             visuals.bg_stroke
-        };
-
-        let text_color = if selected {
-            ui.visuals().selection.stroke.color
-        } else {
-            visuals.text_color()
         };
 
         let rounding = CornerRadius::same(2);
@@ -1338,21 +1555,19 @@ pub fn broken_uuid_button(
 
         let galley = ui.painter().layout_job(job);
 
+        // Текст внутри galley выравнивается таким образом, что минимум у него
+        // имеет отрицательные координаты по `x`, но минимум по `y` это 0, то
+        // есть по сути там лежит [-`w`/2..`w`/2, 0..`h`], по этой причине для `x`
+        // приходится делать поправку на `w`/2, таким образом текст корректно
+        // выравнивается
+        let galley_position = rect.center() + vec2(galley.size().x / 2f32, 0f32);
 
         let text_rect = Rect::from_center_size(
-            rect.center(),
-            vec2(text_width, galley.size().y),
+            galley_position,
+            galley.size()
         );
 
-        // Текст внутри galley выровнян таким образом, что минимум у него
-        // имеет отрицательные координаты по `x`, но минимум по `y` это 0, то
-        // есть по сути там лежит [-`w`/2..`w`/2, 0..`h`], по этой причине мы для
-        // `y` берём просто минимальную координату внутри text_rect, в то время
-        // как для `x` приходится делать поправку на `w`/2, таким образом текст
-        // корректно выравнивается
-        let galley_position = [text_rect.center().x, text_rect.min.y].into();
-
-        ui.painter().galley(galley_position, galley, Color32::WHITE);
+        ui.painter().galley(text_rect.min, galley, Color32::WHITE);
     }
     response
 }

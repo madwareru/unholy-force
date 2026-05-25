@@ -1,6 +1,6 @@
 use egui::{Color32, PopupCloseBehavior, Ui};
 use egui_snarl::{InPin, NodeId, OutPin, Snarl};
-use egui_snarl::ui::{AnyPins, PinInfo, SnarlViewer, WireStyle};
+use egui_snarl::ui::{AnyPins, PinInfo, SnarlPin, SnarlViewer, WireStyle};
 use serde::{Deserialize, Serialize};
 use crate::assets::{AssetKind, ASSET_DATABASE};
 use crate::game_config::{Config, ConfigId};
@@ -80,7 +80,7 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         ui: &mut Ui,
         _scale: f32,
         snarl: &mut Snarl<FloorFlowNode>,
-    ) -> PinInfo {
+    ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node] {
             FloorFlowNode::StartFloor(_) => {
                 unreachable!("Number node has no inputs")
@@ -118,14 +118,13 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         }
     }
 
-    #[allow(refining_impl_trait)]
     fn show_output(
         &mut self,
         pin: &OutPin,
         ui: &mut Ui,
         _scale: f32,
         snarl: &mut Snarl<FloorFlowNode>,
-    ) -> PinInfo {
+    ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node] {
             FloorFlowNode::StartFloor(ref mut value) => {
                 let response = ui.button(value.floor_name());

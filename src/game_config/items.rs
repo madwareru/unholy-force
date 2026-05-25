@@ -65,7 +65,12 @@ impl SpriteHolder for ItemConfig {
     fn sprite_name(&self) -> &str {
         &self.sprite_name
     }
-    fn sprite_pivot(&mut self) -> &mut [u8; 2] {
+
+    fn sprite_pivot(&self) -> &[u8; 2] {
+        &self.sprite_pivot
+    }
+
+    fn sprite_pivot_mut(&mut self) -> &mut [u8; 2] {
         &mut self.sprite_pivot
     }
 }

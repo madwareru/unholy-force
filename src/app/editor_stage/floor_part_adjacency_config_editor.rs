@@ -1,8 +1,9 @@
-use crate::app::editor_stage::image_widgets::{floor_part_id_button};
+use crate::app::editor_stage::image_widgets::{floor_part_id_button, visualize_floor_part_adjacency, NeighbourData};
 use crate::app::editor_stage::{EditorStage, UpdateState, thick_selector_button};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use egui::{Align2, CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, Ui};
+use egui::ahash::{HashSet, HashSetExt};
 use uuid::Uuid;
 use crate::game_config::ConfigId;
 use crate::game_config::floor_parts::FloorPartConfig;
@@ -13,20 +14,35 @@ pub struct FloorPartAdjacencyConfigEditorSection {
     selected_config_id: Option<Uuid>,
     selected_config_name: String,
     current_config: Option<FloorPartAdjacencyConfig>,
+    selection_data: SelectionData
+}
+
+#[derive(Default)]
+struct SelectionData {
+    selected_north_neighbour: Option<ConfigId<FloorPartConfig>>,
+    selected_south_neighbour: Option<ConfigId<FloorPartConfig>>,
+    selected_west_neighbour: Option<ConfigId<FloorPartConfig>>,
+    selected_east_neighbour: Option<ConfigId<FloorPartConfig>>,
 }
 
 impl EditorStage {
     fn update_current_floor_part_adjacency_config(
         &mut self,
         asset_db: &mut AssetDb,
-        foo: impl FnOnce(&mut AssetDb, &mut String, &mut FloorPartAdjacencyConfig) -> UpdateState,
+        foo: impl FnOnce(
+            &mut AssetDb,
+            &mut String,
+            &mut FloorPartAdjacencyConfig,
+            &mut SelectionData,
+        ) -> UpdateState,
     ) {
         let section = &mut self.floor_part_adjacency_section;
         let name = &mut section.selected_config_name;
         let cur_item = &mut section.current_config;
+        let selection_data = &mut section.selection_data;
 
         if let Some(current_item_config) = cur_item {
-            if foo(asset_db, name, current_item_config) == UpdateState::Changed {
+            if foo(asset_db, name, current_item_config, selection_data) == UpdateState::Changed {
                 match section.selected_config_id {
                     Some(id) => {
                         let config_text = json5::to_string(current_item_config)
@@ -95,10 +111,20 @@ impl EditorStage {
                             let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
 
                             if response.clicked_by(PointerButton::Primary) {
-                                section.current_config = Some(fpa_config);
-                                section.selected_config_name.clear();
-                                section.selected_config_name += config_name;
-                                section.selected_config_id = Some(id);
+                                match section.selected_config_id {
+                                    Some(selected_id) if selected_id.eq(&id) => {}
+                                    _ => {
+                                        section.current_config = Some(fpa_config);
+                                        section.selected_config_name.clear();
+                                        section.selected_config_name += config_name;
+                                        section.selected_config_id = Some(id);
+                                        section.selection_data.selected_north_neighbour = None;
+                                        section.selection_data.selected_south_neighbour = None;
+                                        section.selection_data.selected_west_neighbour = None;
+                                        section.selection_data.selected_east_neighbour = None;
+                                    }
+                                }
+
                             } else if response.clicked_by(PointerButton::Secondary) {
                                 ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                             }
@@ -125,6 +151,10 @@ impl EditorStage {
                                     section.selected_config_id = None;
                                     section.current_config = None;
                                     section.selected_config_name.clear();
+                                    section.selection_data.selected_north_neighbour = None;
+                                    section.selection_data.selected_south_neighbour = None;
+                                    section.selection_data.selected_west_neighbour = None;
+                                    section.selection_data.selected_east_neighbour = None;
                                 }
                                 _ => {}
                             }
@@ -153,13 +183,69 @@ impl EditorStage {
                     );
                     section.selected_config_name.clear();
                     section.selected_config_id = Some(id);
+                    section.selection_data.selected_north_neighbour = None;
+                    section.selection_data.selected_south_neighbour = None;
+                    section.selection_data.selected_west_neighbour = None;
+                    section.selection_data.selected_east_neighbour = None;
                 }
             }
             _ => {}
         }
     }
 
-    pub(crate) fn draw_adjacency_visualizer(&self, ui: &mut Ui) {}
+    pub(crate) fn draw_adjacency_visualizer(&self, ui: &mut Ui) {
+        let asset_db = crate::assets::ASSET_DATABASE.lock().unwrap();
+        let texture_id: egui::TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+        let atlas_size = self.atlas_size;
+        
+        let mut selected_north = self
+            .floor_part_adjacency_section
+            .selection_data
+            .selected_north_neighbour
+            .map(|it| {
+                let mut set = HashSet::new();
+                set.insert(it);
+                set
+            });
+
+        
+
+        if let Some(cfg) = self.floor_part_adjacency_section.current_config.as_ref() {
+            visualize_floor_part_adjacency(
+                ui,
+                &asset_db,
+                texture_id,
+                atlas_size,
+                cfg.part,
+                self.floor_part_adjacency_section
+                    .selection_data
+                    .selected_north_neighbour
+                    .map(|it| NeighbourData::SingleFocus(it))
+                    .unwrap_or_else(|| NeighbourData::Multiple(&cfg.north_adjacent_parts)),
+                self.floor_part_adjacency_section
+                    .selection_data
+                    .selected_south_neighbour
+                    .map(|it| NeighbourData::SingleFocus(it))
+                    .unwrap_or_else(|| NeighbourData::Multiple(&cfg.south_adjacent_parts)),
+                self.floor_part_adjacency_section
+                    .selection_data
+                    .selected_west_neighbour
+                    .map(|it| NeighbourData::SingleFocus(it))
+                    .unwrap_or_else(|| NeighbourData::Multiple(&cfg.west_adjacent_parts)),
+                self.floor_part_adjacency_section
+                    .selection_data
+                    .selected_east_neighbour
+                    .map(|it| NeighbourData::SingleFocus(it))
+                    .unwrap_or_else(|| NeighbourData::Multiple(&cfg.east_adjacent_parts)),
+                3f32
+            );
+        }
+    }
 
     pub(crate) fn draw_floor_part_adjacency_editor(&mut self, ui: &mut Ui) {
         let id = self.floor_part_adjacency_section
@@ -174,7 +260,7 @@ impl EditorStage {
         let mut asset_db = crate::assets::ASSET_DATABASE.lock().unwrap();
         self.update_current_floor_part_adjacency_config(
             &mut asset_db,
-            |asset_db, fpa_name, fpa_config| {
+            |asset_db, fpa_name, fpa_config, selection_data| {
                 let mut update_state = UpdateState::Unchanged;
                 ui.vertical(|ui| {
                     ui.group(|ui| {
@@ -208,6 +294,7 @@ impl EditorStage {
                             .id_salt(neighbours_salt_n)
                             .show(ui, |ui| {
                                 ui.label("Связь можно удалить правой кнопкой мыши");
+                                ui.label("Выделите левой кнопкой мыши для фокуса");
                                 ScrollArea::vertical()
                                     .max_height(200f32)
                                     .show(ui, |ui| {
@@ -223,9 +310,14 @@ impl EditorStage {
                                             for conf in parts {
                                                 let ui = &mut uis[current_column];
                                                 ui.add_space(4f32);
+
+                                                let selected = selection_data
+                                                    .selected_north_neighbour
+                                                    .map(|it| it.eq(&conf))
+                                                    .unwrap_or(false);
                                                 let (response, _) = floor_part_id_button(
                                                     ui,
-                                                    false,
+                                                    selected,
                                                     asset_db,
                                                     conf,
                                                     48f32,
@@ -234,6 +326,12 @@ impl EditorStage {
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
                                                     fpa_config.north_adjacent_parts.remove(&conf);
+                                                } else if response.clicked_by(PointerButton::Primary) {
+                                                    if selected {
+                                                        selection_data.selected_north_neighbour = None;
+                                                    } else {
+                                                        selection_data.selected_north_neighbour = Some(conf);
+                                                    }
                                                 }
                                                 current_column = (current_column + 1) % COLUMNS_COUNT;
                                             }
@@ -255,6 +353,7 @@ impl EditorStage {
                             .id_salt(neighbours_salt_s)
                             .show(ui, |ui| {
                                 ui.label("Связь можно удалить правой кнопкой мыши");
+                                ui.label("Выделите левой кнопкой мыши для фокуса");
                                 ScrollArea::vertical()
                                     .max_height(200f32)
                                     .show(ui, |ui| {
@@ -270,9 +369,14 @@ impl EditorStage {
                                             for conf in parts {
                                                 let ui = &mut uis[current_column];
                                                 ui.add_space(4f32);
+
+                                                let selected = selection_data
+                                                    .selected_south_neighbour
+                                                    .map(|it| it.eq(&conf))
+                                                    .unwrap_or(false);
                                                 let (response, _) = floor_part_id_button(
                                                     ui,
-                                                    false,
+                                                    selected,
                                                     asset_db,
                                                     conf,
                                                     48f32,
@@ -281,6 +385,12 @@ impl EditorStage {
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
                                                     fpa_config.south_adjacent_parts.remove(&conf);
+                                                } else if response.clicked_by(PointerButton::Primary) {
+                                                    if selected {
+                                                        selection_data.selected_south_neighbour = None;
+                                                    } else {
+                                                        selection_data.selected_south_neighbour = Some(conf);
+                                                    }
                                                 }
                                                 current_column = (current_column + 1) % COLUMNS_COUNT;
                                             }
@@ -302,6 +412,7 @@ impl EditorStage {
                             .id_salt(neighbours_salt_w)
                             .show(ui, |ui| {
                                 ui.label("Связь можно удалить правой кнопкой мыши");
+                                ui.label("Выделите левой кнопкой мыши для фокуса");
                                 ScrollArea::vertical()
                                     .max_height(200f32)
                                     .show(ui, |ui| {
@@ -317,9 +428,14 @@ impl EditorStage {
                                             for conf in parts {
                                                 let ui = &mut uis[current_column];
                                                 ui.add_space(4f32);
+
+                                                let selected = selection_data
+                                                    .selected_west_neighbour
+                                                    .map(|it| it.eq(&conf))
+                                                    .unwrap_or(false);
                                                 let (response, _) = floor_part_id_button(
                                                     ui,
-                                                    false,
+                                                    selected,
                                                     asset_db,
                                                     conf,
                                                     48f32,
@@ -328,6 +444,12 @@ impl EditorStage {
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
                                                     fpa_config.west_adjacent_parts.remove(&conf);
+                                                } else if response.clicked_by(PointerButton::Primary) {
+                                                    if selected {
+                                                        selection_data.selected_west_neighbour = None;
+                                                    } else {
+                                                        selection_data.selected_west_neighbour = Some(conf);
+                                                    }
                                                 }
                                                 current_column = (current_column + 1) % COLUMNS_COUNT;
                                             }
@@ -349,6 +471,7 @@ impl EditorStage {
                             .id_salt(neighbours_salt_e)
                             .show(ui, |ui| {
                                 ui.label("Связь можно удалить правой кнопкой мыши");
+                                ui.label("Выделите левой кнопкой мыши для фокуса");
                                 ScrollArea::vertical()
                                     .max_height(200f32)
                                     .show(ui, |ui| {
@@ -364,9 +487,14 @@ impl EditorStage {
                                             for conf in parts {
                                                 let ui = &mut uis[current_column];
                                                 ui.add_space(4f32);
+                                                let selected = selection_data
+                                                    .selected_east_neighbour
+                                                    .map(|it| it.eq(&conf))
+                                                    .unwrap_or(false);
+
                                                 let (response, _) = floor_part_id_button(
                                                     ui,
-                                                    false,
+                                                    selected,
                                                     asset_db,
                                                     conf,
                                                     48f32,
@@ -375,6 +503,12 @@ impl EditorStage {
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
                                                     fpa_config.east_adjacent_parts.remove(&conf);
+                                                } else if response.clicked_by(PointerButton::Primary) {
+                                                    if selected {
+                                                        selection_data.selected_east_neighbour = None;
+                                                    } else {
+                                                        selection_data.selected_east_neighbour = Some(conf);
+                                                    }
                                                 }
                                                 current_column = (current_column + 1) % COLUMNS_COUNT;
                                             }

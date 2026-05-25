@@ -1,4 +1,4 @@
-use crate::app::editor_stage::image_widgets::{pivot_editor, item_selector_button, atlas_sprite_button, item_visualizer};
+use crate::app::editor_stage::image_widgets::{sprite_pivot_editor, item_selector_button, atlas_sprite_button, sprite_holder_visualizer};
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::items::{ItemConfig, ItemRarity};
@@ -176,7 +176,7 @@ impl EditorStage {
                 ui.add_space(6f32);
                 ui.group(|ui| {
                     ui.label("Предпросмотр на игровом поле:");
-                    item_visualizer(
+                    sprite_holder_visualizer(
                         ui,
                         texture_id,
                         atlas_size,
@@ -281,7 +281,7 @@ impl EditorStage {
                                         w / (sprite_data.size[0] as f32 * 16f32)
                                     };
                                     let old_pivot = current_item_config.sprite_pivot;
-                                    pivot_editor(
+                                    sprite_pivot_editor(
                                         ui,
                                         texture_id,
                                         atlas_size,

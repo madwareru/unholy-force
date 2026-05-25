@@ -1,7 +1,7 @@
 use egui::{PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
 use crate::app::editor_stage::{EditorStage, UpdateState};
-use crate::app::editor_stage::image_widgets::{atlas_sprite_button, pivot_editor, unit_selector_button, unit_visualizer};
+use crate::app::editor_stage::image_widgets::{atlas_sprite_button, sprite_pivot_editor, sprite_holder_visualizer, unit_selector_button};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::units::{UnitConfig, UnitDanger};
 use crate::graphics::SPRITE_ATLAS_DEF;
@@ -23,7 +23,7 @@ impl EditorStage {
         let section = &mut self.unit_section;
         let name = &mut section.selected_unit_name;
         let cur_unit = &mut section.current_unit_config;
-        
+
         if let Some(current_unit_config) = cur_unit {
             if foo(name, current_unit_config) == UpdateState::Changed {
                 match section.selected_unit_config_id {
@@ -173,7 +173,7 @@ impl EditorStage {
                 ui.add_space(6f32);
                 ui.group(|ui| {
                     ui.label("Предпросмотр на игровом поле:");
-                    unit_visualizer(
+                    sprite_holder_visualizer(
                         ui,
                         texture_id,
                         atlas_size,
@@ -278,7 +278,7 @@ impl EditorStage {
                                         w / (sprite_data.size[0] as f32 * 16f32)
                                     };
                                     let old_pivot = current_unit_config.sprite_pivot;
-                                    pivot_editor(
+                                    sprite_pivot_editor(
                                         ui,
                                         texture_id,
                                         atlas_size,
