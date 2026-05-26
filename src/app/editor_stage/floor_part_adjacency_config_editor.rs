@@ -3,7 +3,6 @@ use crate::app::editor_stage::{EditorStage, UpdateState, thick_selector_button};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use egui::{Align2, CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, Ui};
-use egui::ahash::{HashSet, HashSetExt};
 use uuid::Uuid;
 use crate::game_config::ConfigId;
 use crate::game_config::floor_parts::FloorPartConfig;
@@ -202,18 +201,6 @@ impl EditorStage {
             unreachable!()
         };
         let atlas_size = self.atlas_size;
-        
-        let mut selected_north = self
-            .floor_part_adjacency_section
-            .selection_data
-            .selected_north_neighbour
-            .map(|it| {
-                let mut set = HashSet::new();
-                set.insert(it);
-                set
-            });
-
-        
 
         if let Some(cfg) = self.floor_part_adjacency_section.current_config.as_ref() {
             visualize_floor_part_adjacency(

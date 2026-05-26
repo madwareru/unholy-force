@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use macroquad::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -113,7 +113,7 @@ define_lookup!(WANG_MASK_CLAMP_NORTH_EAST_LOOKUP of wang_mask_clamp_to_north_eas
 define_lookup!(WANG_MASK_CLAMP_SOUTH_WEST_LOOKUP of wang_mask_clamp_to_south_west);
 define_lookup!(WANG_MASK_CLAMP_SOUTH_EAST_LOOKUP of wang_mask_clamp_to_south_east);
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, Default)]
 pub enum FloorGraphicsTileGroup {
     #[default]
     Dirt = 0,
@@ -132,7 +132,7 @@ impl FloorGraphicsTileGroup {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Deserialize, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, Default)]
 pub enum WallGraphicsTileGroup {
     None = 0,
     Sandstone = 1,

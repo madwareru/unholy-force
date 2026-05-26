@@ -25,7 +25,6 @@ use egui::{
 use uuid::Uuid;
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::ConfigId;
-use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use crate::game_config::units::UnitConfig;
 
 #[derive(Clone, Copy, Debug)]
@@ -305,11 +304,41 @@ pub fn sprite_holder_visualizer<Holder: SpriteHolder>(
     }
 }
 
-pub fn floor_part_editor(
+pub trait FloorTilesHolder<const W: usize, const H: usize> {
+    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; H]; W];
+    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; H]; W];
+}
+
+pub trait WallTilesHolder<const W: usize, const H: usize> {
+    fn wall_data(&self) -> &[[WallGraphicsTileGroup; H]; W];
+    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; H]; W];
+}
+
+pub trait FloorDataHolder<const W: usize, const H: usize> :
+    FloorTilesHolder<W, H> + WallTilesHolder<W, H> {}
+
+impl<const W: usize, const H: usize> FloorTilesHolder<W, H> for Box<[[FloorGraphicsTileGroup; H]; W]> {
+    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; H]; W] {
+        self
+    }
+    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; H]; W] {
+        self
+    }
+}
+impl<const W: usize, const H: usize> WallTilesHolder<W, H> for Box<[[WallGraphicsTileGroup; H]; W]> {
+    fn wall_data(&self) -> &[[WallGraphicsTileGroup; H]; W] {
+        self
+    }
+    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; H]; W] {
+        self
+    }
+}
+
+pub fn floor_data_holder_editor<const W: usize, const H: usize>(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
-    floor_part_config: &mut FloorPartConfig,
+    floor_part_config: &mut impl FloorDataHolder<W, H>,
     zoom: u8,
 ) -> Option<[usize; 2]> {
     let zoom = zoom.clamp(1, 8) as f32;
@@ -318,8 +347,8 @@ pub fn floor_part_editor(
         .tile_size
         .map(|it| it as f32);
     let display_size = vec2(
-        tile_size[0] * zoom * floor_part_config.floor_data[0].len() as f32,
-        tile_size[1] * zoom * floor_part_config.floor_data.len() as f32,
+        tile_size[0] * zoom * floor_part_config.floor_data()[0].len() as f32,
+        tile_size[1] * zoom * floor_part_config.floor_data().len() as f32,
     );
 
     let (rect, response) = ui.allocate_exact_size(display_size, Sense::click_and_drag());
@@ -336,7 +365,7 @@ pub fn floor_part_editor(
             ui,
             texture_id,
             atlas_size,
-            &floor_part_config.floor_data,
+            floor_part_config.floor_data(),
             zoom,
             tile_size,
             rect,
@@ -345,7 +374,7 @@ pub fn floor_part_editor(
             ui,
             texture_id,
             atlas_size,
-            &floor_part_config.wall_data,
+            floor_part_config.wall_data(),
             zoom,
             tile_size,
             rect,

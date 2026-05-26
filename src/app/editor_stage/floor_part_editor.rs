@@ -1,4 +1,4 @@
-use crate::app::editor_stage::image_widgets::{floor_part_editor, floor_part_id_button};
+use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, floor_part_id_button};
 use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_parts::FloorPartConfig;
@@ -198,7 +198,7 @@ impl EditorStage {
                             let full_height = ui.available_height();
                             let padding = (full_height - full_width) / 2f32;
                             ui.add_space(padding);
-                            if let Some([x, y]) = floor_part_editor(
+                            if let Some([x, y]) = floor_data_holder_editor(
                                 ui,
                                 texture_id,
                                 atlas_size,
