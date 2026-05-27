@@ -11,12 +11,14 @@ use crate::{
     },
     assets::AssetKind
 };
+use crate::app::editor_stage::floor_config_editor::FloorConfigEditorSection;
 use crate::app::editor_stage::floor_part_adjacency_config_editor::FloorPartAdjacencyConfigEditorSection;
 
 pub mod unit_config_editor;
 pub mod item_config_editor;
 pub mod floor_part_editor;
 pub mod floor_part_adjacency_config_editor;
+pub mod floor_config_editor;
 pub mod image_widgets;
 
 #[derive(Copy, Clone, Deserialize)]
@@ -38,6 +40,7 @@ pub struct EditorStage {
     item_section: ItemConfigEditorSection,
     floor_part_section: FloorPartConfigEditorSection,
     floor_part_adjacency_section: FloorPartAdjacencyConfigEditorSection,
+    floor_section: FloorConfigEditorSection,
 }
 
 impl EditorStage {
@@ -51,6 +54,7 @@ impl EditorStage {
             item_section: Default::default(),
             floor_part_section: Default::default(),
             floor_part_adjacency_section: Default::default(),
+            floor_section: Default::default(),
         }
     }
 
@@ -80,12 +84,12 @@ impl EditorStage {
 
             let screen_width = macroquad::prelude::screen_width();
             let preferred_central_width = match self.current_file_kind {
-                AssetKind::ItemConfig => 600f32,
-                AssetKind::UnitConfig => 450f32,
+                AssetKind::ItemConfig => 510f32,
+                AssetKind::UnitConfig => 510f32,
                 AssetKind::FloorPartConfig => 670f32,
                 AssetKind::FloorPartAdjacencyConfig => 450f32,
-                AssetKind::FloorConfig => 450f32,
-                AssetKind::FloorFlowGraphConfig => 450f32,
+                AssetKind::FloorConfig => 670f32,
+                AssetKind::FloorFlowGraphConfig => f32::INFINITY,
                 AssetKind::ParameterConfig => 450f32,
                 AssetKind::TagConfig => 450f32,
                 AssetKind::EffectMechanicConfig => 450f32,
@@ -134,7 +138,7 @@ impl EditorStage {
                                 AssetKind::UnitConfig => self.draw_unit_selector(ui),
                                 AssetKind::FloorPartConfig => self.draw_floor_part_selector(ui),
                                 AssetKind::FloorPartAdjacencyConfig => self.draw_fpa_selector(ui),
-                                AssetKind::FloorConfig => self.draw_floor_selector(ui),
+                                AssetKind::FloorConfig => self.draw_floor_config_selector(ui),
                                 AssetKind::FloorFlowGraphConfig => self.draw_floor_graph_selector(ui),
                                 AssetKind::ParameterConfig => todo!(),
                                 AssetKind::TagConfig => todo!(),
@@ -166,17 +170,20 @@ impl EditorStage {
                     });
                 });
 
-            egui::SidePanel::right("Дополнительная информация")
-                .exact_width(right_panel_width)
-                .show(egui_ctx, |ui| {
-                    match self.current_file_kind {
-                        AssetKind::UnitConfig => self.draw_unit_preview_in_level(ui),
-                        AssetKind::ItemConfig => self.draw_item_preview_in_level(ui),
-                        AssetKind::FloorPartConfig => self.draw_floor_part_editor_tools(ui),
-                        AssetKind::FloorPartAdjacencyConfig => self.draw_adjacency_visualizer(ui),
-                        _ => {} // todo
-                    }
-                });
+            if right_panel_width > 0f32 {
+                egui::SidePanel::right("Дополнительная информация")
+                    .exact_width(right_panel_width)
+                    .show(egui_ctx, |ui| {
+                        match self.current_file_kind {
+                            AssetKind::UnitConfig => self.draw_unit_preview_in_level(ui),
+                            AssetKind::ItemConfig => self.draw_item_preview_in_level(ui),
+                            AssetKind::FloorPartConfig => self.draw_floor_part_editor_tools(ui),
+                            AssetKind::FloorPartAdjacencyConfig => self.draw_adjacency_visualizer(ui),
+                            AssetKind::FloorConfig => self.draw_floor_editor_tools(ui),
+                            _ => {} // todo
+                        }
+                    });
+            }
 
             egui::CentralPanel::default()
                 .show(egui_ctx, |ui| {
@@ -185,15 +192,12 @@ impl EditorStage {
                     AssetKind::ItemConfig => self.draw_item_editor(ui),
                     AssetKind::FloorPartConfig => self.draw_floor_part_editor(ui),
                     AssetKind::FloorPartAdjacencyConfig => self.draw_floor_part_adjacency_editor(ui),
+                    AssetKind::FloorConfig => self.draw_floor_config_editor(ui),
                     _ => {} // todo
                 }
             });
         });
         result_status
-    }
-
-    fn draw_floor_selector(&mut self, _ui: &mut Ui) {
-        // todo
     }
     fn draw_floor_graph_selector(&mut self, _ui: &mut Ui) {
         // todo

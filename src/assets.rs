@@ -6,10 +6,10 @@ use lazy_static::lazy_static;
 use uuid::Uuid;
 use crate::game_config::{ConfigId, GameConfig};
 
-type SharedAssetDb = Arc<Mutex<AssetDb>>;
+type SharedAssetDb = Mutex<AssetDb>;
 
 lazy_static!(
-    pub static ref ASSET_DATABASE: SharedAssetDb = Arc::new(Mutex::new(AssetDb::load()));
+    pub static ref ASSET_DATABASE: SharedAssetDb = Mutex::new(AssetDb::load());
 );
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

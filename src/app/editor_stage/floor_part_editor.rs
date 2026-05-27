@@ -25,9 +25,9 @@ pub enum FloorPartEditorTool {
 
 #[derive(Copy, Clone, Default)]
 pub struct FloorPartToolsSubSection {
-    current_tool: FloorPartEditorTool,
-    floor_tile_group: FloorGraphicsTileGroup,
-    wall_tile_group: WallGraphicsTileGroup,
+    pub(crate) current_tool: FloorPartEditorTool,
+    pub(crate) floor_tile_group: FloorGraphicsTileGroup,
+    pub(crate) wall_tile_group: WallGraphicsTileGroup,
 }
 
 impl EditorStage {
@@ -180,51 +180,49 @@ impl EditorStage {
         };
         let atlas_size = self.atlas_size;
         let current_tool_section = self.floor_part_section.tools_sub_section;
+        
+        let mut asset_db = crate::assets::ASSET_DATABASE.lock()
+            .expect("Failed to lock asset database");
 
-        match crate::assets::ASSET_DATABASE.lock() {
-            Ok(mut asset_db) => {
-                self.update_current_floor_part_config(&mut asset_db, |floor_part_name, current_floor_part_config| {
-                    let mut update_state = UpdateState::Unchanged;
-                    ui.vertical(|ui| {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("Название для редактора:");
-                                if ui.add(TextEdit::singleline(floor_part_name).desired_width(f32::INFINITY)).changed() {
-                                    update_state = UpdateState::Changed;
-                                }
-                            });
-
-                            let full_width = ui.available_width();
-                            let full_height = ui.available_height();
-                            let padding = (full_height - full_width) / 2f32;
-                            ui.add_space(padding);
-                            if let Some([x, y]) = floor_data_holder_editor(
-                                ui,
-                                texture_id,
-                                atlas_size,
-                                current_floor_part_config,
-                                8
-                            ) {
-                                match current_tool_section.current_tool {
-                                    FloorPartEditorTool::PlaceFloor => {
-                                        current_floor_part_config.floor_data[y][x] =
-                                            current_tool_section.floor_tile_group;
-                                    }
-                                    FloorPartEditorTool::PlaceWall => {
-                                        current_floor_part_config.wall_data[y][x] =
-                                            current_tool_section.wall_tile_group;
-                                    }
-                                }
-                                update_state = UpdateState::Changed;
-                            }
-                            ui.add_space(padding);
-                        });
+        self.update_current_floor_part_config(&mut asset_db, |floor_part_name, current_floor_part_config| {
+            let mut update_state = UpdateState::Unchanged;
+            ui.vertical(|ui| {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Название для редактора:");
+                        if ui.add(TextEdit::singleline(floor_part_name).desired_width(f32::INFINITY)).changed() {
+                            update_state = UpdateState::Changed;
+                        }
                     });
-                    update_state
+
+                    let full_width = ui.available_width();
+                    let full_height = ui.available_height();
+                    let padding = (full_height - full_width) / 2f32;
+                    ui.add_space(padding);
+                    if let Some([x, y]) = floor_data_holder_editor(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        current_floor_part_config,
+                        8
+                    ) {
+                        match current_tool_section.current_tool {
+                            FloorPartEditorTool::PlaceFloor => {
+                                current_floor_part_config.floor_data[y][x] =
+                                    current_tool_section.floor_tile_group;
+                            }
+                            FloorPartEditorTool::PlaceWall => {
+                                current_floor_part_config.wall_data[y][x] =
+                                    current_tool_section.wall_tile_group;
+                            }
+                        }
+                        update_state = UpdateState::Changed;
+                    }
+                    ui.add_space(padding);
                 });
-            }
-            _ => {}
-        };
+            });
+            update_state
+        });
     }
 
     pub(crate) fn draw_floor_part_editor_tools(&mut self, ui: &mut Ui) {

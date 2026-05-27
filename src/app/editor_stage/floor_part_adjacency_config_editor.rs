@@ -1,8 +1,8 @@
-use crate::app::editor_stage::image_widgets::{floor_part_id_button, visualize_floor_part_adjacency, NeighbourData};
+use crate::app::editor_stage::image_widgets::{floor_part_id_button, fpa_button, visualize_floor_part_adjacency, NeighbourData};
 use crate::app::editor_stage::{EditorStage, UpdateState, thick_selector_button};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
-use egui::{Align2, CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, Ui};
+use egui::{CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, Ui};
 use uuid::Uuid;
 use crate::game_config::ConfigId;
 use crate::game_config::floor_parts::FloorPartConfig;
@@ -60,6 +60,14 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_fpa_selector(&mut self, ui: &mut Ui) {
+        let texture_id: egui::TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+        let atlas_size = self.atlas_size;
+
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
                 let full_width = ui.available_width();
@@ -100,11 +108,15 @@ impl EditorStage {
                             let fpa_config: FloorPartAdjacencyConfig =
                                 json5::from_str(&config_text).expect("Failed to load unit config");
 
-                            let response = thick_selector_button(
+                            let response = fpa_button(
                                 ui,
+                                &asset_db,
                                 selected,
-                                Align2::LEFT_CENTER,
+                                texture_id,
+                                atlas_size,
+                                60f32,
                                 config_name,
+                                &fpa_config
                             );
 
                             let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
@@ -312,7 +324,7 @@ impl EditorStage {
                                                 );
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
-                                                    fpa_config.north_adjacent_parts.remove(&conf);
+                                                    fpa_config.north_adjacent_parts.retain(|it| !it.eq(&conf));
                                                 } else if response.clicked_by(PointerButton::Primary) {
                                                     if selected {
                                                         selection_data.selected_north_neighbour = None;
@@ -331,7 +343,7 @@ impl EditorStage {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
-                                    fpa_config.north_adjacent_parts.insert(config_id);
+                                    fpa_config.north_adjacent_parts.push(config_id);
                                     update_state = UpdateState::Changed;
                                 });
                             });
@@ -371,7 +383,7 @@ impl EditorStage {
                                                 );
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
-                                                    fpa_config.south_adjacent_parts.remove(&conf);
+                                                    fpa_config.south_adjacent_parts.retain(|it| !it.eq(&conf));
                                                 } else if response.clicked_by(PointerButton::Primary) {
                                                     if selected {
                                                         selection_data.selected_south_neighbour = None;
@@ -389,7 +401,7 @@ impl EditorStage {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
-                                    fpa_config.south_adjacent_parts.insert(config_id);
+                                    fpa_config.south_adjacent_parts.push(config_id);
                                     update_state = UpdateState::Changed;
                                 });
                             });
@@ -430,7 +442,7 @@ impl EditorStage {
                                                 );
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
-                                                    fpa_config.west_adjacent_parts.remove(&conf);
+                                                    fpa_config.west_adjacent_parts.retain(|it| !it.eq(&conf));
                                                 } else if response.clicked_by(PointerButton::Primary) {
                                                     if selected {
                                                         selection_data.selected_west_neighbour = None;
@@ -448,7 +460,7 @@ impl EditorStage {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
-                                    fpa_config.west_adjacent_parts.insert(config_id);
+                                    fpa_config.west_adjacent_parts.push(config_id);
                                     update_state = UpdateState::Changed;
                                 });
                             });
@@ -489,7 +501,7 @@ impl EditorStage {
                                                 );
                                                 if response.clicked_by(PointerButton::Secondary) {
                                                     update_state = UpdateState::Changed;
-                                                    fpa_config.east_adjacent_parts.remove(&conf);
+                                                    fpa_config.east_adjacent_parts.retain(|it| !it.eq(&conf));
                                                 } else if response.clicked_by(PointerButton::Primary) {
                                                     if selected {
                                                         selection_data.selected_east_neighbour = None;
@@ -507,7 +519,7 @@ impl EditorStage {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
                                 shared_floor_part_closure(ui, asset_db, popup_id, &response, |config_id| {
-                                    fpa_config.east_adjacent_parts.insert(config_id);
+                                    fpa_config.east_adjacent_parts.push(config_id);
                                     update_state = UpdateState::Changed;
                                 });
                             });

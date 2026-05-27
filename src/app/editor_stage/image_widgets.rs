@@ -18,13 +18,11 @@ use crate::graphics::{
     WANG_MASK_CLAMP_SOUTH_EAST_LOOKUP,
     WANG_MASK_CLAMP_SOUTH_WEST_LOOKUP
 };
-use egui::{
-    Align2, Color32, CornerRadius, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId,
-    Ui, Vec2, pos2, vec2,
-};
+use egui::{Align2, Color32, CornerRadius, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId, Ui, Vec2, pos2, vec2, UiBuilder, Layout, Align};
 use uuid::Uuid;
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::ConfigId;
+use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use crate::game_config::units::UnitConfig;
 
 #[derive(Clone, Copy, Debug)]
@@ -305,31 +303,31 @@ pub fn sprite_holder_visualizer<Holder: SpriteHolder>(
 }
 
 pub trait FloorTilesHolder<const W: usize, const H: usize> {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; H]; W];
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; H]; W];
+    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; W]; H];
+    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; W]; H];
 }
 
 pub trait WallTilesHolder<const W: usize, const H: usize> {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; H]; W];
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; H]; W];
+    fn wall_data(&self) -> &[[WallGraphicsTileGroup; W]; H];
+    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; W]; H];
 }
 
 pub trait FloorDataHolder<const W: usize, const H: usize> :
     FloorTilesHolder<W, H> + WallTilesHolder<W, H> {}
 
-impl<const W: usize, const H: usize> FloorTilesHolder<W, H> for Box<[[FloorGraphicsTileGroup; H]; W]> {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; H]; W] {
+impl<const W: usize, const H: usize> FloorTilesHolder<W, H> for Box<[[FloorGraphicsTileGroup; W]; H]> {
+    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; W]; H] {
         self
     }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; H]; W] {
+    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; W]; H] {
         self
     }
 }
-impl<const W: usize, const H: usize> WallTilesHolder<W, H> for Box<[[WallGraphicsTileGroup; H]; W]> {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; H]; W] {
+impl<const W: usize, const H: usize> WallTilesHolder<W, H> for Box<[[WallGraphicsTileGroup; W]; H]> {
+    fn wall_data(&self) -> &[[WallGraphicsTileGroup; W]; H] {
         self
     }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; H]; W] {
+    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; W]; H] {
         self
     }
 }
@@ -579,6 +577,294 @@ fn get_coords_west(
 pub enum NeighbourData<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPartConfig>> + Copy> {
     SingleFocus(ConfigId<FloorPartConfig>),
     Multiple(TNeighbours),
+}
+
+pub fn visualize_floor_part_adjacency_in_rect<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPartConfig>> + Copy>(
+    ui: &'a mut Ui,
+    rect: Rect,
+    asset_db: &AssetDb,
+    texture_id: TextureId,
+    atlas_size: [u16; 2],
+    central_part: ConfigId<FloorPartConfig>,
+    north_neighbours: NeighbourData<'a, TNeighbours>,
+    south_neighbours: NeighbourData<'a, TNeighbours>,
+    west_neighbours: NeighbourData<'a, TNeighbours>,
+    east_neighbours: NeighbourData<'a, TNeighbours>,
+    zoom: f32
+) {
+    fn square_side(count: usize) -> usize {
+        if count == 0 {
+            return 0;
+        }
+
+        let mut side = 1;
+
+        while side * side < count {
+            side += 1;
+        }
+
+        side
+    }
+
+    let tile_size = crate::graphics::SPRITE_ATLAS_DEF
+        .tile_size
+        .map(|it| it as f32);
+
+    if !asset_db.has_asset(AssetKind::FloorPartConfig, central_part.uuid) {
+        return;
+    }
+
+    let north_neighbour_count = match north_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(north_neighbours) => {
+            north_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let north_sides = square_side(north_neighbour_count);
+
+    let south_neighbour_count = match south_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(south_neighbours) => {
+            south_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let south_sides = square_side(south_neighbour_count);
+
+    let west_neighbour_count = match west_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(west_neighbours) => {
+            west_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let west_sides = square_side(west_neighbour_count);
+
+    let east_neighbour_count = match east_neighbours {
+        NeighbourData::SingleFocus(cfg_id) => {
+            if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                1
+            } else {
+                0
+            }
+        }
+        NeighbourData::Multiple(east_neighbours) => {
+            east_neighbours
+                .into_iter()
+                .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                .count()
+        }
+    };
+    let east_sides = square_side(east_neighbour_count);
+
+    let bytes = asset_db.load_asset(AssetKind::FloorPartConfig, central_part.uuid);
+    let central_part = FloorPartConfig::load_from_slice(bytes)
+        .expect("Failed to load floor part config");
+
+    let central_rect = Rect::from_min_max(
+        rect.min + rect.size() / 3f32,
+        rect.max - rect.size() / 3f32
+    );
+
+    let north_rect = Rect::from_min_max(
+        central_rect.min - vec2(0f32, central_rect.height()),
+        central_rect.max - vec2(0f32, central_rect.height())
+    );
+    let north_sub_rect_size = if north_sides <= 1 {
+        north_rect.size()
+    } else {
+        north_rect.size() / north_sides as f32
+    };
+
+    let south_rect = Rect::from_min_max(
+        central_rect.min + vec2(0f32, central_rect.height()),
+        central_rect.max + vec2(0f32, central_rect.height())
+    );
+    let south_sub_rect_size = if south_sides <= 1 {
+        south_rect.size()
+    } else {
+        south_rect.size() / south_sides as f32
+    };
+
+    let west_rect = Rect::from_min_max(
+        central_rect.min - vec2(central_rect.width(), 0f32),
+        central_rect.max - vec2(central_rect.width(), 0f32)
+    );
+    let west_sub_rect_size = if west_sides <= 1 {
+        west_rect.size()
+    } else {
+        west_rect.size() / west_sides as f32
+    };
+
+    let east_rect = Rect::from_min_max(
+        central_rect.min + vec2(central_rect.width(), 0f32),
+        central_rect.max + vec2(central_rect.width(), 0f32)
+    );
+    let east_sub_rect_size = if east_sides <= 1 {
+        east_rect.size()
+    } else {
+        east_rect.size() / east_sides as f32
+    };
+
+    draw_floors_w_h(
+        ui,
+        texture_id,
+        atlas_size,
+        &central_part.floor_data,
+        zoom,
+        tile_size,
+        central_rect
+    );
+    draw_walls_w_h(
+        ui,
+        texture_id,
+        atlas_size,
+        &central_part.wall_data,
+        zoom,
+        tile_size,
+        central_rect
+    );
+
+    let north_sub_rect = Rect::from_min_max(
+        pos2(north_rect.min.x, north_rect.max.y - north_sub_rect_size.y),
+        pos2(north_rect.min.x + north_sub_rect_size.x, north_rect.max.y)
+    );
+    let north_sub_rect_step_small = vec2(north_sub_rect_size.x, 0f32);
+    let north_sub_rect_step_big = vec2(
+        -north_sub_rect_size.x * north_sides as f32,
+        -north_sub_rect_size.y
+    );
+
+    let south_sub_rect = Rect::from_min_max(
+        pos2(south_rect.min.x, south_rect.min.y),
+        pos2(south_rect.min.x + south_sub_rect_size.x, south_rect.max.y + south_sub_rect_size.y)
+    );
+    let south_sub_rect_step_small = vec2(south_sub_rect_size.x, 0f32);
+    let south_sub_rect_step_big = vec2(
+        -south_sub_rect_size.x * south_sides as f32,
+        south_sub_rect_size.y
+    );
+
+    let west_sub_rect = Rect::from_min_max(
+        pos2(west_rect.max.x - west_sub_rect_size.x, west_rect.min.y),
+        pos2(west_rect.max.x, west_rect.min.y + west_sub_rect_size.y)
+    );
+    let west_sub_rect_step_small = vec2(0f32, west_sub_rect_size.y);
+    let west_sub_rect_step_big = vec2(
+        -west_sub_rect_size.x,
+        -west_sub_rect_size.y * west_sides as f32
+    );
+
+    let east_sub_rect = Rect::from_min_max(
+        pos2(east_rect.min.x, east_rect.min.y),
+        pos2(east_rect.min.x + east_sub_rect_size.x, east_rect.min.y + east_sub_rect_size.y)
+    );
+    let east_sub_rect_step_small = vec2(0f32, east_sub_rect_size.y);
+    let east_sub_rect_step_big = vec2(
+        east_sub_rect_size.x,
+        -east_sub_rect_size.y * east_sides as f32
+    );
+
+    for (mut sub_rect, step_small, step_big, neighbours, sides) in [
+        (north_sub_rect, north_sub_rect_step_small, north_sub_rect_step_big, north_neighbours, north_sides ),
+        (south_sub_rect, south_sub_rect_step_small, south_sub_rect_step_big, south_neighbours, south_sides ),
+        (west_sub_rect, west_sub_rect_step_small, west_sub_rect_step_big, west_neighbours, west_sides ),
+        (east_sub_rect, east_sub_rect_step_small, east_sub_rect_step_big, east_neighbours, east_sides ),
+    ] {
+        let mut offset = 0;
+        match neighbours {
+            NeighbourData::SingleFocus(cfg_id) => {
+                if asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid) {
+                    let bytes = asset_db.load_asset(AssetKind::FloorPartConfig, cfg_id.uuid);
+                    let side_part = FloorPartConfig::load_from_slice(bytes).expect("Failed to load FloorPartConfig");
+
+                    draw_floors_w_h(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        &side_part.floor_data,
+                        zoom,
+                        tile_size,
+                        sub_rect
+                    );
+                    draw_walls_w_h(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        &side_part.wall_data,
+                        zoom,
+                        tile_size,
+                        sub_rect
+                    );
+                }
+            }
+            NeighbourData::Multiple(neighbours) => {
+                for side_part in neighbours
+                    .into_iter()
+                    .filter(|cfg_id| asset_db.has_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                    .map(|cfg_id| asset_db.load_asset(AssetKind::FloorPartConfig, cfg_id.uuid))
+                    .map(|bytes| FloorPartConfig::load_from_slice(bytes).expect("Failed to load FloorPartConfig")) {
+
+                    draw_floors_w_h(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        &side_part.floor_data,
+                        zoom / sides as f32,
+                        tile_size,
+                        sub_rect
+                    );
+                    draw_walls_w_h(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        &side_part.wall_data,
+                        zoom / sides as f32,
+                        tile_size,
+                        sub_rect
+                    );
+
+                    sub_rect = Rect::from_min_max(
+                        sub_rect.min + step_small,
+                        sub_rect.max + step_small
+                    );
+                    offset += 1;
+                    if offset == sides {
+                        offset = 0;
+                        sub_rect = Rect::from_min_max(
+                            sub_rect.min + step_big,
+                            sub_rect.max + step_big
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub fn visualize_floor_part_adjacency<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPartConfig>> + Copy>(
@@ -1601,6 +1887,127 @@ pub fn broken_uuid_button(
     response
 }
 
+pub fn fpa_button(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    selected: bool,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    preview_size: f32,
+    editor_name: &str,
+    config: &FloorPartAdjacencyConfig,
+) -> Response {
+    let padding_size = ui.spacing().item_spacing.x;
+    let button_width = preview_size + padding_size * 2f32;
+
+    let (rect, response) = ui.allocate_exact_size(vec2(button_width, button_width), Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+
+        let fill = if selected {
+            ui.visuals().selection.bg_fill
+        } else {
+            visuals.bg_fill
+        };
+
+        let stroke = if selected {
+            ui.visuals().selection.stroke
+        } else {
+            visuals.bg_stroke
+        };
+
+        let text_color = if selected {
+            ui.visuals().selection.stroke.color
+        } else {
+            visuals.text_color()
+        };
+
+        let rounding = CornerRadius::same(4);
+
+        ui.painter().rect_filled(rect, rounding, fill);
+        ui.painter()
+            .rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
+
+        let zoom_one_width = crate::graphics::SPRITE_ATLAS_DEF.tile_size[0] as f32 * 15f32;
+        let zoom = preview_size / zoom_one_width;
+
+        let rect_min = rect.min + vec2(padding_size, padding_size);
+        let rect_max = rect.max - vec2(padding_size, padding_size);
+
+        let rect = Rect::from_min_max(rect_min, rect_max);
+
+        visualize_floor_part_adjacency_in_rect(
+            ui,
+            rect,
+            asset_db,
+            atlas_texture,
+            atlas_size,
+            config.part,
+            NeighbourData::Multiple(&config.north_adjacent_parts),
+            NeighbourData::Multiple(&config.south_adjacent_parts),
+            NeighbourData::Multiple(&config.west_adjacent_parts),
+            NeighbourData::Multiple(&config.east_adjacent_parts),
+            zoom
+        );
+
+        let text_pos = pos2(
+            rect.center().x,
+            rect.max.y - ui.spacing().interact_size.y * 0.5f32,
+        );
+
+        let text_style = match preview_size {
+            x if x >= 240f32 => TextStyle::Heading.resolve(ui.style()),
+            x if x >= 180f32 => TextStyle::Button.resolve(ui.style()),
+            x if x >= 120f32 => TextStyle::Body.resolve(ui.style()),
+            _ => TextStyle::Small.resolve(ui.style())
+        };
+
+        for j in -1..=1 {
+            for i in -1..=1 {
+                if i * j == 0 { continue; }
+                let added_vec = vec2(i as f32, j as f32);
+                ui.painter().text(
+                    text_pos + added_vec,
+                    Align2::CENTER_CENTER,
+                    editor_name,
+                    text_style.clone(),
+                    Color32::BLACK,
+                );
+            }
+        }
+
+        ui.painter().text(
+            text_pos,
+            Align2::CENTER_CENTER,
+            editor_name,
+            text_style,
+            text_color
+        );
+    }
+
+    response
+}
+
+pub fn item_config_id_button(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    selected: bool,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    unit_config_id: ConfigId<ItemConfig>,
+) -> Response {
+    if !asset_db.has_asset(AssetKind::ItemConfig, unit_config_id.uuid) {
+        let size = [ui.available_width(), ui.spacing().interact_size.y * 4f32];
+        broken_uuid_button(ui, size, unit_config_id.uuid)
+    } else {
+        let config_text = asset_db.load_json5_asset(AssetKind::ItemConfig, unit_config_id.uuid);
+        let config_name = asset_db.asset_name(AssetKind::ItemConfig, unit_config_id.uuid);
+        let config: ItemConfig = json5::from_str(config_text).expect("Failed to parse item config");
+        item_selector_button(ui, selected, atlas_texture, atlas_size, config_name, &config)
+    }
+}
+
 pub fn item_selector_button(
     ui: &mut Ui,
     selected: bool,
@@ -1737,6 +2144,25 @@ pub fn item_selector_button(
     response
 }
 
+pub fn unit_config_id_button(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    selected: bool,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    unit_config_id: ConfigId<UnitConfig>,
+) -> Response {
+    if !asset_db.has_asset(AssetKind::UnitConfig, unit_config_id.uuid) {
+        let size = [ui.available_width(), ui.spacing().interact_size.y * 4f32];
+        broken_uuid_button(ui, size, unit_config_id.uuid)
+    } else {
+        let config_text = asset_db.load_json5_asset(AssetKind::UnitConfig, unit_config_id.uuid);
+        let config_name = asset_db.asset_name(AssetKind::UnitConfig, unit_config_id.uuid);
+        let config: UnitConfig = json5::from_str(config_text).expect("Failed to parse unit config");
+        unit_selector_button(ui, selected, atlas_texture, atlas_size, config_name, &config)
+    }
+}
+
 pub fn unit_selector_button(
     ui: &mut Ui,
     selected: bool,
@@ -1871,4 +2297,63 @@ pub fn unit_selector_button(
     }
 
     response
+}
+
+
+#[inline]
+pub fn split_2_horizontal<R>(
+    ui: &mut Ui,
+    ratio: f32,
+    add_contents: impl FnOnce(&mut [Ui; 2]) -> R,
+) -> Option<R> {
+    let ratio = ratio.clamp(0f32, 1f32);
+    let spacing = ui.spacing().item_spacing.x;
+    let columns_width = ui.available_width() - spacing;
+    if columns_width <= 0f32 { return None; }
+
+    let column_width_0 = columns_width * ratio;
+    let column_width_1 = columns_width - column_width_0;
+    let top_left = ui.cursor().min;
+
+    let mut columns = [
+        {
+            let pos = top_left;
+            let child_rect = Rect::from_min_max(
+                pos,
+                pos2(pos.x + column_width_0, ui.max_rect().right_bottom().y),
+            );
+            let mut column_ui = ui.new_child(
+                UiBuilder::new()
+                    .max_rect(child_rect)
+                    .layout(Layout::top_down_justified(Align::LEFT)),
+            );
+            column_ui.set_width(column_width_0);
+            column_ui
+        },
+        {
+            let pos = pos2(top_left.x + column_width_0 + spacing, top_left.y);
+            let child_rect = Rect::from_min_max(
+                pos,
+                pos2(pos.x + column_width_1, ui.max_rect().right_bottom().y),
+            );
+            let mut column_ui = ui.new_child(
+                UiBuilder::new()
+                    .max_rect(child_rect)
+                    .layout(Layout::top_down_justified(Align::LEFT)),
+            );
+            column_ui.set_width(column_width_1);
+            column_ui
+        }
+    ];
+    let result = add_contents(&mut columns);
+    let mut max_height = 0.0;
+    for column in &columns {
+        max_height = column.min_size().y.max(max_height);
+    }
+
+    let total_required_width = columns_width + spacing;
+
+    let size = vec2(ui.available_width().max(total_required_width), max_height);
+    ui.advance_cursor_after_rect(Rect::from_min_size(top_left, size));
+    Some(result)
 }
