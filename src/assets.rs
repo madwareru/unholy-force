@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Mutex};
 use lazy_static::lazy_static;
 use uuid::Uuid;
 use crate::game_config::{ConfigId, GameConfig};

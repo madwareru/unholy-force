@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use crate::app::editor_stage::image_widgets::{FloorDataHolder, FloorTilesHolder, WallTilesHolder};
 use crate::game_config::{Config, ConfigId};
@@ -124,6 +123,111 @@ impl WallTilesHolder<30, 30> for AuthoredFloorSize30x30 {
     }
 }
 impl FloorDataHolder<30, 30> for AuthoredFloorSize30x30 {}
+
+#[derive(Clone, Debug)]
+pub struct FloorSize40x40 {
+    pub floor_data: Box<[[FloorGraphicsTileGroup; 40]; 40]>,
+    pub wall_data: Box<[[WallGraphicsTileGroup; 40]; 40]>,
+}
+impl Default for FloorSize40x40 {
+    fn default() -> Self {
+        Self {
+            floor_data: Box::new([[FloorGraphicsTileGroup::default(); 40]; 40]),
+            wall_data: Box::new([[WallGraphicsTileGroup::default(); 40]; 40]),
+        }
+    }
+}
+impl FloorSize for FloorSize40x40 {
+    const WIDTH: usize = 40;
+    const HEIGHT: usize = 40;
+}
+impl FloorTilesHolder<40, 40> for FloorSize40x40 {
+    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 40]; 40] {
+        self.floor_data.floor_data()
+    }
+    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 40]; 40] {
+        self.floor_data.floor_data_mut()
+    }
+}
+impl WallTilesHolder<40, 40> for FloorSize40x40 {
+    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 40]; 40] {
+        self.wall_data.wall_data()
+    }
+    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 40]; 40] {
+        self.wall_data.wall_data_mut()
+    }
+}
+impl FloorDataHolder<40, 40> for FloorSize40x40 {}
+
+#[derive(Clone, Debug)]
+pub struct FloorSize60x60 {
+    pub floor_data: Box<[[FloorGraphicsTileGroup; 60]; 60]>,
+    pub wall_data: Box<[[WallGraphicsTileGroup; 60]; 60]>,
+}
+impl Default for FloorSize60x60 {
+    fn default() -> Self {
+        Self {
+            floor_data: Box::new([[FloorGraphicsTileGroup::default(); 60]; 60]),
+            wall_data: Box::new([[WallGraphicsTileGroup::default(); 60]; 60]),
+        }
+    }
+}
+impl FloorSize for FloorSize60x60 {
+    const WIDTH: usize = 60;
+    const HEIGHT: usize = 60;
+}
+impl FloorTilesHolder<60, 60> for FloorSize60x60 {
+    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 60]; 60] {
+        self.floor_data.floor_data()
+    }
+    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 60]; 60] {
+        self.floor_data.floor_data_mut()
+    }
+}
+impl WallTilesHolder<60, 60> for FloorSize60x60 {
+    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 60]; 60] {
+        self.wall_data.wall_data()
+    }
+    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 60]; 60] {
+        self.wall_data.wall_data_mut()
+    }
+}
+impl FloorDataHolder<60, 60> for FloorSize60x60 {}
+
+#[derive(Clone, Debug)]
+pub struct FloorSize80x80 {
+    pub floor_data: Box<[[FloorGraphicsTileGroup; 80]; 80]>,
+    pub wall_data: Box<[[WallGraphicsTileGroup; 80]; 80]>,
+}
+impl Default for FloorSize80x80 {
+    fn default() -> Self {
+        Self {
+            floor_data: Box::new([[FloorGraphicsTileGroup::default(); 80]; 80]),
+            wall_data: Box::new([[WallGraphicsTileGroup::default(); 80]; 80]),
+        }
+    }
+}
+impl FloorSize for FloorSize80x80 {
+    const WIDTH: usize = 80;
+    const HEIGHT: usize = 80;
+}
+impl FloorTilesHolder<80, 80> for FloorSize80x80 {
+    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 80]; 80] {
+        self.floor_data.floor_data()
+    }
+    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 80]; 80] {
+        self.floor_data.floor_data_mut()
+    }
+}
+impl WallTilesHolder<80, 80> for FloorSize80x80 {
+    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 80]; 80] {
+        self.wall_data.wall_data()
+    }
+    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 80]; 80] {
+        self.wall_data.wall_data_mut()
+    }
+}
+impl FloorDataHolder<80, 80> for FloorSize80x80 {}
 
 #[derive(Copy, Clone, Serialize, Deserialize, Default, Debug)]
 pub struct GeneratedFloor<const W: usize, const H: usize>;

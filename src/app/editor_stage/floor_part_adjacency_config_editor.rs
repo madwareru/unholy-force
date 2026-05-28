@@ -1,5 +1,5 @@
 use crate::app::editor_stage::image_widgets::{floor_part_id_button, fpa_button, visualize_floor_part_adjacency, NeighbourData};
-use crate::app::editor_stage::{EditorStage, UpdateState, thick_selector_button};
+use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use egui::{CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, Ui};
@@ -68,139 +68,140 @@ impl EditorStage {
         };
         let atlas_size = self.atlas_size;
 
-        match crate::assets::ASSET_DATABASE.lock() {
-            Ok(mut asset_db) => {
-                let full_width = ui.available_width();
-                let available_height = ui.available_height() - ui.spacing().interact_size.y * 6f32;
+        let mut asset_db = crate::assets::ASSET_DATABASE.lock().expect("Failed to lock asset db");
+        let full_width = ui.available_width();
+        let available_height = ui.available_height() - ui.spacing().interact_size.y * 6f32;
 
-                ui.horizontal(|ui| {
-                    ui.label("Фильтр:");
-                    ui.add(
-                        TextEdit::singleline(
-                            &mut self.floor_part_adjacency_section.config_name_filter,
-                        )
-                        .desired_width(f32::INFINITY),
-                    )
-                });
-                ui.add_space(4f32);
-                ScrollArea::vertical()
-                    .max_height(available_height)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        let mut to_delete = None;
+        ui.horizontal(|ui| {
+            ui.label("Фильтр:");
+            ui.add(
+                TextEdit::singleline(
+                    &mut self.floor_part_adjacency_section.config_name_filter,
+                )
+                    .desired_width(f32::INFINITY),
+            )
+        });
+        ui.add_space(4f32);
+        ScrollArea::vertical()
+            .max_height(available_height)
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                let mut to_delete = None;
 
-                        let units = asset_db.list_all_assets(AssetKind::FloorPartAdjacencyConfig);
-                        for (id, config_name) in units {
-                            let section = &mut self.floor_part_adjacency_section;
-                            if !section.config_name_filter.is_empty() {
-                                if !config_name.starts_with(&section.config_name_filter) {
-                                    continue;
-                                }
+                ui.columns(3, |uis| {
+                    let mut offset = 0;
+                    let units = asset_db.list_all_assets(AssetKind::FloorPartAdjacencyConfig);
+                    for (id, config_name) in units {
+                        let section = &mut self.floor_part_adjacency_section;
+                        if !section.config_name_filter.is_empty() {
+                            if !config_name.starts_with(&section.config_name_filter) {
+                                continue;
                             }
-
-                            let selected = section
-                                .selected_config_id
-                                .map(|it| it.eq(&id))
-                                .unwrap_or(false);
-
-                            let config_text =
-                                asset_db.load_json5_asset(AssetKind::FloorPartAdjacencyConfig, id);
-                            let fpa_config: FloorPartAdjacencyConfig =
-                                json5::from_str(&config_text).expect("Failed to load unit config");
-
-                            let response = fpa_button(
-                                ui,
-                                &asset_db,
-                                selected,
-                                texture_id,
-                                atlas_size,
-                                60f32,
-                                config_name,
-                                &fpa_config
-                            );
-
-                            let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
-
-                            if response.clicked_by(PointerButton::Primary) {
-                                match section.selected_config_id {
-                                    Some(selected_id) if selected_id.eq(&id) => {}
-                                    _ => {
-                                        section.current_config = Some(fpa_config);
-                                        section.selected_config_name.clear();
-                                        section.selected_config_name += config_name;
-                                        section.selected_config_id = Some(id);
-                                        section.selection_data.selected_north_neighbour = None;
-                                        section.selection_data.selected_south_neighbour = None;
-                                        section.selection_data.selected_west_neighbour = None;
-                                        section.selection_data.selected_east_neighbour = None;
-                                    }
-                                }
-
-                            } else if response.clicked_by(PointerButton::Secondary) {
-                                ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                            }
-
-                            egui::popup_below_widget(
-                                ui,
-                                popup_id,
-                                &response,
-                                PopupCloseBehavior::CloseOnClickOutside,
-                                |ui| {
-                                    ui.set_min_width(100f32);
-                                    if ui.button("Удалить").clicked() {
-                                        to_delete = Some(id);
-                                        ui.memory_mut(|mem| mem.close_popup());
-                                    }
-                                },
-                            );
                         }
+                        let ui = &mut uis[offset];
 
-                        if let Some(id) = to_delete {
-                            let section = &mut self.floor_part_adjacency_section;
+                        let selected = section
+                            .selected_config_id
+                            .map(|it| it.eq(&id))
+                            .unwrap_or(false);
+
+                        let config_text =
+                            asset_db.load_json5_asset(AssetKind::FloorPartAdjacencyConfig, id);
+                        let fpa_config: FloorPartAdjacencyConfig =
+                            json5::from_str(&config_text).expect("Failed to load unit config");
+
+                        let response = fpa_button(
+                            ui,
+                            &asset_db,
+                            selected,
+                            texture_id,
+                            atlas_size,
+                            60f32,
+                            config_name,
+                            &fpa_config
+                        );
+
+                        let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
+
+                        if response.clicked_by(PointerButton::Primary) {
                             match section.selected_config_id {
-                                Some(selected_id) if selected_id.eq(&id) => {
-                                    section.selected_config_id = None;
-                                    section.current_config = None;
+                                Some(selected_id) if selected_id.eq(&id) => {}
+                                _ => {
+                                    section.current_config = Some(fpa_config);
                                     section.selected_config_name.clear();
+                                    section.selected_config_name += config_name;
+                                    section.selected_config_id = Some(id);
                                     section.selection_data.selected_north_neighbour = None;
                                     section.selection_data.selected_south_neighbour = None;
                                     section.selection_data.selected_west_neighbour = None;
                                     section.selection_data.selected_east_neighbour = None;
                                 }
-                                _ => {}
                             }
-                            asset_db.delete_asset(AssetKind::FloorPartAdjacencyConfig, id);
+                        } else if response.clicked_by(PointerButton::Secondary) {
+                            ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                         }
-                    });
 
-                if ui
-                    .add_sized(
-                        [full_width, 24f32],
-                        egui::Button::new("Создать конфигурацию"),
-                    )
-                    .clicked()
-                {
-                    let default_unit_config = FloorPartAdjacencyConfig::default();
-                    let config_text = json5::to_string(&default_unit_config)
-                        .expect("Failed to serialize default unit config");
+                        egui::popup_below_widget(
+                            ui,
+                            popup_id,
+                            &response,
+                            PopupCloseBehavior::CloseOnClickOutside,
+                            |ui| {
+                                ui.set_min_width(100f32);
+                                if ui.button("Удалить").clicked() {
+                                    to_delete = Some(id);
+                                    ui.memory_mut(|mem| mem.close_popup());
+                                }
+                            },
+                        );
 
+                        offset = (offset + 1) % 3;
+                    }
+                });
+
+                if let Some(id) = to_delete {
                     let section = &mut self.floor_part_adjacency_section;
-                    section.current_config = Some(default_unit_config);
-
-                    let id = asset_db.create_json5_asset(
-                        AssetKind::FloorPartAdjacencyConfig,
-                        "",
-                        &config_text,
-                    );
-                    section.selected_config_name.clear();
-                    section.selected_config_id = Some(id);
-                    section.selection_data.selected_north_neighbour = None;
-                    section.selection_data.selected_south_neighbour = None;
-                    section.selection_data.selected_west_neighbour = None;
-                    section.selection_data.selected_east_neighbour = None;
+                    match section.selected_config_id {
+                        Some(selected_id) if selected_id.eq(&id) => {
+                            section.selected_config_id = None;
+                            section.current_config = None;
+                            section.selected_config_name.clear();
+                            section.selection_data.selected_north_neighbour = None;
+                            section.selection_data.selected_south_neighbour = None;
+                            section.selection_data.selected_west_neighbour = None;
+                            section.selection_data.selected_east_neighbour = None;
+                        }
+                        _ => {}
+                    }
+                    asset_db.delete_asset(AssetKind::FloorPartAdjacencyConfig, id);
                 }
-            }
-            _ => {}
+            });
+
+        if ui
+            .add_sized(
+                [full_width, 24f32],
+                egui::Button::new("Создать конфигурацию"),
+            )
+            .clicked()
+        {
+            let default_unit_config = FloorPartAdjacencyConfig::default();
+            let config_text = json5::to_string(&default_unit_config)
+                .expect("Failed to serialize default unit config");
+
+            let section = &mut self.floor_part_adjacency_section;
+            section.current_config = Some(default_unit_config);
+
+            let id = asset_db.create_json5_asset(
+                AssetKind::FloorPartAdjacencyConfig,
+                "",
+                &config_text,
+            );
+            section.selected_config_name.clear();
+            section.selected_config_id = Some(id);
+            section.selection_data.selected_north_neighbour = None;
+            section.selection_data.selected_south_neighbour = None;
+            section.selection_data.selected_west_neighbour = None;
+            section.selection_data.selected_east_neighbour = None;
         }
     }
 

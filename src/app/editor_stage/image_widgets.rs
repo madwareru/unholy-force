@@ -314,7 +314,6 @@ pub trait WallTilesHolder<const W: usize, const H: usize> {
 
 pub trait FloorDataHolder<const W: usize, const H: usize> :
     FloorTilesHolder<W, H> + WallTilesHolder<W, H> {}
-
 impl<const W: usize, const H: usize> FloorTilesHolder<W, H> for Box<[[FloorGraphicsTileGroup; W]; H]> {
     fn floor_data(&self) -> &[[FloorGraphicsTileGroup; W]; H] {
         self
@@ -336,7 +335,7 @@ pub fn floor_data_holder_editor<const W: usize, const H: usize>(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
-    floor_part_config: &mut impl FloorDataHolder<W, H>,
+    floor_part_config: &impl FloorDataHolder<W, H>,
     zoom: u8,
 ) -> Option<[usize; 2]> {
     let zoom = zoom.clamp(1, 8) as f32;

@@ -1,5 +1,7 @@
 use crate::effect_mechanics::{EffectMechanicRegistry};
 
+pub mod floor_generator;
+
 pub type EntityId = hecs::Entity;
 pub type GameWorld = hecs::World;
 

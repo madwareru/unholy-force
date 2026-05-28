@@ -367,31 +367,31 @@ impl EditorStage {
                                         tag,
                                         tag.editor_label()
                                     ).clicked()  {
-                                        if floor_variant_tag != old_variant_tag {
-                                            current_floor_config.floor_variant = match floor_variant_tag {
-                                                FloorVariantTag::Authored15x15 =>
-                                                    FloorVariant::Authored15x15(Default::default()),
-                                                FloorVariantTag::Authored20x20 =>
-                                                    FloorVariant::Authored20x20(Default::default()),
-                                                FloorVariantTag::Authored25x25 =>
-                                                    FloorVariant::Authored25x25(Default::default()),
-                                                FloorVariantTag::Authored30x30 =>
-                                                    FloorVariant::Authored30x30(Default::default()),
-                                                FloorVariantTag::Generated15x15 =>
-                                                    FloorVariant::Generated15x15(Default::default()),
-                                                FloorVariantTag::Generated20x20 =>
-                                                    FloorVariant::Generated20x20(Default::default()),
-                                                FloorVariantTag::Generated25x25 =>
-                                                    FloorVariant::Generated25x25(Default::default()),
-                                                FloorVariantTag::Generated30x30 =>
-                                                    FloorVariant::Generated30x30(Default::default()),
-                                                FloorVariantTag::Generated40x40 =>
-                                                FloorVariant::Generated40x40(Default::default()),
-                                                FloorVariantTag::Generated60x60 =>
-                                                    FloorVariant::Generated60x60(Default::default()),
-                                                FloorVariantTag::Generated80x80 =>
-                                                    FloorVariant::Generated80x80(Default::default()),
+                                        macro_rules! floor_variant_make {
+                                            ($tag: ident with cases $($case: ident)*) => {
+                                                match $tag {
+                                                    $(FloorVariantTag::$case =>
+                                                    FloorVariant::$case(Default::default()),)*
+                                                }
                                             };
+                                        }
+                                        if floor_variant_tag != old_variant_tag {
+                                            current_floor_config.floor_variant = 
+                                                floor_variant_make![
+                                                    floor_variant_tag with cases
+                                                    Authored15x15
+                                                    Authored20x20
+                                                    Authored25x25
+                                                    Authored30x30
+                                                    Generated15x15
+                                                    Generated20x20
+                                                    Generated25x25
+                                                    Generated30x30
+                                                    Generated40x40
+                                                    Generated60x60
+                                                    Generated80x80
+                                                ];
+
                                             update_state = UpdateState::Changed;
                                         }
                                     }
@@ -399,90 +399,49 @@ impl EditorStage {
                             });
                     });
 
+                    macro_rules! authored_edit {
+                        ($name:ident with scale $scale:expr) => {
+                            let available_height = ui.available_height();
+                            ScrollArea::vertical()
+                                .max_height(available_height)
+                                .auto_shrink([false, false])
+                                .show(ui, |ui| {
+                                    if let Some([x, y]) = floor_data_holder_editor(
+                                        ui,
+                                        texture_id,
+                                        atlas_size,
+                                        $name,
+                                        $scale
+                                    ) {
+                                        match current_tool_section.current_tool {
+                                            FloorPartEditorTool::PlaceFloor => {
+                                                $name.floor_data[y][x] =
+                                                    current_tool_section.floor_tile_group;
+                                            }
+                                            FloorPartEditorTool::PlaceWall => {
+                                                $name.wall_data[y][x] =
+                                                    current_tool_section.wall_tile_group;
+                                            }
+                                        }
+                                        update_state = UpdateState::Changed;
+                                    }
+                                }
+                            );
+                        };
+                    }
+
                     match &mut current_floor_config.floor_variant {
                         FloorVariant::Authored15x15(authored_15x15) => {
-                            if let Some([x, y]) = floor_data_holder_editor(
-                                ui,
-                                texture_id,
-                                atlas_size,
-                                authored_15x15,
-                                2
-                            ) {
-                                match current_tool_section.current_tool {
-                                    FloorPartEditorTool::PlaceFloor => {
-                                        authored_15x15.floor_data[y][x] =
-                                            current_tool_section.floor_tile_group;
-                                    }
-                                    FloorPartEditorTool::PlaceWall => {
-                                        authored_15x15.wall_data[y][x] =
-                                            current_tool_section.wall_tile_group;
-                                    }
-                                }
-                                update_state = UpdateState::Changed;
-                            }
+                            authored_edit!(authored_15x15 with scale 2);
                         }
                         FloorVariant::Authored20x20(authored_20x20) => {
-                            if let Some([x, y]) = floor_data_holder_editor(
-                                ui,
-                                texture_id,
-                                atlas_size,
-                                authored_20x20,
-                                2
-                            ) {
-                                match current_tool_section.current_tool {
-                                    FloorPartEditorTool::PlaceFloor => {
-                                        authored_20x20.floor_data[y][x] =
-                                            current_tool_section.floor_tile_group;
-                                    }
-                                    FloorPartEditorTool::PlaceWall => {
-                                        authored_20x20.wall_data[y][x] =
-                                            current_tool_section.wall_tile_group;
-                                    }
-                                }
-                                update_state = UpdateState::Changed;
-                            }
+                            authored_edit!(authored_20x20 with scale 2);
                         }
                         FloorVariant::Authored25x25(authored_25x25) => {
-                            if let Some([x, y]) = floor_data_holder_editor(
-                                ui,
-                                texture_id,
-                                atlas_size,
-                                authored_25x25,
-                                1
-                            ) {
-                                match current_tool_section.current_tool {
-                                    FloorPartEditorTool::PlaceFloor => {
-                                        authored_25x25.floor_data[y][x] =
-                                            current_tool_section.floor_tile_group;
-                                    }
-                                    FloorPartEditorTool::PlaceWall => {
-                                        authored_25x25.wall_data[y][x] =
-                                            current_tool_section.wall_tile_group;
-                                    }
-                                }
-                                update_state = UpdateState::Changed;
-                            }
+                            authored_edit!(authored_25x25 with scale 1);
                         }
                         FloorVariant::Authored30x30(authored_30x30) => {
-                            if let Some([x, y]) = floor_data_holder_editor(
-                                ui,
-                                texture_id,
-                                atlas_size,
-                                authored_30x30,
-                                1
-                            ) {
-                                match current_tool_section.current_tool {
-                                    FloorPartEditorTool::PlaceFloor => {
-                                        authored_30x30.floor_data[y][x] =
-                                            current_tool_section.floor_tile_group;
-                                    }
-                                    FloorPartEditorTool::PlaceWall => {
-                                        authored_30x30.wall_data[y][x] =
-                                            current_tool_section.wall_tile_group;
-                                    }
-                                }
-                                update_state = UpdateState::Changed;
-                            }
+                            authored_edit!(authored_30x30 with scale 1);
                         }
                         _ => {
                             // todo: adjacent parts setting

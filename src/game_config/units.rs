@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::app::editor_stage::image_widgets::SpriteHolder;
 use crate::game_config::{Config};
-use crate::game_config::floors::LootTableEntry;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum UnitDanger {
