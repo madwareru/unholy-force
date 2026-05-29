@@ -1,5 +1,4 @@
 use egui::{Align2, Button, CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, TextureId, Ui};
-use egui::Key::P;
 use uuid::Uuid;
 use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::app::editor_stage::floor_part_editor::{FloorPartEditorTool, FloorPartToolsSubSection};

@@ -6,16 +6,15 @@ use crate::{
     game_config::floors::{
         AuthoredFloorSize15x15, AuthoredFloorSize20x20, AuthoredFloorSize25x25,
         AuthoredFloorSize30x30, FloorConfig, FloorSize40x40, FloorSize60x60, FloorSize80x80,
-        FloorVariant, PartsSize, GeneratedFloorSize,
+        FloorVariant,
     },
 };
-use simple_tiled_wfc::grid_generation::{WfcContext, WfcContextBuilder, WfcModule};
+use simple_tiled_wfc::grid_generation::{WfcModule};
 use std::collections::HashMap;
-use std::sync::mpsc::channel;
-use bitsetium::{BitEmpty, BitIntersection, BitUnion, BitSet};
+use bitsetium::{BitEmpty, BitSet};
 use simple_tiled_wfc::make_initial_probabilities;
 use crate::app::editor_stage::image_widgets::{EditableFloorData, FloorTilesHolderConst, WallTilesHolderConst};
-use crate::app::game_stage::grid_math::traverse_area_inward;
+use crate::app::game_stage::grid_math::{traverse_area_inward, traverse_area_outward};
 use crate::game_config::floors::{AuthoredFloor, GeneratedFloor};
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
 
@@ -325,7 +324,7 @@ pub fn generate(
             let results = vec![0; width * height];
             let mut offset = 0;
 
-            for [i, j] in traverse_area_inward(
+            for [i, j] in traverse_area_outward(
                 match floor_var {
                     GeneratedFloor::Size15x15(_) => 3,
                     GeneratedFloor::Size20x20(_) => 4,
