@@ -120,6 +120,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9da9bd2762491b1291e041fadaa0c77054f2acbb5a8b9a899191d82b6eaba133"
 
 [[package]]
+name = "bitsetium"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8603c1e6e332320ea9609f83b1a848ed5fe8c688c9872b0022baf299f60c966a"
+
+[[package]]
 name = "block2"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1811,7 +1817,7 @@ version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41bb02c23f421ff8f70e107297d86b51add85c6661c38600020d94363f48d316"
 dependencies = [
- "bitsetium",
+ "bitsetium 0.0.0",
  "image 0.23.14",
  "macroquad 0.3.26",
  "rand 0.7.3",
@@ -2001,6 +2007,7 @@ checksum = "2896d95c02a80c6d6a5d6e953d479f5ddf2dfdb6a244441010e373ac0fb88971"
 name = "unholy-force"
 version = "0.1.0"
 dependencies = [
+ "bitsetium 0.0.2",
  "bumpalo",
  "egui",
  "egui-macroquad",

@@ -1,11 +1,14 @@
 use egui::{Align2, Button, CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, TextureId, Ui};
+use egui::Key::P;
 use uuid::Uuid;
 use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::app::editor_stage::floor_part_editor::{FloorPartEditorTool, FloorPartToolsSubSection};
-use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, item_config_id_button, split_2_horizontal, unit_config_id_button};
+use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, fpa_id_button, item_config_id_button, split_2_horizontal, unit_config_id_button, EditableFloorData};
+use crate::app::game_stage::floor_generator::{generate, FloorGeneratorResult};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::ConfigId;
-use crate::game_config::floors::{FloorConfig, FloorVariant, FloorVariantTag, LootTableEntry, SpawnTableEntry};
+use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
+use crate::game_config::floors::{FloorConfig, FloorVariant, FloorVariantTag, LootTableEntry, SpawnTableEntry, AuthoredFloor, GeneratedFloor};
 use crate::game_config::items::ItemConfig;
 use crate::game_config::units::UnitConfig;
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
@@ -17,6 +20,7 @@ pub struct FloorConfigEditorSection {
     selected_config_name: String,
     current_config: Option<FloorConfig>,
     tools_sub_section: FloorPartToolsSubSection,
+    generated_floor: Option<FloorGeneratorResult>,
 }
 
 impl EditorStage {
@@ -102,6 +106,7 @@ impl EditorStage {
                                 section.selected_config_name.clear();
                                 section.selected_config_name += config_name;
                                 section.selected_config_id = Some(id);
+                                section.generated_floor = None;
                             }
                         }
 
@@ -130,6 +135,7 @@ impl EditorStage {
                         Some(selected_id) if selected_id.eq(&id) => {
                             section.selected_config_id = None;
                             section.current_config = None;
+                            section.generated_floor = None;
                             section.selected_config_name.clear();
                         }
                         _ => {}
@@ -141,7 +147,7 @@ impl EditorStage {
         if ui
             .add_sized(
                 [full_width, 24f32],
-                egui::Button::new("Создать этаж"),
+                Button::new("Создать этаж"),
             )
             .clicked()
         {
@@ -176,14 +182,15 @@ impl EditorStage {
         let mut asset_db = crate::assets::ASSET_DATABASE.lock()
             .expect("Failed to lock asset database");
 
-        let id = self.floor_section
+        let floor_config_id = self.floor_section
             .selected_config_id
-            .unwrap_or(Uuid::nil());
+            .unwrap_or_default();
 
-        let loot_table_salt = format!("floor_loot_table_{}", id);
-        let spawn_table_salt = format!("floor_spawn_table_{}", id);
-        let adjacency_rule_table_salt = format!("floor_adjacency_rule_table_{}", id);
+        let loot_table_salt = format!("floor_loot_table_{}", floor_config_id);
+        let spawn_table_salt = format!("floor_spawn_table_{}", floor_config_id);
+        let adjacency_rule_table_salt = format!("floor_adjacency_rule_table_{}", floor_config_id);
 
+        let mut generate_requested = false;
         self.update_current_floor_config(&mut asset_db, |asset_db, floor_name, current_floor_config| {
             let mut update_state = UpdateState::Unchanged;
 
@@ -367,30 +374,76 @@ impl EditorStage {
                                         tag,
                                         tag.editor_label()
                                     ).clicked()  {
-                                        macro_rules! floor_variant_make {
-                                            ($tag: ident with cases $($case: ident)*) => {
-                                                match $tag {
-                                                    $(FloorVariantTag::$case =>
-                                                    FloorVariant::$case(Default::default()),)*
-                                                }
-                                            };
-                                        }
                                         if floor_variant_tag != old_variant_tag {
-                                            current_floor_config.floor_variant = 
-                                                floor_variant_make![
-                                                    floor_variant_tag with cases
-                                                    Authored15x15
-                                                    Authored20x20
-                                                    Authored25x25
-                                                    Authored30x30
-                                                    Generated15x15
-                                                    Generated20x20
-                                                    Generated25x25
-                                                    Generated30x30
-                                                    Generated40x40
-                                                    Generated60x60
-                                                    Generated80x80
-                                                ];
+                                            current_floor_config.floor_variant =
+                                                match floor_variant_tag {
+                                                    FloorVariantTag::Authored15x15 =>
+                                                        FloorVariant::Authored(
+                                                            AuthoredFloor::Size15x15(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Authored20x20 =>
+                                                        FloorVariant::Authored(
+                                                            AuthoredFloor::Size20x20(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Authored25x25 =>
+                                                        FloorVariant::Authored(
+                                                            AuthoredFloor::Size25x25(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Authored30x30 =>
+                                                        FloorVariant::Authored(
+                                                            AuthoredFloor::Size30x30(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Generated15x15 =>
+                                                        FloorVariant::Generated(
+                                                            GeneratedFloor::Size15x15(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Generated20x20 =>
+                                                        FloorVariant::Generated(
+                                                            GeneratedFloor::Size20x20(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Generated25x25 =>
+                                                        FloorVariant::Generated(
+                                                            GeneratedFloor::Size25x25(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Generated30x30 =>
+                                                        FloorVariant::Generated(
+                                                            GeneratedFloor::Size30x30(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Generated40x40 =>
+                                                        FloorVariant::Generated(
+                                                            GeneratedFloor::Size40x40(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Generated60x60 =>
+                                                        FloorVariant::Generated(
+                                                            GeneratedFloor::Size60x60(
+                                                                Default::default()
+                                                            )
+                                                        ),
+                                                    FloorVariantTag::Generated80x80 =>
+                                                        FloorVariant::Generated(
+                                                            GeneratedFloor::Size80x80(
+                                                                Default::default()
+                                                            )
+                                                        )
+                                                };
 
                                             update_state = UpdateState::Changed;
                                         }
@@ -399,8 +452,15 @@ impl EditorStage {
                             });
                     });
 
-                    macro_rules! authored_edit {
-                        ($name:ident with scale $scale:expr) => {
+                    match &mut current_floor_config.floor_variant {
+                        FloorVariant::Authored(authored_floor) => {
+                            let scale = match authored_floor {
+                                AuthoredFloor::Size15x15(_) => 2,
+                                AuthoredFloor::Size20x20(_) => 2,
+                                AuthoredFloor::Size25x25(_) => 1,
+                                AuthoredFloor::Size30x30(_) => 1,
+                            };
+
                             let available_height = ui.available_height();
                             ScrollArea::vertical()
                                 .max_height(available_height)
@@ -410,41 +470,78 @@ impl EditorStage {
                                         ui,
                                         texture_id,
                                         atlas_size,
-                                        $name,
-                                        $scale
+                                        authored_floor,
+                                        scale
                                     ) {
                                         match current_tool_section.current_tool {
                                             FloorPartEditorTool::PlaceFloor => {
-                                                $name.floor_data[y][x] =
+                                                *authored_floor.get_floor_data_mut([x, y]) =
                                                     current_tool_section.floor_tile_group;
                                             }
                                             FloorPartEditorTool::PlaceWall => {
-                                                $name.wall_data[y][x] =
+                                                *authored_floor.get_wall_data_mut([x, y]) =
                                                     current_tool_section.wall_tile_group;
                                             }
                                         }
                                         update_state = UpdateState::Changed;
                                     }
-                                }
-                            );
-                        };
-                    }
-
-                    match &mut current_floor_config.floor_variant {
-                        FloorVariant::Authored15x15(authored_15x15) => {
-                            authored_edit!(authored_15x15 with scale 2);
-                        }
-                        FloorVariant::Authored20x20(authored_20x20) => {
-                            authored_edit!(authored_20x20 with scale 2);
-                        }
-                        FloorVariant::Authored25x25(authored_25x25) => {
-                            authored_edit!(authored_25x25 with scale 1);
-                        }
-                        FloorVariant::Authored30x30(authored_30x30) => {
-                            authored_edit!(authored_30x30 with scale 1);
+                                });
                         }
                         _ => {
-                            // todo: adjacent parts setting
+                            CollapsingHeader::new("Правила связности на этаже")
+                                .id_salt(adjacency_rule_table_salt)
+                                .show(ui, |ui| {
+                                    let available_width = ui.available_width();
+                                    ScrollArea::vertical()
+                                        .max_height(400f32)
+                                        .max_width(available_width - 15f32)
+                                        .auto_shrink([false, true])
+                                        .show(ui, |ui| {
+                                            let mut available_parts = std::mem::take(&mut current_floor_config.available_parts);
+                                            let mut to_delete = None;
+                                            ui.label("Для удаления нажмите правой кнопкой мыши");
+                                            const NUM_COLUMNS: usize = 6;
+                                            ui.columns(NUM_COLUMNS, |uis| {
+                                                let mut offset = 0;
+                                                for (index, config_id) in available_parts.iter().enumerate() {
+                                                    let ui = &mut uis[offset];
+                                                    offset = (offset + 1) % NUM_COLUMNS;
+                                                    let response = fpa_id_button(
+                                                        ui,
+                                                        asset_db,
+                                                        false,
+                                                        texture_id,
+                                                        atlas_size,
+                                                        80f32,
+                                                        *config_id,
+                                                    );
+                                                    if response.clicked_by(PointerButton::Secondary) {
+                                                        to_delete = Some(index);
+                                                    }
+                                                }
+                                            });
+
+                                            if let Some(to_delete) = to_delete {
+                                                available_parts.remove(to_delete);
+                                                update_state = UpdateState::Changed;
+                                            }
+                                            current_floor_config.available_parts = available_parts;
+                                        });
+
+                                    let popup_id = ui.make_persistent_id("Добавление правила связности");
+                                    let response = ui.button("Добавить правило");
+                                    if response.clicked() {
+                                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                    }
+                                    fpa_selector_popup(ui, asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
+                                        current_floor_config.available_parts.push(config_id);
+                                        update_state = UpdateState::Changed;
+                                    });
+                                });
+
+                            if ui.button("Тестовая генерация").clicked() {
+                                generate_requested = true;
+                            }
                         }
                     }
                 });
@@ -452,6 +549,30 @@ impl EditorStage {
 
             update_state
         });
+        if generate_requested {
+            self.floor_section.generated_floor = generate(
+                &asset_db,
+                ConfigId::from_uuid(floor_config_id)
+            );
+        }
+        if let Some(generated_result) = &self.floor_section.generated_floor {
+            let available_height = ui.available_height();
+            let available_width = ui.available_width();
+            ScrollArea::vertical()
+                .max_height(available_height)
+                .max_width(available_width)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    floor_data_holder_editor(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        generated_result,
+                        1
+                    );
+                }
+            );
+        }
     }
 
     pub(crate) fn draw_floor_editor_tools(&mut self, ui: &mut Ui) {
@@ -604,6 +725,54 @@ fn item_selector_popup(
                         ui.memory_mut(|mem| mem.close_popup());
                     }
                 }
+            });
+        },
+    );
+}
+
+fn fpa_selector_popup(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    popup_id: Id,
+    response: &Response,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    mut foo: impl FnMut(ConfigId<FloorPartAdjacencyConfig>) -> ()
+) {
+    egui::popup_below_widget(
+        ui,
+        popup_id,
+        response,
+        PopupCloseBehavior::IgnoreClicks,
+        |ui| {
+            ui.set_min_width(300f32);
+            ui.label("Для отмены выбора нажмите ESC");
+            ui.vertical(|ui|{
+                const NUM_COLUMNS: usize = 4;
+                let mut offset = 0;
+                ui.columns(NUM_COLUMNS, |uis| {
+                    for (uuid, _) in asset_db.list_all_assets(AssetKind::FloorPartAdjacencyConfig) {
+                        let ui = &mut uis[offset];
+                        offset = (offset + 1) % NUM_COLUMNS;
+                        let config_id = ConfigId::from_uuid(uuid);
+                        ui.add_space(4f32);
+
+                        let response = fpa_id_button(
+                            ui,
+                            asset_db,
+                            false,
+                            atlas_texture,
+                            atlas_size,
+                            60f32,
+                            config_id,
+                        );
+
+                        if response.clicked() {
+                            foo(config_id);
+                            ui.memory_mut(|mem| mem.close_popup());
+                        }
+                    }
+                });
             });
         },
     );

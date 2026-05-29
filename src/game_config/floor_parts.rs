@@ -4,7 +4,7 @@ use crate::game_config::units::{UnitConfig, UnitDanger};
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
 use std::io::{Result, Error, ErrorKind, Write, Read};
 use uuid::Uuid;
-use crate::app::editor_stage::image_widgets::{FloorDataHolder, FloorTilesHolder, WallTilesHolder};
+use crate::app::editor_stage::image_widgets::{EditableFloorData, FloorDataHolderConst, FloorTilesHolderConst, WallTilesHolderConst};
 use crate::game_config::effects::EffectMechanicConfig;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -49,13 +49,13 @@ impl Default for FloorCellExtra {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FloorPartConfig {
-    pub floor_data: Box<[[FloorGraphicsTileGroup; 5]; 5]>,
-    pub wall_data: Box<[[WallGraphicsTileGroup; 5]; 5]>,
-    pub extra_data: Box<[[FloorCellExtra; 5]; 5]>,
+    pub floor_data: [[FloorGraphicsTileGroup; 5]; 5],
+    pub wall_data: [[WallGraphicsTileGroup; 5]; 5],
+    pub extra_data: [[FloorCellExtra; 5]; 5],
     pub payload_count: u8,
 }
 
-impl FloorTilesHolder<5, 5> for FloorPartConfig {
+impl FloorTilesHolderConst<5, 5> for FloorPartConfig {
     fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 5]; 5] {
         &self.floor_data
     }
@@ -64,7 +64,7 @@ impl FloorTilesHolder<5, 5> for FloorPartConfig {
     }
 }
 
-impl WallTilesHolder<5, 5> for FloorPartConfig {
+impl WallTilesHolderConst<5, 5> for FloorPartConfig {
     fn wall_data(&self) -> &[[WallGraphicsTileGroup; 5]; 5] {
         &self.wall_data
     }
@@ -73,7 +73,29 @@ impl WallTilesHolder<5, 5> for FloorPartConfig {
     }
 }
 
-impl FloorDataHolder<5, 5> for FloorPartConfig {}
+impl EditableFloorData for FloorPartConfig {
+    fn width(&self) -> usize { self.floor_data[0].len() }
+
+    fn height(&self) -> usize { self.floor_data.len() }
+
+    fn get_floor_data(&self, [x, y]: [usize; 2]) -> &FloorGraphicsTileGroup {
+        &self.floor_data()[y][x]
+    }
+
+    fn get_floor_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut FloorGraphicsTileGroup {
+        &mut self.floor_data_mut()[y][x]
+    }
+
+    fn get_wall_data(&self, [x, y]: [usize; 2]) -> &WallGraphicsTileGroup {
+        &self.wall_data()[y][x]
+    }
+
+    fn get_wall_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut WallGraphicsTileGroup {
+        &mut self.wall_data_mut()[y][x]
+    }
+}
+
+impl FloorDataHolderConst<5, 5> for FloorPartConfig {}
 
 
 impl FloorPartConfig {
@@ -168,9 +190,9 @@ impl FloorPartConfig {
             effect_spawner_mask = effect_spawner_mask | ((mask_part[0] as u32) << (i * 8));
         }
 
-        let mut floor_data: Box<[[FloorGraphicsTileGroup; 5]; 5]> = Default::default();
-        let mut wall_data: Box<[[WallGraphicsTileGroup; 5]; 5]> = Default::default();
-        let mut extra_data: Box<[[FloorCellExtra; 5]; 5]> = Default::default();
+        let mut floor_data: [[FloorGraphicsTileGroup; 5]; 5] = Default::default();
+        let mut wall_data: [[WallGraphicsTileGroup; 5]; 5] = Default::default();
+        let mut extra_data: [[FloorCellExtra; 5]; 5] = Default::default();
         for j in 0..5 {
             for i in 0..5 {
                 let mut packed = [0u8];
