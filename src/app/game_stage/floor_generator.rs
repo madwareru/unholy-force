@@ -394,180 +394,218 @@ pub fn generate(
                 }
             }
 
-            let (mut num_islands, mut islands_mapping) = get_island_mapping(&result_floor);
-            while num_islands > 1 {
-                struct CrossRoadCorner {
-                    x: usize,
-                    y: usize,
-                    north_way: Option<(u8, usize)>,
-                    south_way: Option<(u8, usize)>,
-                    west_way: Option<(u8, usize)>,
-                    east_way: Option<(u8, usize)>,
-                }
-                impl CrossRoadCorner {
-                    pub fn unique_way_count(&self) -> u8 {
-                        let mut color_buffer = [0; 4];
-                        let mut num_colors = 0;
-                        if let Some((_, color)) = self.north_way {
-                            if (0..num_colors).all(|i| color_buffer[i] != color) {
-                                color_buffer[num_colors] = color;
-                                num_colors += 1;
-                            }
-                        }
-                        if let Some((_, color)) = self.south_way {
-                            if (0..num_colors).all(|i| color_buffer[i] != color) {
-                                color_buffer[num_colors] = color;
-                                num_colors += 1;
-                            }
-                        }
-                        if let Some((_, color)) = self.west_way {
-                            if (0..num_colors).all(|i| color_buffer[i] != color) {
-                                color_buffer[num_colors] = color;
-                                num_colors += 1;
-                            }
-                        }
-                        if let Some((_, color)) = self.east_way {
-                            if (0..num_colors).all(|i| color_buffer[i] != color) {
-                                num_colors += 1;
-                            }
-                        }
-                        num_colors as u8
-                    }
-                    pub fn max_way_length(&self) -> u8 {
-                        self.north_way.map(|it| it.0).unwrap_or(0)
-                            .max(self.south_way.map(|it| it.0).unwrap_or(0))
-                            .max(self.west_way.map(|it| it.0).unwrap_or(0))
-                            .max(self.east_way.map(|it| it.0).unwrap_or(0))
-                    }
-                    pub fn is_worse_than(&self, other: &Self) -> bool {
-                        self.unique_way_count() < other.unique_way_count() ||
-                            self.max_way_length() > other.max_way_length()
-                    }
-                }
-
-                let mut better_corner: Option<CrossRoadCorner> = None;
-                let mut known_islands = HashSet::new();
-
-                for j in 0..result_floor.height() {
-                    for i in 0..result_floor.width() {
-                        known_islands.clear();
-                        let mut corner = CrossRoadCorner {
-                            x: i,
-                            y: j,
-                            north_way: None,
-                            south_way: None,
-                            west_way: None,
-                            east_way: None,
-                        };
-
-                        let idx = j * result_floor.width() + i;
-                        if islands_mapping[idx].is_none() {
-                            continue;
-                        }
-
-                        'search_north: for jj in (0..j).rev() {
-                            let idx = jj * result_floor.width() + i;
-                            if let Some(color) = islands_mapping[idx] {
-                                let length = (j - jj) as u8;
-                                if known_islands.insert(color) {
-                                    corner.north_way = Some((length, color));
-                                }
-                                break 'search_north;
-                            }
-                        }
-                        'search_south: for jj in j + 1..result_floor.height() {
-                            let idx = jj * result_floor.width() + i;
-                            if let Some(color) = islands_mapping[idx] {
-                                let length = (jj - j) as u8;
-                                if known_islands.insert(color) {
-                                    corner.south_way = Some((length, color));
-                                }
-                                break 'search_south;
-                            }
-                        }
-                        'search_west: for ii in (0..i).rev() {
-                            let idx = j * result_floor.width() + ii;
-                            if let Some(color) = islands_mapping[idx] {
-                                let length = (i - ii) as u8;
-                                if known_islands.insert(color) {
-                                    corner.west_way = Some((length, color));
-                                }
-                                break 'search_west;
-                            }
-                        }
-                        'search_east: for ii in i + 1..result_floor.width() {
-                            let idx = j * result_floor.width() + ii;
-                            if let Some(color) = islands_mapping[idx] {
-                                let length = (ii - i) as u8;
-                                if known_islands.insert(color) {
-                                    corner.east_way = Some((length, color));
-                                }
-                                break 'search_east;
-                            }
-                        }
-
-                        if corner.unique_way_count() < 2 {
-                            continue;
-                        }
-
-                        if better_corner.is_none() {
-                            better_corner = Some(corner);
-                            continue;
-                        }
-
-                        if let Some(best) = &better_corner && best.is_worse_than(&corner) {
-                            better_corner = Some(corner);
-                        }
-                    }
-                }
-
-                let Some(better_corner) = better_corner else {
-                    println!("Curious situation: no better corner found to connect islands.");
-                    break;
-                };
-
-                *result_floor.get_wall_data_mut([better_corner.x, better_corner.y]) =
-                    WallGraphicsTileGroup::None;
-                *result_floor.get_floor_data_mut([better_corner.x, better_corner.y]) =
-                    FloorGraphicsTileGroup::Tile;
-
-                if let Some((num_tiles, _)) = better_corner.north_way {
-                    for i in 1..=num_tiles {
-                        *result_floor.get_wall_data_mut([better_corner.x, better_corner.y - i as usize]) =
-                            WallGraphicsTileGroup::None;
-                        *result_floor.get_floor_data_mut([better_corner.x, better_corner.y - i as usize]) =
-                            FloorGraphicsTileGroup::Tile;
-                    }
-                }
-                if let Some((num_tiles, _)) = better_corner.south_way {
-                    for i in 1..=num_tiles {
-                        *result_floor.get_wall_data_mut([better_corner.x, better_corner.y + i as usize]) =
-                            WallGraphicsTileGroup::None;
-                        *result_floor.get_floor_data_mut([better_corner.x, better_corner.y + i as usize]) =
-                            FloorGraphicsTileGroup::Tile;
-                    }
-                }
-                if let Some((num_tiles, _)) = better_corner.west_way {
-                    for i in 1..=num_tiles {
-                        *result_floor.get_wall_data_mut([better_corner.x - i as usize, better_corner.y]) =
-                            WallGraphicsTileGroup::None;
-                        *result_floor.get_floor_data_mut([better_corner.x - i as usize, better_corner.y]) =
-                            FloorGraphicsTileGroup::Tile;
-                    }
-                }
-                if let Some((num_tiles, _)) = better_corner.east_way {
-                    for i in 1..=num_tiles {
-                        *result_floor.get_wall_data_mut([better_corner.x + i as usize, better_corner.y]) =
-                            WallGraphicsTileGroup::None;
-                        *result_floor.get_floor_data_mut([better_corner.x + i as usize, better_corner.y]) =
-                            FloorGraphicsTileGroup::Tile;
-                    }
-                }
-
-                (num_islands, islands_mapping) = get_island_mapping(&result_floor);
-            }
+            connect_islands(&mut result_floor);
 
             Some(result_floor)
         }
+    }
+}
+
+fn connect_islands(result_floor: &mut FloorGeneratorResult) {
+    let (mut num_islands, mut islands_mapping) = get_island_mapping(result_floor);
+    while num_islands > 1 {
+        struct CrossRoadCorner {
+            x: usize,
+            y: usize,
+            north_way: Option<(u8, usize)>,
+            south_way: Option<(u8, usize)>,
+            west_way: Option<(u8, usize)>,
+            east_way: Option<(u8, usize)>,
+        }
+        impl CrossRoadCorner {
+            pub fn unique_way_count(&self) -> u8 {
+                let mut color_buffer = [0; 4];
+                let mut num_colors = 0;
+                if let Some((_, color)) = self.north_way {
+                    if (0..num_colors).all(|i| color_buffer[i] != color) {
+                        color_buffer[num_colors] = color;
+                        num_colors += 1;
+                    }
+                }
+                if let Some((_, color)) = self.south_way {
+                    if (0..num_colors).all(|i| color_buffer[i] != color) {
+                        color_buffer[num_colors] = color;
+                        num_colors += 1;
+                    }
+                }
+                if let Some((_, color)) = self.west_way {
+                    if (0..num_colors).all(|i| color_buffer[i] != color) {
+                        color_buffer[num_colors] = color;
+                        num_colors += 1;
+                    }
+                }
+                if let Some((_, color)) = self.east_way {
+                    if (0..num_colors).all(|i| color_buffer[i] != color) {
+                        num_colors += 1;
+                    }
+                }
+                num_colors as u8
+            }
+            pub fn max_way_length(&self) -> u8 {
+                self.north_way.map(|it| it.0).unwrap_or(0)
+                    .max(self.south_way.map(|it| it.0).unwrap_or(0))
+                    .max(self.west_way.map(|it| it.0).unwrap_or(0))
+                    .max(self.east_way.map(|it| it.0).unwrap_or(0))
+            }
+            pub fn is_worse_than(&self, other: &Self) -> bool {
+                self.unique_way_count() < other.unique_way_count() ||
+                    self.max_way_length() > other.max_way_length()
+            }
+        }
+
+        let mut better_corner: Option<CrossRoadCorner> = None;
+        let mut known_islands = HashSet::new();
+
+        for j in 0..result_floor.height() {
+            for i in 0..result_floor.width() {
+                known_islands.clear();
+                let mut corner = CrossRoadCorner {
+                    x: i,
+                    y: j,
+                    north_way: None,
+                    south_way: None,
+                    west_way: None,
+                    east_way: None,
+                };
+
+                let idx = j * result_floor.width() + i;
+
+                if !islands_mapping[idx].is_none() {
+                    continue;
+                }
+
+                'search_north: for jj in (0..j).rev() {
+                    let idx = jj * result_floor.width() + i;
+                    if let Some(color) = islands_mapping[idx] {
+                        let length = (j - jj) as u8;
+                        if known_islands.insert(color) {
+                            corner.north_way = Some((length, color));
+                        }
+                        break 'search_north;
+                    }
+                }
+                'search_south: for jj in j + 1..result_floor.height() {
+                    let idx = jj * result_floor.width() + i;
+                    if let Some(color) = islands_mapping[idx] {
+                        let length = (jj - j) as u8;
+                        if known_islands.insert(color) {
+                            corner.south_way = Some((length, color));
+                        }
+                        break 'search_south;
+                    }
+                }
+                'search_west: for ii in (0..i).rev() {
+                    let idx = j * result_floor.width() + ii;
+                    if let Some(color) = islands_mapping[idx] {
+                        let length = (i - ii) as u8;
+                        if known_islands.insert(color) {
+                            corner.west_way = Some((length, color));
+                        }
+                        break 'search_west;
+                    }
+                }
+                'search_east: for ii in i + 1..result_floor.width() {
+                    let idx = j * result_floor.width() + ii;
+                    if let Some(color) = islands_mapping[idx] {
+                        let length = (ii - i) as u8;
+                        if known_islands.insert(color) {
+                            corner.east_way = Some((length, color));
+                        }
+                        break 'search_east;
+                    }
+                }
+
+                if corner.unique_way_count() < 2 {
+                    continue;
+                }
+
+                if better_corner.is_none() {
+                    better_corner = Some(corner);
+                    continue;
+                }
+
+                if let Some(best) = &better_corner && best.is_worse_than(&corner) {
+                    better_corner = Some(corner);
+                }
+            }
+        }
+
+        let Some(better_corner) = better_corner else {
+            println!("Curious situation: no better corner found to connect islands.");
+            break;
+        };
+
+        *result_floor.get_wall_data_mut([better_corner.x, better_corner.y]) =
+            WallGraphicsTileGroup::None;
+        *result_floor.get_floor_data_mut([better_corner.x, better_corner.y]) =
+            FloorGraphicsTileGroup::Tile;
+
+        if let Some((num_tiles, _)) = better_corner.north_way {
+            for i in 1..=num_tiles {
+                *result_floor.get_wall_data_mut([better_corner.x, better_corner.y - i as usize]) =
+                    WallGraphicsTileGroup::None;
+                *result_floor.get_floor_data_mut([better_corner.x, better_corner.y - i as usize]) =
+                    FloorGraphicsTileGroup::Tile;
+            }
+        }
+        if let Some((num_tiles, _)) = better_corner.south_way {
+            for i in 1..=num_tiles {
+                *result_floor.get_wall_data_mut([better_corner.x, better_corner.y + i as usize]) =
+                    WallGraphicsTileGroup::None;
+                *result_floor.get_floor_data_mut([better_corner.x, better_corner.y + i as usize]) =
+                    FloorGraphicsTileGroup::Tile;
+            }
+        }
+        if let Some((num_tiles, _)) = better_corner.west_way {
+            for i in 1..=num_tiles {
+                *result_floor.get_wall_data_mut([better_corner.x - i as usize, better_corner.y]) =
+                    WallGraphicsTileGroup::None;
+                *result_floor.get_floor_data_mut([better_corner.x - i as usize, better_corner.y]) =
+                    FloorGraphicsTileGroup::Tile;
+            }
+        }
+        if let Some((num_tiles, _)) = better_corner.east_way {
+            for i in 1..=num_tiles {
+                *result_floor.get_wall_data_mut([better_corner.x + i as usize, better_corner.y]) =
+                    WallGraphicsTileGroup::None;
+                *result_floor.get_floor_data_mut([better_corner.x + i as usize, better_corner.y]) =
+                    FloorGraphicsTileGroup::Tile;
+            }
+        }
+
+        (num_islands, islands_mapping) = get_island_mapping(result_floor);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn should_connect_islands() {
+        let mut floor = FloorGeneratorResult::Size15x15(AuthoredFloorSize15x15::default());
+        for [row, col] in [
+            [1, 12],
+            [2, 11], [2, 12], [2, 13],
+            [3, 11], [3, 12], [3, 13],
+            [4, 12],
+            [5, 7],
+            [6, 5], [6, 6], [6, 7], [6, 8], [6, 9],
+            [7, 8],
+            [8, 6], [8, 7], [8, 8],
+            [9, 6],
+            [10, 1], [10, 6],
+            [11, 1], [11, 2], [11, 3], [11, 4], [11, 5], [11, 6], [11, 7], [11, 8],
+            [12, 1], [12, 2], [12, 3], [12, 4], [12, 5], [12, 6], [12, 7], [12, 8],
+            [13, 1], [13, 2], [13, 3], [13, 4], [13, 5], [13, 6], [13, 7], [13, 8],
+        ] {
+            *floor.get_wall_data_mut([col, row]) = WallGraphicsTileGroup::None;
+            *floor.get_floor_data_mut([col, row]) = FloorGraphicsTileGroup::Tile;
+        }
+        let (num_islands, _) = get_island_mapping(&floor);
+        assert_eq!(num_islands, 2);
+
+        connect_islands(&mut floor);
+        let (num_islands, _) = get_island_mapping(&floor);
+        assert_eq!(num_islands, 1);
     }
 }
