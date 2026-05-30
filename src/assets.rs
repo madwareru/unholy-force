@@ -12,6 +12,14 @@ lazy_static!(
     pub static ref ASSET_DATABASE: SharedAssetDb = Mutex::new(AssetDb::load());
 );
 
+pub fn dummy_asset_db() -> AssetDb {
+    AssetDb {
+        assets: HashMap::new(),
+        deleted_assets: HashSet::new(),
+        changed_assets: HashSet::new()
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum AssetKind {
     UnitConfig,
@@ -58,6 +66,7 @@ impl AssetDb {
         let mut floor_flow_graph_assets = HashMap::new();
         let mut parameter_assets = HashMap::new();
         let mut tag_assets = HashMap::new();
+        let mut effect_mechanic_assets = HashMap::new();
 
         for (kind, map, ext) in [
             (AssetKind::UnitConfig, &mut unit_assets, ".json5"),
@@ -109,6 +118,7 @@ impl AssetDb {
         assets.insert(AssetKind::FloorFlowGraphConfig, floor_flow_graph_assets);
         assets.insert(AssetKind::ParameterConfig, parameter_assets);
         assets.insert(AssetKind::TagConfig, tag_assets);
+        assets.insert(AssetKind::EffectMechanicConfig, effect_mechanic_assets);
 
         Self {
             assets,

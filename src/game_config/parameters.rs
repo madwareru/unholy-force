@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use crate::assets::{AssetKind};
+use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::{Config, ConfigId};
 use crate::game_config::effects::EffectMechanicConfig;
 
@@ -66,18 +66,29 @@ pub struct ParameterConfig {
 
 impl Config for ParameterConfig {}
 
+use crate::app::editor_stage::image_widgets::SpriteHolder;
+
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct TagConfig {
-    /// Имя для формул
     pub bound_name: String,
-    /// Название в игре
     pub name: String,
-    /// Описание в игре
     pub description: String,
-    /// Иконка для информационных окон
     pub sprite_name : String,
-    /// Эффект, который может быть создан при наложении лычки
+    #[serde(default)]
+    pub sprite_pivot: [u8; 2],
     pub effect_mechanic: Option<ConfigId<EffectMechanicConfig>>,
+}
+
+impl SpriteHolder for TagConfig {
+    fn sprite_name(&self) -> &str {
+        &self.sprite_name
+    }
+    fn sprite_pivot(&self) -> &[u8; 2] {
+        &self.sprite_pivot
+    }
+    fn sprite_pivot_mut(&mut self) -> &mut [u8; 2] {
+        &mut self.sprite_pivot
+    }
 }
 
 impl Config for TagConfig {}
@@ -96,38 +107,34 @@ impl ExpressionParameterIdCache {
         }
     }
 
-    fn resolve_tag_id(&mut self, tag_name: &str)  {
+    fn resolve_tag_id(&mut self, asset_db: &AssetDb, tag_name: &str) {
         if self.is_test {
             // в тестах ассетов нет и разрешать нечего
             return;
         }
-        if let Ok(asset_db) = crate::assets::ASSET_DATABASE.lock() {
-            for (uuid, _) in asset_db.list_all_assets(AssetKind::TagConfig) {
-                let asset_text = asset_db.load_json5_asset(AssetKind::TagConfig, uuid);
-                let tag_config = json5::from_str::<TagConfig>(&asset_text).ok()
-                    .expect("Failed to parse tag config");
-                if tag_name == tag_config.bound_name {
-                    self.tags.insert(tag_name.to_string(), ConfigId::from_uuid(uuid));
-                    break;
-                }
+        for (uuid, _) in asset_db.list_all_assets(AssetKind::TagConfig) {
+            let asset_text = asset_db.load_json5_asset(AssetKind::TagConfig, uuid);
+            let tag_config = json5::from_str::<TagConfig>(&asset_text).ok()
+                .expect("Failed to parse tag config");
+            if tag_name == tag_config.bound_name {
+                self.tags.insert(tag_name.to_string(), ConfigId::from_uuid(uuid));
+                break;
             }
         }
     }
 
-    fn resolve_parameter_id(&mut self, parameter_name: &str)  {
+    fn resolve_parameter_id(&mut self, asset_db: &AssetDb, parameter_name: &str) {
         if self.is_test {
             // в тестах ассетов нет и разрешать нечего
             return;
         }
-        if let Ok(asset_db) = crate::assets::ASSET_DATABASE.lock() {
-            for (uuid, _) in asset_db.list_all_assets(AssetKind::ParameterConfig) {
-                let asset_text = asset_db.load_json5_asset(AssetKind::ParameterConfig, uuid);
-                let parameter_config = json5::from_str::<ParameterConfig>(&asset_text).ok()
-                    .expect("Failed to parse parameter config");
-                if parameter_name == parameter_config.bound_name {
-                    self.parameters.insert(parameter_name.to_string(), ConfigId::from_uuid(uuid));
-                    break;
-                }
+        for (uuid, _) in asset_db.list_all_assets(AssetKind::ParameterConfig) {
+            let asset_text = asset_db.load_json5_asset(AssetKind::ParameterConfig, uuid);
+            let parameter_config = json5::from_str::<ParameterConfig>(&asset_text).ok()
+                .expect("Failed to parse parameter config");
+            if parameter_name == parameter_config.bound_name {
+                self.parameters.insert(parameter_name.to_string(), ConfigId::from_uuid(uuid));
+                break;
             }
         }
     }
@@ -140,15 +147,15 @@ impl ExpressionParameterIdCache {
         self.parameters.remove(parameter_name);
     }
 
-    pub fn get_tag_id(&mut self, tag_name: &str) -> Option<ConfigId<TagConfig>> {
+    pub fn get_tag_id(&mut self, asset_db: &AssetDb, tag_name: &str) -> Option<ConfigId<TagConfig>> {
         if !self.tags.contains_key(tag_name) {
-            self.resolve_tag_id(tag_name);
+            self.resolve_tag_id(asset_db, tag_name);
         }
         self.tags.get(tag_name).copied()
     }
-    pub fn get_parameter_id(&mut self, parameter_name: &str) -> Option<ConfigId<ParameterConfig>> {
+    pub fn get_parameter_id(&mut self, asset_db: &AssetDb, parameter_name: &str) -> Option<ConfigId<ParameterConfig>> {
         if !self.parameters.contains_key(parameter_name) {
-            self.resolve_parameter_id(parameter_name);
+            self.resolve_parameter_id(asset_db, parameter_name);
         }
         self.parameters.get(parameter_name).copied()
     }
@@ -541,12 +548,13 @@ fn collapse_unfinished_frames(
 }
 
 fn resolve_parameter_reference(
+    asset_db: &AssetDb,
     cache: &mut ExpressionParameterIdCache,
     name: &str,
     byte: usize,
     errors: &mut String,
 ) -> ConfigId<ParameterConfig> {
-    if let Some(id) = cache.get_parameter_id(name) {
+    if let Some(id) = cache.get_parameter_id(asset_db, name) {
         id
     } else {
         push_parse_error(
@@ -558,12 +566,13 @@ fn resolve_parameter_reference(
 }
 
 fn resolve_tag_reference(
+    asset_db: &AssetDb,
     cache: &mut ExpressionParameterIdCache,
     name: &str,
     byte: usize,
     errors: &mut String,
 ) -> ConfigId<TagConfig> {
-    if let Some(id) = cache.get_tag_id(name) {
+    if let Some(id) = cache.get_tag_id(asset_db, name) {
         id
     } else {
         push_parse_error(
@@ -575,6 +584,7 @@ fn resolve_tag_reference(
 }
 
 fn value_token_to_node(
+    asset_db: &AssetDb,
     token: ExpressionToken,
     cache: &mut ExpressionParameterIdCache,
     errors: &mut String,
@@ -591,10 +601,10 @@ fn value_token_to_node(
             }
         },
         ExpressionToken::Parameter { name, byte, .. } => Some(ExpressionParameterNode::ParameterValue(
-            resolve_parameter_reference(cache, &name, byte, errors),
+            resolve_parameter_reference(asset_db, cache, &name, byte, errors),
         )),
         ExpressionToken::Tag { name, byte, .. } => Some(ExpressionParameterNode::TagCount(
-            resolve_tag_reference(cache, &name, byte, errors),
+            resolve_tag_reference(asset_db, cache, &name, byte, errors),
         )),
         ExpressionToken::Invalid { raw, reason, byte } => {
             push_parse_error(
@@ -618,6 +628,7 @@ fn value_token_to_node(
 /// unknown names become `ConfigId::INVALID`, invalid tokens are skipped,
 /// unfinished operator expressions are collapsed into partial AST nodes.
 pub fn parse_expression_parameter(
+    asset_db: &AssetDb,
     source: &str,
     cache: &mut ExpressionParameterIdCache,
 ) -> ParsedExpressionParameter {
@@ -684,7 +695,7 @@ pub fn parse_expression_parameter(
                 );
             }
             token => {
-                if let Some(node) = value_token_to_node(token, cache, &mut errors) {
+                if let Some(node) = value_token_to_node(asset_db, token, cache, &mut errors) {
                     receive_expression_node(node, &mut stack, &mut root, &mut errors);
                 }
             }
@@ -708,17 +719,18 @@ pub fn parse_expression_parameter(
 }
 
 pub fn compile_expression_parameter(
+    asset_db: &AssetDb,
     source: &str,
     cache: &mut ExpressionParameterIdCache,
 ) -> CompiledExpressionParameterNode {
-    parse_expression_parameter(source, cache).into_compiled()
+    parse_expression_parameter(asset_db, source, cache).into_compiled()
 }
 
 impl ParameterConfig {
-    pub fn compile_expression(&mut self, cache: &mut ExpressionParameterIdCache) {
+    pub fn compile_expression(&mut self, asset_db: &AssetDb, cache: &mut ExpressionParameterIdCache) {
         self.compiled_expression = match &self.parameter_type {
             ParameterType::Constant => CompiledExpressionParameterNode::None,
-            ParameterType::Expression(source) => compile_expression_parameter(source, cache),
+            ParameterType::Expression(source) => compile_expression_parameter(asset_db, source, cache),
         };
     }
 
@@ -729,6 +741,7 @@ impl ParameterConfig {
 
 #[cfg(test)]
 mod tests {
+    use crate::assets::dummy_asset_db;
     use super::*;
     use super::CompiledExpressionParameterNode::*;
     use super::ParameterOperator::*;
@@ -778,18 +791,18 @@ mod tests {
         }
     }
 
-    fn compile_for_tests(source: &str) -> CompiledExpressionParameterNode {
+    fn compile_for_tests(asset_db: &AssetDb, source: &str) -> CompiledExpressionParameterNode {
         let mut cache = parameter_cache_for_tests();
-        compile_expression_parameter(source, &mut cache)
+        compile_expression_parameter(&asset_db, source, &mut cache)
     }
 
-    fn parse_for_tests(source: &str) -> ParsedExpressionParameter {
+    fn parse_for_tests(asset_db: &AssetDb, source: &str) -> ParsedExpressionParameter {
         let mut cache = parameter_cache_for_tests();
-        parse_expression_parameter(source, &mut cache)
+        parse_expression_parameter(&asset_db, source, &mut cache)
     }
 
-    fn assert_error_contains(source: &str, expected_part: &str) {
-        match compile_for_tests(source) {
+    fn assert_error_contains(asset_db: &AssetDb, source: &str, expected_part: &str) {
+        match compile_for_tests(asset_db, source) {
             Error { compile_error } => {
                 assert!(
                     compile_error.contains(expected_part),
@@ -801,11 +814,12 @@ mod tests {
     }
 
     fn assert_operator_arity_is_ok(
+        asset_db: &AssetDb,
         source: &str,
         expected_operator: ParameterOperator,
         expected_arity: usize,
     ) {
-        match compile_for_tests(source) {
+        match compile_for_tests(asset_db, source) {
             Ok(Operator(operator, args)) => {
                 assert_eq!(expected_operator, operator, "source: {source}");
                 assert_eq!(expected_arity, args.len(), "source: {source}");
@@ -814,8 +828,13 @@ mod tests {
         }
     }
 
-    fn assert_operator_arity_is_error(source: &str, operator_token: &str, actual_arity: usize) {
-        match compile_for_tests(source) {
+    fn assert_operator_arity_is_error(
+        asset_db: &AssetDb,
+        source: &str,
+        operator_token: &str,
+        actual_arity: usize
+    ) {
+        match compile_for_tests(asset_db, source) {
             Error { compile_error } => {
                 assert!(
                     compile_error.contains("Некорректная арность оператора"),
@@ -840,7 +859,8 @@ mod tests {
         let mut cache = parameter_cache_for_tests();
         let mut parameter_config = ParameterConfig::default();
         parameter_config.parameter_type = ParameterType::Expression(source.to_string());
-        parameter_config.compile_expression(&mut cache);
+        let asset_db = dummy_asset_db();
+        parameter_config.compile_expression(&asset_db, &mut cache);
         assert_eq!(
             &Ok(
                 Operator(
@@ -869,6 +889,7 @@ mod tests {
 
     #[test]
     fn test_plus_and_minus_arity() {
+        let asset_db = dummy_asset_db();
         for (source, operator, arity) in [
             ("(+ 1)", Plus, 1),
             ("(+ 1 2)", Plus, 2),
@@ -877,22 +898,24 @@ mod tests {
             ("(- 1 2)", Minus, 2),
             ("(- 1 2 3)", Minus, 3),
         ] {
-            assert_operator_arity_is_ok(source, operator, arity);
+            assert_operator_arity_is_ok(&asset_db, source, operator, arity);
         }
 
-        assert_operator_arity_is_error("(+)", "+", 0);
-        assert_operator_arity_is_error("(-)", "-", 0);
+        assert_operator_arity_is_error(&asset_db, "(+)", "+", 0);
+        assert_operator_arity_is_error(&asset_db, "(-)", "-", 0);
     }
 
     #[test]
     fn test_mul_and_div_arity() {
+        let asset_db = dummy_asset_db();
+
         for (source, operator, arity) in [
             ("(* 1 2)", Mul, 2),
             ("(* 1 2 3)", Mul, 3),
             ("(/ 1 2)", Div, 2),
             ("(/ 1 2 3)", Div, 3),
         ] {
-            assert_operator_arity_is_ok(source, operator, arity);
+            assert_operator_arity_is_ok(&asset_db, source, operator, arity);
         }
 
         for (source, operator_token, arity) in [
@@ -901,14 +924,16 @@ mod tests {
             ("(/)", "/", 0),
             ("(/ 1)", "/", 1),
         ] {
-            assert_operator_arity_is_error(source, operator_token, arity);
+            assert_operator_arity_is_error(&asset_db, source, operator_token, arity);
         }
     }
 
     #[test]
     fn test_min_and_max_arity() {
-        assert_operator_arity_is_ok("(min 1 2)", Min, 2);
-        assert_operator_arity_is_ok("(max 1 2)", Max, 2);
+        let asset_db = dummy_asset_db();
+
+        assert_operator_arity_is_ok(&asset_db, "(min 1 2)", Min, 2);
+        assert_operator_arity_is_ok(&asset_db, "(max 1 2)", Max, 2);
 
         for (source, operator_token, arity) in [
             ("(min)", "min", 0),
@@ -918,13 +943,15 @@ mod tests {
             ("(max 1)", "max", 1),
             ("(max 1 2 3)", "max", 3),
         ] {
-            assert_operator_arity_is_error(source, operator_token, arity);
+            assert_operator_arity_is_error(&asset_db, source, operator_token, arity);
         }
     }
 
     #[test]
     fn test_clamp_arity() {
-        assert_operator_arity_is_ok("(clamp 1 2 3)", Clamp, 3);
+        let asset_db = dummy_asset_db();
+
+        assert_operator_arity_is_ok(&asset_db, "(clamp 1 2 3)", Clamp, 3);
 
         for (source, arity) in [
             ("(clamp)", 0),
@@ -932,39 +959,44 @@ mod tests {
             ("(clamp 1 2)", 2),
             ("(clamp 1 2 3 4)", 4),
         ] {
-            assert_operator_arity_is_error(source, "clamp", arity);
+            assert_operator_arity_is_error(&asset_db, source, "clamp", arity);
         }
     }
 
     #[test]
     fn test_round_arity() {
-        assert_operator_arity_is_ok("(round 1)", Round, 1);
+        let asset_db = dummy_asset_db();
+
+        assert_operator_arity_is_ok(&asset_db, "(round 1)", Round, 1);
 
         for (source, arity) in [
             ("(round)", 0),
             ("(round 1 2)", 2),
         ] {
-            assert_operator_arity_is_error(source, "round", arity);
+            assert_operator_arity_is_error(&asset_db, source, "round", arity);
         }
     }
 
     #[test]
     fn test_rand_arity() {
-        assert_operator_arity_is_ok("(rand 1 2)", Rand, 2);
+        let asset_db = dummy_asset_db();
+
+        assert_operator_arity_is_ok(&asset_db, "(rand 1 2)", Rand, 2);
 
         for (source, arity) in [
             ("(rand)", 0),
             ("(rand 1)", 1),
             ("(rand 1 2 3)", 3),
         ] {
-            assert_operator_arity_is_error(source, "rand", arity);
+            assert_operator_arity_is_error(&asset_db, source, "rand", arity);
         }
     }
 
     #[test]
     fn test_unknown_parameter_name_is_error_and_uses_invalid_id() {
+        let asset_db = dummy_asset_db();
         let source = "(+ {неизвестная_черта} 1)";
-        let parsed = parse_for_tests(source);
+        let parsed = parse_for_tests(&asset_db, source);
 
         assert!(parsed.has_errors(), "source: {source}");
         assert!(
@@ -983,13 +1015,14 @@ mod tests {
             parsed.node,
         );
 
-        assert_error_contains(source, "Неизвестная черта `неизвестная_черта`");
+        assert_error_contains(&asset_db, source, "Неизвестная черта `неизвестная_черта`");
     }
 
     #[test]
     fn test_unknown_tag_name_is_error_and_uses_invalid_id() {
+        let asset_db = dummy_asset_db();
         let source = "(+ [неизвестная_лычка] 1)";
-        let parsed = parse_for_tests(source);
+        let parsed = parse_for_tests(&asset_db, source);
 
         assert!(parsed.has_errors(), "source: {source}");
         assert!(
@@ -1008,13 +1041,14 @@ mod tests {
             parsed.node,
         );
 
-        assert_error_contains(source, "Неизвестная лычка `неизвестная_лычка`");
+        assert_error_contains(&asset_db, source, "Неизвестная лычка `неизвестная_лычка`");
     }
 
     #[test]
     fn test_invalid_atom_tokens_are_skipped_and_parser_continues() {
+        let asset_db = dummy_asset_db();
         let source = "(+ 1 мусор 2 @ 3)";
-        let parsed = parse_for_tests(source);
+        let parsed = parse_for_tests(&asset_db, source);
 
         assert!(parsed.has_errors(), "source: {source}");
         assert!(
@@ -1042,8 +1076,9 @@ mod tests {
 
     #[test]
     fn test_invalid_reference_tokens_are_skipped_and_parser_continues() {
+        let asset_db = dummy_asset_db();
         let source = "(+ {битая 1 [ 2 3)";
-        let parsed = parse_for_tests(source);
+        let parsed = parse_for_tests(&asset_db, source);
 
         assert!(parsed.has_errors(), "source: {source}");
         assert!(
@@ -1071,8 +1106,9 @@ mod tests {
 
     #[test]
     fn test_unfinished_expression_is_error_but_partial_ast_is_returned() {
+        let asset_db = dummy_asset_db();
         let source = "(* 2 (+ 3 4)";
-        let parsed = parse_for_tests(source);
+        let parsed = parse_for_tests(&asset_db, source);
 
         assert!(parsed.has_errors(), "source: {source}");
         assert!(
@@ -1100,8 +1136,9 @@ mod tests {
 
     #[test]
     fn test_trailing_text_after_complete_expression_is_error() {
+        let asset_db = dummy_asset_db();
         let source = "(+ 1 2) (* 3 4)";
-        let parsed = parse_for_tests(source);
+        let parsed = parse_for_tests(&asset_db, source);
 
         assert!(parsed.has_errors(), "source: {source}");
         assert!(

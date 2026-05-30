@@ -1,0 +1,402 @@
+use egui::{PopupCloseBehavior, TextEdit, Ui};
+use uuid::Uuid;
+use crate::app::editor_stage::{EditorStage, UpdateState};
+use crate::assets::{AssetDb, AssetKind};
+use crate::game_config::effects::EffectMechanicConfig;
+use crate::game_config::parameters::TagConfig;
+use crate::app::editor_stage::image_widgets::{sprite_holder_visualizer, sprite_pivot_editor};
+use crate::graphics::SPRITE_ATLAS_DEF;
+
+struct EffectMechanicEntry {
+    uuid: Uuid,
+    label: String,
+}
+
+#[derive(Default)]
+pub struct TagConfigEditorSection {
+    tag_name_filter: String,
+    selected_tag_config_id: Option<Uuid>,
+    selected_tag_name: String,
+    current_tag_config: Option<TagConfig>,
+}
+
+impl EditorStage {
+    fn update_current_tag_config(
+        &mut self,
+        asset_db: &mut AssetDb,
+        foo: impl FnOnce(&mut String, &mut TagConfig) -> UpdateState
+    ) {
+        let section = &mut self.tag_section;
+        let name = &mut section.selected_tag_name;
+        let cur_tag = &mut section.current_tag_config;
+
+        if let Some(current_tag_config) = cur_tag {
+            if foo(name, current_tag_config) == UpdateState::Changed {
+                match section.selected_tag_config_id {
+                    Some(id) => {
+                        let config_text = json5::to_string(current_tag_config)
+                            .expect("Failed to serialize tag config");
+                        asset_db.update_json5_asset(AssetKind::TagConfig, id, &config_text);
+                        asset_db.rename_asset(AssetKind::TagConfig, id, &name);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    pub(crate) fn draw_tag_selector(&mut self, ui: &mut Ui) {
+        match crate::assets::ASSET_DATABASE.lock() {
+            Ok(mut asset_db) => {
+                let full_width = ui.available_width();
+                let available_height = ui.available_height() - ui.spacing().interact_size.y * 6f32;
+
+                ui.horizontal(|ui| {
+                    ui.label("Фильтр:");
+                    ui.add(
+                        TextEdit::singleline(&mut self.tag_section.tag_name_filter)
+                            .desired_width(f32::INFINITY)
+                    )
+                });
+                ui.add_space(4f32);
+                egui::ScrollArea::vertical()
+                    .max_height(available_height)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        let mut to_delete = None;
+
+                        let tags = asset_db.list_all_assets(AssetKind::TagConfig);
+                        for (id, tag_asset_name) in tags {
+                            let section = &mut self.tag_section;
+                            if !section.tag_name_filter.is_empty() {
+                                if !tag_asset_name.starts_with(&section.tag_name_filter) {
+                                    continue;
+                                }
+                            }
+
+                            let selected = section
+                                .selected_tag_config_id
+                                .map(|it| it.eq(&id))
+                                .unwrap_or(false);
+
+                            let config_text = asset_db.load_json5_asset(AssetKind::TagConfig, id);
+                            let tag_config: TagConfig = json5::from_str(&config_text)
+                                .expect("Failed to load tag config");
+
+                            let response = ui.selectable_label(
+                                selected,
+                                if tag_config.bound_name.is_empty() {
+                                    tag_asset_name.to_owned()
+                                } else {
+                                    format!("[{}] {}", tag_config.bound_name, tag_asset_name)
+                                }
+                            );
+
+                            let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));
+
+                            if response.clicked_by(egui::PointerButton::Primary) {
+                                section.current_tag_config = Some(tag_config);
+                                section.selected_tag_name.clear();
+                                section.selected_tag_name += tag_asset_name;
+                                section.selected_tag_config_id = Some(id);
+                            } else if response.clicked_by(egui::PointerButton::Secondary) {
+                                ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                            }
+
+                            egui::popup_below_widget(
+                                ui,
+                                popup_id,
+                                &response,
+                                PopupCloseBehavior::CloseOnClickOutside,
+                                |ui| {
+                                    ui.set_min_width(100f32);
+                                    if ui.button("Удалить").clicked() {
+                                        to_delete = Some(id);
+                                        ui.memory_mut(|mem| mem.close_popup());
+                                    }
+                                }
+                            );
+                        }
+
+                        if let Some(id) = to_delete {
+                            let section = &mut self.tag_section;
+                            match section.selected_tag_config_id {
+                                Some(selected_id) if selected_id.eq(&id) => {
+                                    section.selected_tag_config_id = None;
+                                    section.current_tag_config = None;
+                                }
+                                _ => {}
+                            }
+                            asset_db.delete_asset(AssetKind::TagConfig, id);
+                        }
+                    });
+
+                if ui.add_sized(
+                    [full_width, 24f32],
+                    egui::Button::new("Создать лычку")
+                ).clicked() {
+                    let default_tag_config = TagConfig::default();
+                    let config_text = json5::to_string(&default_tag_config)
+                        .expect("Failed to serialize default tag config");
+
+                    let section = &mut self.tag_section;
+                    section.current_tag_config = Some(default_tag_config);
+
+                    let id = asset_db.create_json5_asset(
+                        AssetKind::TagConfig,
+                        "",
+                        &config_text
+                    );
+                    section.selected_tag_name.clear();
+                    section.selected_tag_config_id = Some(id);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub(crate) fn draw_tag_editor(&mut self, ui: &mut Ui) {
+        let texture_id: egui::TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+        let atlas_size = self.atlas_size;
+
+        let effect_entries: Vec<EffectMechanicEntry> =
+            if let Ok(db) = crate::assets::ASSET_DATABASE.lock() {
+                db.list_all_assets(AssetKind::EffectMechanicConfig)
+                    .map(|(uuid, _)| {
+                        let text = db.load_json5_asset(AssetKind::EffectMechanicConfig, uuid);
+                        let config: EffectMechanicConfig = json5::from_str(&text)
+                            .expect("Failed to load effect mechanic config");
+                        EffectMechanicEntry {
+                            uuid,
+                            label: format!("{:?}", config.mechanic_name),
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+        match crate::assets::ASSET_DATABASE.lock() {
+            Ok(mut asset_db) => {
+                self.update_current_tag_config(&mut asset_db, |tag_name, current_tag_config| {
+                    let mut update_state = UpdateState::Unchanged;
+                    ui.vertical(|ui| {
+                        ui.group(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.label("Название для редактора:");
+                                if ui.add(TextEdit::singleline(tag_name).desired_width(f32::INFINITY)).changed() {
+                                    update_state = UpdateState::Changed;
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Имя для формул:");
+                                if ui.add(TextEdit::singleline(&mut current_tag_config.bound_name).desired_width(f32::INFINITY)).changed() {
+                                    update_state = UpdateState::Changed;
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Название:");
+                                if ui.add(TextEdit::singleline(&mut current_tag_config.name).desired_width(f32::INFINITY)).changed() {
+                                    update_state = UpdateState::Changed;
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Описание:");
+                                if ui.add(TextEdit::multiline(&mut current_tag_config.description).desired_width(f32::INFINITY)).changed() {
+                                    update_state = UpdateState::Changed;
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Изображение:");
+                                let full_width = ui.available_width();
+
+                                let response = ui.add_sized(
+                                    [full_width, ui.spacing().interact_size.y],
+                                    egui::Button::new(&current_tag_config.sprite_name),
+                                );
+                                let popup_id = ui.make_persistent_id("выбор изображения");
+                                if response.clicked() {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
+                                egui::popup_below_widget(
+                                    ui,
+                                    popup_id,
+                                    &response,
+                                    PopupCloseBehavior::CloseOnClickOutside,
+                                    |ui| {
+                                        const COLUMNS_COUNT: usize = 6;
+                                        ui.columns(COLUMNS_COUNT, |uis| {
+                                            let mut current_column = 0;
+
+                                            for sprite in crate::graphics::SPRITE_ATLAS_DEF.sprites.keys() {
+                                                let sprite_name = sprite.as_str();
+
+                                                let ui = &mut uis[current_column];
+                                                ui.add_space(4f32);
+                                                let response = crate::app::editor_stage::image_widgets::atlas_sprite_button(
+                                                    ui,
+                                                    texture_id,
+                                                    atlas_size,
+                                                    sprite_name,
+                                                    96f32,
+                                                );
+
+                                                if response.clicked() {
+                                                    current_tag_config.sprite_name.clear();
+                                                    current_tag_config.sprite_name += sprite_name;
+                                                    update_state = UpdateState::Changed;
+                                                    ui.memory_mut(|mem| mem.close_popup());
+                                                }
+
+                                                current_column = (current_column + 1) % COLUMNS_COUNT;
+                                            }
+                                        });
+                                    },
+                                );
+                            });
+                            let entry = SPRITE_ATLAS_DEF
+                                .sprites
+                                .get(&current_tag_config.sprite_name);
+                            match entry {
+                                None => {}
+                                Some(sprite_data) => {
+                                    let w = ui.available_width();
+                                    let zoom = if sprite_data.size[0] == 0 {
+                                        1f32
+                                    } else {
+                                        w / (sprite_data.size[0] as f32 * 16f32)
+                                    };
+                                    let old_pivot = current_tag_config.sprite_pivot;
+                                    sprite_pivot_editor(
+                                        ui,
+                                        texture_id,
+                                        atlas_size,
+                                        current_tag_config,
+                                        zoom,
+                                    );
+                                    if !old_pivot.eq(&current_tag_config.sprite_pivot) {
+                                        update_state = UpdateState::Changed;
+                                    }
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Опорная точка:");
+
+                                        let available_width = ui.available_width();
+                                        let slider_width = available_width / 2f32;
+
+                                        if ui
+                                            .add_sized(
+                                                [slider_width, ui.spacing().interact_size.y],
+                                                egui::Slider::new(
+                                                    &mut current_tag_config.sprite_pivot[0],
+                                                    0..=sprite_data.size[0] * 16 - 1,
+                                                )
+                                            )
+                                            .changed()
+                                        {
+                                            update_state = UpdateState::Changed;
+                                        }
+                                        if ui
+                                            .add_sized(
+                                                [slider_width, ui.spacing().interact_size.y],
+                                                egui::Slider::new(
+                                                    &mut current_tag_config.sprite_pivot[1],
+                                                    0..=sprite_data.size[1] * 16 - 1,
+                                                )
+                                            )
+                                            .changed()
+                                        {
+                                            update_state = UpdateState::Changed;
+                                        }
+                                    });
+                                }
+                            }
+
+                            ui.horizontal(|ui| {
+                                ui.label("Эффект при наложении:");
+                                let full_width = ui.available_width();
+                                let effect_label = match current_tag_config.effect_mechanic {
+                                    Some(ref id) if !id.uuid.is_nil() => {
+                                        effect_entries
+                                            .iter()
+                                            .find(|e| e.uuid == id.uuid)
+                                            .map(|e| e.label.as_str())
+                                            .unwrap_or("Не найден")
+                                            .to_owned()
+                                    }
+                                    _ => "Нет".to_owned()
+                                };
+                                let response = ui.add_sized(
+                                    [full_width, ui.spacing().interact_size.y],
+                                    egui::Button::new(&effect_label),
+                                );
+                                let popup_id = ui.make_persistent_id("выбор эффекта");
+                                if response.clicked() {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
+                                egui::popup_below_widget(
+                                    ui,
+                                    popup_id,
+                                    &response,
+                                    PopupCloseBehavior::CloseOnClickOutside,
+                                    |ui| {
+                                        if ui.button("Сбросить").clicked() {
+                                            current_tag_config.effect_mechanic = None;
+                                            update_state = UpdateState::Changed;
+                                            ui.memory_mut(|mem| mem.close_popup());
+                                        }
+                                        ui.separator();
+                                        for entry in &effect_entries {
+                                            if ui.button(&entry.label).clicked() {
+                                                current_tag_config.effect_mechanic = Some(
+                                                    crate::game_config::ConfigId::from_uuid(entry.uuid)
+                                                );
+                                                update_state = UpdateState::Changed;
+                                                ui.memory_mut(|mem| mem.close_popup());
+                                            }
+                                        }
+                                    },
+                                );
+                            });
+                        })
+                    });
+
+                    update_state
+                });
+            }
+            _ => {}
+        }
+    }
+
+    pub(crate) fn draw_tag_preview_in_level(&self, ui: &mut Ui) {
+        let texture_id: egui::TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+        let atlas_size = self.atlas_size;
+        if let Some(tag_config) = &self.tag_section.current_tag_config {
+            if tag_config.sprite_name.is_empty() {
+                return;
+            }
+            ui.vertical(|ui| {
+                ui.add_space(6f32);
+                ui.group(|ui| {
+                    ui.label("Предпросмотр на игровом поле:");
+                    sprite_holder_visualizer(
+                        ui,
+                        texture_id,
+                        atlas_size,
+                        tag_config
+                    )
+                });
+            });
+        }
+    }
+}

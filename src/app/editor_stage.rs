@@ -6,6 +6,7 @@ use crate::{
         editor_stage::{
             floor_part_editor::FloorPartConfigEditorSection,
             item_config_editor::ItemConfigEditorSection,
+            tag_config_editor::TagConfigEditorSection,
             unit_config_editor::UnitConfigEditorSection
         }
     },
@@ -19,6 +20,8 @@ pub mod item_config_editor;
 pub mod floor_part_editor;
 pub mod floor_part_adjacency_config_editor;
 pub mod floor_config_editor;
+pub mod tag_config_editor;
+pub mod parameter_config_editor;
 pub mod image_widgets;
 
 #[derive(Copy, Clone, Deserialize)]
@@ -41,6 +44,7 @@ pub struct EditorStage {
     floor_part_section: FloorPartConfigEditorSection,
     floor_part_adjacency_section: FloorPartAdjacencyConfigEditorSection,
     floor_section: FloorConfigEditorSection,
+    tag_section: TagConfigEditorSection,
 }
 
 impl EditorStage {
@@ -55,6 +59,7 @@ impl EditorStage {
             floor_part_section: Default::default(),
             floor_part_adjacency_section: Default::default(),
             floor_section: Default::default(),
+            tag_section: Default::default(),
         }
     }
 
@@ -141,7 +146,7 @@ impl EditorStage {
                                 AssetKind::FloorConfig => self.draw_floor_config_selector(ui),
                                 AssetKind::FloorFlowGraphConfig => self.draw_floor_graph_selector(ui),
                                 AssetKind::ParameterConfig => todo!(),
-                                AssetKind::TagConfig => todo!(),
+                                AssetKind::TagConfig => self.draw_tag_selector(ui),
                                 AssetKind::EffectMechanicConfig => todo!(),
                                 AssetKind::GameGonfig => todo!()
                             }
@@ -180,7 +185,8 @@ impl EditorStage {
                             AssetKind::FloorPartConfig => self.draw_floor_part_editor_tools(ui),
                             AssetKind::FloorPartAdjacencyConfig => self.draw_adjacency_visualizer(ui),
                             AssetKind::FloorConfig => self.draw_floor_editor_tools(ui),
-                            _ => {} // todo
+                            AssetKind::TagConfig => self.draw_tag_preview_in_level(ui),
+                            _ => {}
                         }
                     });
             }
@@ -193,6 +199,7 @@ impl EditorStage {
                     AssetKind::FloorPartConfig => self.draw_floor_part_editor(ui),
                     AssetKind::FloorPartAdjacencyConfig => self.draw_floor_part_adjacency_editor(ui),
                     AssetKind::FloorConfig => self.draw_floor_config_editor(ui),
+                    AssetKind::TagConfig => self.draw_tag_editor(ui),
                     _ => {} // todo
                 }
             });
