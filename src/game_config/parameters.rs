@@ -57,6 +57,7 @@ pub struct ParameterConfig {
     pub description: String,
     /// Иконка для информационных окон
     pub sprite_name : String,
+    pub sprite_pivot: [u8; 2],
     /// Тип черты
     pub parameter_type: ParameterType,
     /// В случае если черта вычисляемая, содержит скомпилированное выражение

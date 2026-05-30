@@ -8,15 +8,19 @@ use crate::{
         AuthoredFloorSize30x30, FloorConfig, FloorSize40x40, FloorSize60x60, FloorSize80x80,
         FloorVariant,
     },
+    app::editor_stage::image_widgets::{
+        EditableFloorData, FloorTilesHolderConst, WallTilesHolderConst
+    },
+    app::game_stage::grid_math::{traverse_area_inward},
+    game_config::floors::{AuthoredFloor, GeneratedFloor},
+    graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup}
 };
 use simple_tiled_wfc::grid_generation::{WfcModule};
-use std::collections::HashMap;
-use bitsetium::{BitEmpty, BitSet};
-use simple_tiled_wfc::make_initial_probabilities;
-use crate::app::editor_stage::image_widgets::{EditableFloorData, FloorTilesHolderConst, WallTilesHolderConst};
-use crate::app::game_stage::grid_math::{traverse_area_inward, traverse_area_outward};
-use crate::game_config::floors::{AuthoredFloor, GeneratedFloor};
-use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
+use std::collections::{HashMap, HashSet};
+use bitsetium::{BitEmpty, BitIntersection, BitSet, BitTest, BitUnset};
+use rand::RngExt;
+use simple_tiled_wfc::{make_initial_probabilities, BitsIterator};
+use crate::app::game_stage::grid_math::get_island_mapping;
 
 pub enum FloorGeneratorResult {
     Size15x15(AuthoredFloorSize15x15),
@@ -217,27 +221,27 @@ pub fn generate(
             let mut probabilities_east_edge = CustomBitSet::empty();
 
             for module_id in module_ids.iter() {
-                let part_config_bytes = asset_db.load_asset(AssetKind::FloorPartConfig, module_id.uuid);
-                let part_config = FloorPartConfig::load_from_slice(part_config_bytes)
+                let config_bytes = asset_db.load_asset(AssetKind::FloorPartConfig, module_id.uuid);
+                let config = FloorPartConfig::load_from_slice(config_bytes)
                     .expect("Failed to parse FloorPartConfig");
                 let id = floor_part_cache.len();
-                if part_config.wall_data[0].iter().all(|it| !it.eq(&WallGraphicsTileGroup::None)) {
+                if config.wall_data[0].iter().all(|it| !it.eq(&WallGraphicsTileGroup::None)) {
                     probabilities_north_edge.set(id);
                 }
-                if part_config.wall_data[4].iter().all(|it| !it.eq(&WallGraphicsTileGroup::None)) {
+                if config.wall_data[4].iter().all(|it| !it.eq(&WallGraphicsTileGroup::None)) {
                     probabilities_south_edge.set(id);
                 }
-                if part_config.wall_data.iter().all(
+                if config.wall_data.iter().all(
                     |it| !it[0].eq(&WallGraphicsTileGroup::None),
                 ) {
                     probabilities_west_edge.set(id);
                 }
-                if part_config.wall_data.iter().all(
+                if config.wall_data.iter().all(
                     |it| !it[4].eq(&WallGraphicsTileGroup::None),
                 ) {
                     probabilities_east_edge.set(id);
                 }
-                floor_part_cache.insert(*module_id, part_config);
+                floor_part_cache.insert(*module_id, config);
             }
 
             for config in adjacency_configs.iter() {
@@ -311,32 +315,67 @@ pub fn generate(
                     (16, 16, FloorGeneratorResult::Size80x80(FloorSize80x80::default())),
             };
 
-            let walk_order = match floor_var {
-                GeneratedFloor::Size15x15(_) => make_walk_indices(3),
-                GeneratedFloor::Size20x20(_) => make_walk_indices(4),
-                GeneratedFloor::Size25x25(_) => make_walk_indices(5),
-                GeneratedFloor::Size30x30(_) => make_walk_indices(6),
-                GeneratedFloor::Size40x40(_) => make_walk_indices(8),
-                GeneratedFloor::Size60x60(_) => make_walk_indices(12),
-                GeneratedFloor::Size80x80(_) => make_walk_indices(16),
-            };
+            let mut indices_to_choose = Vec::new();
+            let mut rng = rand::rng();
 
-            let results = vec![0; width * height];
-            let mut offset = 0;
+            let mut results = vec![None; width * height];
+            for [i, j] in traverse_area_inward(width) {
+                let idx = j * width + i;
+                let mut prob = probabilities;
 
-            for [i, j] in traverse_area_outward(
-                match floor_var {
-                    GeneratedFloor::Size15x15(_) => 3,
-                    GeneratedFloor::Size20x20(_) => 4,
-                    GeneratedFloor::Size25x25(_) => 5,
-                    GeneratedFloor::Size30x30(_) => 6,
-                    GeneratedFloor::Size40x40(_) => 8,
-                    GeneratedFloor::Size60x60(_) => 12,
-                    GeneratedFloor::Size80x80(_) => 16,
+                if j == 0 {
+                    prob = prob.intersection(probabilities_north_edge);
+                } else if j == height - 1 {
+                    prob = prob.intersection(probabilities_south_edge);
                 }
-            ) {
-                let config_id = module_ids[offset % modules.len()]; // module_ids[results[idx]];
-                offset += 1;
+                if i == 0 {
+                    prob = prob.intersection(probabilities_west_edge);
+                } else if i == width - 1 {
+                    prob = prob.intersection(probabilities_east_edge);
+                }
+
+                let prob_copy = prob;
+                for bit in BitsIterator::new(&prob_copy) {
+                    let module = modules[bit];
+                    if j > 0 && let Some(id) = results[j * width + i - width] {
+                        if !module.north_neighbours.test(id) {
+                            prob.unset(bit);
+                        }
+                    }
+                    if j < height - 1 && let Some(id) = results[j * width + i + width] {
+                        if !module.south_neighbours.test(id) {
+                            prob.unset(bit);
+                        }
+                    }
+                    if i > 0 && let Some(id) = results[j * width + i - 1] {
+                        if !module.west_neighbours.test(id) {
+                            prob.unset(bit);
+                        }
+                    }
+                    if i < width - 1 && let Some(id) = results[j * width + i + 1] {
+                        if !module.east_neighbours.test(id) {
+                            prob.unset(bit);
+                        }
+                    }
+                }
+
+                indices_to_choose.clear();
+                indices_to_choose.extend(BitsIterator::new(&prob));
+
+                if !indices_to_choose.is_empty() {
+                    let id =rng.random_range(0..indices_to_choose.len());
+                    results[idx] = Some(indices_to_choose[id]);
+                }
+            }
+
+            for [i, j] in traverse_area_inward(width) {
+                let idx = j * width + i;
+
+                let Some(id) = results[idx] else {
+                    continue;
+                };
+
+                let config_id = module_ids[id];
 
                 let Some(part_config) = floor_part_cache.get(&config_id) else {
                     continue;
@@ -354,101 +393,181 @@ pub fn generate(
                     }
                 }
             }
-            Some(result_floor)
-        }
-    }
-}
 
-
-fn make_walk_indices(width: usize) -> Vec<[usize; 2]> {
-    fn grow_walk_indices(
-        walk_order: &mut Vec<[usize; 2]>,
-        [base_offset_x, base_offset_y]: [usize; 2],
-        width: usize,
-    ) {
-        match width {
-            0 => {}
-            1 => {
-                walk_order.push([base_offset_x, base_offset_y]);
-            }
-            2 => {
-                walk_order.extend([
-                    [base_offset_x, base_offset_y],
-                    [base_offset_x + 1, base_offset_y],
-                    [base_offset_x, base_offset_y + 1],
-                    [base_offset_x + 1, base_offset_y + 1],
-                ]);
-            }
-            3 => {
-                walk_order.extend([
-                    // Сначала углы:
-                    [base_offset_x, base_offset_y],
-                    [base_offset_x + 2, base_offset_y],
-                    [base_offset_x, base_offset_y + 2],
-                    [base_offset_x + 2, base_offset_y + 2],
-                    // Затем рёбра:
-                    [base_offset_x + 1, base_offset_y],
-                    [base_offset_x + 1, base_offset_y + 2],
-                    [base_offset_x, base_offset_y + 1],
-                    [base_offset_x + 2, base_offset_y + 1],
-                    // Затем центр:
-                    [base_offset_x + 1, base_offset_y + 1],
-                ]);
-            }
-            _ => {
-                walk_order.extend([
-                    // Углы
-                    [base_offset_x, base_offset_y],
-                    [base_offset_x + width - 1, base_offset_y],
-                    [base_offset_x, base_offset_y + width - 1],
-                    [base_offset_x + width - 1, base_offset_y + width - 1]
-                ]);
-                let ww = width - 2;
-
-                // Рёбра заполняются от краёв к центру:
-                for i in 0..ww / 2 {
-                    walk_order.extend([
-                        [base_offset_x + 1 + i, base_offset_y],
-                        [base_offset_x + width - 2 - i, base_offset_y]
-                    ]);
-                    if ww % 2 == 1 {
-                        walk_order.push([base_offset_x + ww / 2 + 1, base_offset_y]);
+            let (mut num_islands, mut islands_mapping) = get_island_mapping(&result_floor);
+            while num_islands > 1 {
+                struct CrossRoadCorner {
+                    x: usize,
+                    y: usize,
+                    north_way: Option<(u8, usize)>,
+                    south_way: Option<(u8, usize)>,
+                    west_way: Option<(u8, usize)>,
+                    east_way: Option<(u8, usize)>,
+                }
+                impl CrossRoadCorner {
+                    pub fn unique_way_count(&self) -> u8 {
+                        let mut color_buffer = [0; 4];
+                        let mut num_colors = 0;
+                        if let Some((_, color)) = self.north_way {
+                            if (0..num_colors).all(|i| color_buffer[i] != color) {
+                                color_buffer[num_colors] = color;
+                                num_colors += 1;
+                            }
+                        }
+                        if let Some((_, color)) = self.south_way {
+                            if (0..num_colors).all(|i| color_buffer[i] != color) {
+                                color_buffer[num_colors] = color;
+                                num_colors += 1;
+                            }
+                        }
+                        if let Some((_, color)) = self.west_way {
+                            if (0..num_colors).all(|i| color_buffer[i] != color) {
+                                color_buffer[num_colors] = color;
+                                num_colors += 1;
+                            }
+                        }
+                        if let Some((_, color)) = self.east_way {
+                            if (0..num_colors).all(|i| color_buffer[i] != color) {
+                                num_colors += 1;
+                            }
+                        }
+                        num_colors as u8
                     }
-                    walk_order.extend([
-                        [base_offset_x + 1 + i, base_offset_y + width - 1],
-                        [base_offset_x + width - 2 - i, base_offset_y + width - 1]
-                    ]);
-                    if ww % 2 == 1 {
-                        walk_order.push([base_offset_x + ww / 2 + 1, base_offset_y + width - 1]);
+                    pub fn max_way_length(&self) -> u8 {
+                        self.north_way.map(|it| it.0).unwrap_or(0)
+                            .max(self.south_way.map(|it| it.0).unwrap_or(0))
+                            .max(self.west_way.map(|it| it.0).unwrap_or(0))
+                            .max(self.east_way.map(|it| it.0).unwrap_or(0))
                     }
-                    walk_order.extend([
-                        [base_offset_x, base_offset_y + 1 + i],
-                        [base_offset_x, base_offset_y + width - 2 - i]
-                    ]);
-                    if ww % 2 == 1 {
-                        walk_order.push([base_offset_x, base_offset_y + ww / 2 + 1]);
-                    }
-                    walk_order.extend([
-                        [base_offset_x + width - 1, base_offset_y + 1 + i],
-                        [base_offset_x + width - 1, base_offset_y + width - 2 - i]
-                    ]);
-                    if ww % 2 == 1 {
-                        walk_order.push([base_offset_x + width - 1, base_offset_y + ww / 2 + 1]);
+                    pub fn is_worse_than(&self, other: &Self) -> bool {
+                        self.unique_way_count() < other.unique_way_count() ||
+                            self.max_way_length() > other.max_way_length()
                     }
                 }
 
-                // Центр заполняется через рекурсивный вызов:
-                grow_walk_indices(
-                    walk_order,
-                    [base_offset_x + 1 , base_offset_y + 1],
-                    ww
-                );
+                let mut better_corner: Option<CrossRoadCorner> = None;
+                let mut known_islands = HashSet::new();
+
+                for j in 0..result_floor.height() {
+                    for i in 0..result_floor.width() {
+                        known_islands.clear();
+                        let mut corner = CrossRoadCorner {
+                            x: i,
+                            y: j,
+                            north_way: None,
+                            south_way: None,
+                            west_way: None,
+                            east_way: None,
+                        };
+
+                        let idx = j * result_floor.width() + i;
+                        if islands_mapping[idx].is_none() {
+                            continue;
+                        }
+
+                        'search_north: for jj in (0..j).rev() {
+                            let idx = jj * result_floor.width() + i;
+                            if let Some(color) = islands_mapping[idx] {
+                                let length = (j - jj) as u8;
+                                if known_islands.insert(color) {
+                                    corner.north_way = Some((length, color));
+                                }
+                                break 'search_north;
+                            }
+                        }
+                        'search_south: for jj in j + 1..result_floor.height() {
+                            let idx = jj * result_floor.width() + i;
+                            if let Some(color) = islands_mapping[idx] {
+                                let length = (jj - j) as u8;
+                                if known_islands.insert(color) {
+                                    corner.south_way = Some((length, color));
+                                }
+                                break 'search_south;
+                            }
+                        }
+                        'search_west: for ii in (0..i).rev() {
+                            let idx = j * result_floor.width() + ii;
+                            if let Some(color) = islands_mapping[idx] {
+                                let length = (i - ii) as u8;
+                                if known_islands.insert(color) {
+                                    corner.west_way = Some((length, color));
+                                }
+                                break 'search_west;
+                            }
+                        }
+                        'search_east: for ii in i + 1..result_floor.width() {
+                            let idx = j * result_floor.width() + ii;
+                            if let Some(color) = islands_mapping[idx] {
+                                let length = (ii - i) as u8;
+                                if known_islands.insert(color) {
+                                    corner.east_way = Some((length, color));
+                                }
+                                break 'search_east;
+                            }
+                        }
+
+                        if corner.unique_way_count() < 2 {
+                            continue;
+                        }
+
+                        if better_corner.is_none() {
+                            better_corner = Some(corner);
+                            continue;
+                        }
+
+                        if let Some(best) = &better_corner && best.is_worse_than(&corner) {
+                            better_corner = Some(corner);
+                        }
+                    }
+                }
+
+                let Some(better_corner) = better_corner else {
+                    println!("Curious situation: no better corner found to connect islands.");
+                    break;
+                };
+
+                *result_floor.get_wall_data_mut([better_corner.x, better_corner.y]) =
+                    WallGraphicsTileGroup::None;
+                *result_floor.get_floor_data_mut([better_corner.x, better_corner.y]) =
+                    FloorGraphicsTileGroup::Tile;
+
+                if let Some((num_tiles, _)) = better_corner.north_way {
+                    for i in 1..=num_tiles {
+                        *result_floor.get_wall_data_mut([better_corner.x, better_corner.y - i as usize]) =
+                            WallGraphicsTileGroup::None;
+                        *result_floor.get_floor_data_mut([better_corner.x, better_corner.y - i as usize]) =
+                            FloorGraphicsTileGroup::Tile;
+                    }
+                }
+                if let Some((num_tiles, _)) = better_corner.south_way {
+                    for i in 1..=num_tiles {
+                        *result_floor.get_wall_data_mut([better_corner.x, better_corner.y + i as usize]) =
+                            WallGraphicsTileGroup::None;
+                        *result_floor.get_floor_data_mut([better_corner.x, better_corner.y + i as usize]) =
+                            FloorGraphicsTileGroup::Tile;
+                    }
+                }
+                if let Some((num_tiles, _)) = better_corner.west_way {
+                    for i in 1..=num_tiles {
+                        *result_floor.get_wall_data_mut([better_corner.x - i as usize, better_corner.y]) =
+                            WallGraphicsTileGroup::None;
+                        *result_floor.get_floor_data_mut([better_corner.x - i as usize, better_corner.y]) =
+                            FloorGraphicsTileGroup::Tile;
+                    }
+                }
+                if let Some((num_tiles, _)) = better_corner.east_way {
+                    for i in 1..=num_tiles {
+                        *result_floor.get_wall_data_mut([better_corner.x + i as usize, better_corner.y]) =
+                            WallGraphicsTileGroup::None;
+                        *result_floor.get_floor_data_mut([better_corner.x + i as usize, better_corner.y]) =
+                            FloorGraphicsTileGroup::Tile;
+                    }
+                }
+
+                (num_islands, islands_mapping) = get_island_mapping(&result_floor);
             }
+
+            Some(result_floor)
         }
     }
-
-    let mut walk_order: Vec<[usize; 2]> = Vec::new();
-    grow_walk_indices(&mut walk_order, [0, 0], width);
-    assert_eq!(walk_order.len(), width * width);
-    walk_order
 }

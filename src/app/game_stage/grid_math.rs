@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+use crate::app::editor_stage::image_widgets::EditableFloorData;
+use crate::graphics::WallGraphicsTileGroup;
+
 #[derive(Clone, Copy)]
 enum TraverseAreaIteratorState {
     Done,
@@ -722,6 +726,120 @@ impl Iterator for TraverseAreaOutwardIterator {
         }
     }
 }
+
+pub fn get_island_mapping(data: &impl EditableFloorData) ->(usize, Vec<Option<usize>>) {
+    struct IslandNode {
+        color: usize,
+        neighbors: Vec<usize>,
+        propagated: bool,
+    }
+
+    let width = data.width();
+    let height = data.height();
+
+    let mut island_nodes = Vec::new();
+    let mut island_map: Vec<Option<usize>> = vec![None; width * height];
+    let mut roots = HashSet::new();
+
+    // Шаг 1: Собираем узлы островов и соединяем их с их
+    // верхними соседями. Важно: связь односторонняя,
+    // таким образом мы формируем Directed Acyclic Graph (DAG).
+    // Мы попутно так же соберём набор корневых узлов,
+    // и каждый узел по итогу станет отдельным островом.
+    'rows: for y in 0..height {
+        let mut x = 0;
+        'series: loop {
+            while x < width && !data.get_wall_data([x, y]).eq(&WallGraphicsTileGroup::None) {
+                x += 1;
+                if x == width {
+                    continue 'rows;
+                }
+            }
+
+            let color = island_nodes.len();
+            let island = IslandNode {
+                color,
+                neighbors: Vec::with_capacity(16),
+                propagated: false,
+            };
+            island_nodes.push(island);
+            roots.insert(color);
+            island_map[y * width + x] = Some(color);
+
+            if y > 0
+                && let Some(id) = island_map[(y - 1) * width + x]
+                && !island_nodes[color].neighbors.contains(&id)
+            {
+                island_nodes[color].neighbors.push(id);
+                roots.remove(&id);
+            }
+
+            loop {
+                x += 1;
+                if x == width {
+                    continue 'rows;
+                }
+                if !data.get_wall_data([x, y]).eq(&WallGraphicsTileGroup::None) {
+                    continue 'series;
+                }
+
+                island_map[y * width + x] = Some(color);
+                if y > 0
+                    && let Some(id) = island_map[(y - 1) * width + x]
+                    && !island_nodes[color].neighbors.contains(&id)
+                {
+                    island_nodes[color].neighbors.push(id);
+                    roots.remove(&id);
+                }
+            }
+        }
+    }
+
+    // Шаг 2: Распространяем цвет узла острова на его соседей
+    // по графу, тем самым соединяем острова
+    let mut queue = Vec::new();
+    for root in roots.iter() {
+        queue.clear();
+        let mut color = island_nodes[*root].color;
+        queue.push(*root);
+
+        let mut i = 0;
+        while i < queue.len() {
+            let neighbor = queue[i];
+            if island_nodes[neighbor].propagated {
+                if island_nodes[neighbor].color != color {
+                    // Возможна ситуация, где один остров имеет несколько корней.
+                    // Мы берём цвет первого корня и распространяем его на остальных.
+                    color = island_nodes[neighbor].color;
+                    for j in (0..i).rev() {
+                        let neighbor = queue[j];
+                        island_nodes[neighbor].color = color;
+                    }
+                } else {
+                    i += 1;
+                    continue;
+                }
+            }
+            island_nodes[neighbor].propagated = true;
+            island_nodes[neighbor].color = color;
+            queue.extend(island_nodes[neighbor].neighbors.iter().copied());
+            i += 1;
+        }
+    }
+
+    // Шаг 3: Обновляем карту финальными цветами,
+    // после чего возвращаем её, так как это именно тот результат, который ожидается.
+    let mut set = HashSet::new();
+    let mut result_map = vec![None; width * height];
+    for (i, r) in island_map.drain(..).enumerate() {
+        let Some(color) = r else { continue; };
+        let color = island_nodes[color].color;
+        result_map[i] = Some(color);
+        set.insert(color);
+    }
+    (set.len(), result_map)
+}
+
 
 #[cfg(test)]
 mod tests {
