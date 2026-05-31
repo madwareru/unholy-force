@@ -1,8 +1,15 @@
 use std::collections::HashMap;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::{Config, ConfigId};
 use crate::game_config::effects::EffectMechanicConfig;
+
+lazy_static!(
+    pub static ref PARAMETER_CACHE: Mutex<ExpressionParameterIdCache> =
+        Mutex::new(ExpressionParameterIdCache::new());
+);
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub enum ParameterType {
@@ -63,6 +70,18 @@ pub struct ParameterConfig {
     /// В случае если черта вычисляемая, содержит скомпилированное выражение
     /// (или ошибку, если не удалось скомпилировать)
     compiled_expression: CompiledExpressionParameterNode
+}
+
+impl SpriteHolder for ParameterConfig {
+    fn sprite_name(&self) -> &str {
+        &self.sprite_name
+    }
+    fn sprite_pivot(&self) -> &[u8; 2] {
+        &self.sprite_pivot
+    }
+    fn sprite_pivot_mut(&mut self) -> &mut [u8; 2] {
+        &mut self.sprite_pivot
+    }
 }
 
 impl Config for ParameterConfig {}
@@ -728,6 +747,45 @@ pub fn compile_expression_parameter(
 }
 
 impl ParameterConfig {
+    pub fn validate_compiled_expression(&self, asset_db: &AssetDb) -> Result<(), String> {
+        fn validate_parameter_node(
+            asset_db: &AssetDb,
+            expression_parameter_node: &ExpressionParameterNode
+        ) -> Result<(), String> {
+            match expression_parameter_node {
+                ExpressionParameterNode::ParameterValue(parameter_id) => {
+                    if asset_db.has_asset(AssetKind::ParameterConfig, parameter_id.uuid) {
+                        Ok(())
+                    } else {
+                        Err(
+                            format!("parameter config id has a broken link: {}", parameter_id.uuid))
+                    }
+                }
+                ExpressionParameterNode::TagCount(tag_id) => {
+                    if asset_db.has_asset(AssetKind::TagConfig, tag_id.uuid) {
+                        Ok(())
+                    } else {
+                        Err(format!("tag config id has a broken link: {}", tag_id.uuid))
+                    }
+                }
+                ExpressionParameterNode::Constant(_) => Ok(()),
+                ExpressionParameterNode::Operator(_, rhs) => {
+                    for operator in rhs.iter() {
+                        validate_parameter_node(asset_db, operator)?;
+                    }
+                    Ok(())
+                }
+            }
+        }
+
+        match &self.compiled_expression {
+            CompiledExpressionParameterNode::None => Ok(()),
+            CompiledExpressionParameterNode::Error { .. } => Ok(()),
+            CompiledExpressionParameterNode::Ok(expression_parameter_node) =>
+                validate_parameter_node(asset_db, &expression_parameter_node)
+        }
+    }
+
     pub fn compile_expression(&mut self, asset_db: &AssetDb, cache: &mut ExpressionParameterIdCache) {
         self.compiled_expression = match &self.parameter_type {
             ParameterType::Constant => CompiledExpressionParameterNode::None,

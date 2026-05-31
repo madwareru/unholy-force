@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::effects::EffectMechanicConfig;
-use crate::game_config::parameters::TagConfig;
+use crate::game_config::parameters::{TagConfig, PARAMETER_CACHE};
 use crate::app::editor_stage::image_widgets::{sprite_holder_visualizer, sprite_pivot_editor};
 use crate::graphics::SPRITE_ATLAS_DEF;
 
@@ -122,10 +122,23 @@ impl EditorStage {
                             let section = &mut self.tag_section;
                             match section.selected_tag_config_id {
                                 Some(selected_id) if selected_id.eq(&id) => {
+                                    if let Some(current_config) = &section.current_tag_config {
+                                        if let Ok(mut cache) = PARAMETER_CACHE.lock() {
+                                            cache.flush_tag_id(&current_config.bound_name);
+                                        }
+                                    }
+
                                     section.selected_tag_config_id = None;
                                     section.current_tag_config = None;
                                 }
-                                _ => {}
+                                _ => {
+                                    if let Ok(mut cache) = PARAMETER_CACHE.lock() {
+                                        let config_text = asset_db.load_json5_asset(AssetKind::TagConfig, id);
+                                        let config_to_delete: TagConfig = json5::from_str(&config_text)
+                                            .expect("Failed to load tag config");
+                                        cache.flush_tag_id(&config_to_delete.bound_name);
+                                    }
+                                }
                             }
                             asset_db.delete_asset(AssetKind::TagConfig, id);
                         }
@@ -195,7 +208,11 @@ impl EditorStage {
                             });
                             ui.horizontal(|ui| {
                                 ui.label("Имя для формул:");
+                                let old_name = current_tag_config.bound_name.clone();
                                 if ui.add(TextEdit::singleline(&mut current_tag_config.bound_name).desired_width(f32::INFINITY)).changed() {
+                                    if let Ok(mut cache) = PARAMETER_CACHE.lock() {
+                                        cache.flush_tag_id(&old_name);
+                                    }
                                     update_state = UpdateState::Changed;
                                 }
                             });
