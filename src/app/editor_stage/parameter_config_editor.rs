@@ -4,6 +4,7 @@ use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::parameters::{CompiledExpressionParameterNode, ParameterConfig, ParameterType, PARAMETER_CACHE};
 use crate::app::editor_stage::image_widgets::{sprite_holder_visualizer, sprite_pivot_editor};
+use crate::game_config::ConfigId;
 use crate::graphics::SPRITE_ATLAS_DEF;
 
 #[derive(Default)]
@@ -18,14 +19,14 @@ impl EditorStage {
     fn update_current_parameter_config(
         &mut self,
         asset_db: &mut AssetDb,
-        foo: impl FnOnce(&mut AssetDb, &mut String, &mut ParameterConfig) -> UpdateState,
+        foo: impl FnOnce(&AssetDb, ConfigId<ParameterConfig>, &mut String, &mut ParameterConfig) -> UpdateState,
     ) {
         let section = &mut self.parameter_section;
         let name = &mut section.selected_parameter_name;
         let cur_param = &mut section.current_parameter_config;
 
-        if let Some(current_parameter_config) = cur_param {
-            if foo(asset_db, name, current_parameter_config) == UpdateState::Changed {
+        if let (Some(config_id), Some(current_parameter_config)) = (section.selected_parameter_config_id, cur_param) {
+            if foo(asset_db, ConfigId::from_uuid(config_id), name, current_parameter_config) == UpdateState::Changed {
                 match section.selected_parameter_config_id {
                     Some(id) => {
                         let config_text = json5::to_string(current_parameter_config)
@@ -176,7 +177,7 @@ impl EditorStage {
             Ok(mut asset_db) => {
                 self.update_current_parameter_config(
                     &mut asset_db,
-                    |asset_db, param_name, current_param_config| {
+                    |asset_db, current_config_id, param_name, current_param_config| {
                         let mut update_state = UpdateState::Unchanged;
                         ui.vertical(|ui| {
                             ui.group(|ui| {
@@ -196,6 +197,11 @@ impl EditorStage {
                                         update_state = UpdateState::Changed;
                                     }
                                 });
+                                let duplicate_errors = current_param_config
+                                    .check_duplicate_bound_name(current_config_id, asset_db);
+                                if !duplicate_errors.is_empty() {
+                                    ui.colored_label(egui::Color32::RED, duplicate_errors);
+                                }
                                 ui.horizontal(|ui| {
                                     ui.label("Название:");
                                     if ui.add(TextEdit::singleline(&mut current_param_config.name).desired_width(f32::INFINITY)).changed() {
@@ -349,10 +355,6 @@ impl EditorStage {
                                         },
                                     );
                                 });
-
-                                let compiled_expr_is_invalid = current_param_config
-                                    .validate_compiled_expression(asset_db)
-                                    .is_err();
 
                                 match &mut current_param_config.parameter_type {
                                     ParameterType::Constant => {}

@@ -5,6 +5,7 @@ use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::effects::EffectMechanicConfig;
 use crate::game_config::parameters::{TagConfig, PARAMETER_CACHE};
 use crate::app::editor_stage::image_widgets::{sprite_holder_visualizer, sprite_pivot_editor};
+use crate::game_config::ConfigId;
 use crate::graphics::SPRITE_ATLAS_DEF;
 
 struct EffectMechanicEntry {
@@ -24,14 +25,14 @@ impl EditorStage {
     fn update_current_tag_config(
         &mut self,
         asset_db: &mut AssetDb,
-        foo: impl FnOnce(&mut String, &mut TagConfig) -> UpdateState
+        foo: impl FnOnce(&AssetDb, ConfigId<TagConfig>, &mut String, &mut TagConfig) -> UpdateState
     ) {
         let section = &mut self.tag_section;
         let name = &mut section.selected_tag_name;
         let cur_tag = &mut section.current_tag_config;
 
-        if let Some(current_tag_config) = cur_tag {
-            if foo(name, current_tag_config) == UpdateState::Changed {
+        if let (Some(uuid), Some(current_tag_config)) = (section.selected_tag_config_id, cur_tag) {
+            if foo(asset_db, ConfigId::from_uuid(uuid), name, current_tag_config) == UpdateState::Changed {
                 match section.selected_tag_config_id {
                     Some(id) => {
                         let config_text = json5::to_string(current_tag_config)
@@ -196,7 +197,7 @@ impl EditorStage {
 
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
-                self.update_current_tag_config(&mut asset_db, |tag_name, current_tag_config| {
+                self.update_current_tag_config(&mut asset_db, |asset_db, current_config_id, tag_name, current_tag_config| {
                     let mut update_state = UpdateState::Unchanged;
                     ui.vertical(|ui| {
                         ui.group(|ui| {
@@ -216,6 +217,11 @@ impl EditorStage {
                                     update_state = UpdateState::Changed;
                                 }
                             });
+                            let duplicate_errors = current_tag_config
+                                .check_duplicate_bound_name(current_config_id, asset_db);
+                            if !duplicate_errors.is_empty() {
+                                ui.colored_label(egui::Color32::RED, duplicate_errors);
+                            }
                             ui.horizontal(|ui| {
                                 ui.label("Название:");
                                 if ui.add(TextEdit::singleline(&mut current_tag_config.name).desired_width(f32::INFINITY)).changed() {

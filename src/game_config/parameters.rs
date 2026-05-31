@@ -111,6 +111,38 @@ impl SpriteHolder for TagConfig {
     }
 }
 
+impl TagConfig {
+    pub fn check_duplicate_bound_name(&self, self_config_id: ConfigId<TagConfig>, asset_db: &AssetDb) -> String {
+        let mut duplicates = String::new();
+        if self.bound_name.is_empty() {
+            return duplicates;
+        }
+
+        for (uuid, asset_name) in asset_db.list_all_assets(AssetKind::TagConfig) {
+            if uuid == self_config_id.uuid {
+                continue;
+            }
+
+            let config_text = asset_db.load_json5_asset(AssetKind::TagConfig, uuid);
+            if let Ok(other) = json5::from_str::<TagConfig>(config_text) {
+                if other.bound_name == self.bound_name {
+                    duplicates += format!("\n{}:{}", uuid, asset_name).as_str();
+                }
+            }
+        }
+
+        if duplicates.is_empty() {
+            duplicates
+        } else {
+            format!(
+                "bound_name `{}` уже используется в лычках:{}",
+                self.bound_name,
+                duplicates
+            )
+        }
+    }
+}
+
 impl Config for TagConfig {}
 
 pub struct ExpressionParameterIdCache {
@@ -747,6 +779,35 @@ pub fn compile_expression_parameter(
 }
 
 impl ParameterConfig {
+    pub fn check_duplicate_bound_name(&self, self_config_id: ConfigId<ParameterConfig>, asset_db: &AssetDb) -> String {
+        let mut duplicates = String::new();
+        if self.bound_name.is_empty() {
+            return duplicates;
+        }
+
+        for (uuid, asset_name) in asset_db.list_all_assets(AssetKind::ParameterConfig) {
+            if uuid == self_config_id.uuid {
+                continue;
+            }
+            let config_text = asset_db.load_json5_asset(AssetKind::ParameterConfig, uuid);
+            if let Ok(other) = json5::from_str::<ParameterConfig>(config_text) {
+                if other.bound_name == self.bound_name {
+                    duplicates += format!("\n{}:{}", uuid, asset_name).as_str();
+                }
+            }
+        }
+
+        if duplicates.is_empty() {
+            duplicates
+        } else {
+            format!(
+                "bound_name `{}` уже используется в лычках:{}",
+                self.bound_name,
+                duplicates
+            )
+        }
+    }
+
     pub fn validate_compiled_expression(&self, asset_db: &AssetDb) -> Result<(), String> {
         fn validate_parameter_node(
             asset_db: &AssetDb,
