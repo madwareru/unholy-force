@@ -429,7 +429,7 @@ impl EditorStage {
                                                     .id_source("редактор выражений")
                                                     .with_rows(4)
                                                     .with_fontsize(14.0)
-                                                    .with_theme(ColorTheme::GITHUB_DARK)
+                                                    .with_theme(ColorTheme::GRUVBOX)
                                                     .with_syntax(syntax.clone())
                                                     .with_numlines(true)
                                                     .show(ui, source)

@@ -14,6 +14,7 @@ use crate::{
     assets::AssetKind
 };
 use crate::app::editor_stage::floor_config_editor::FloorConfigEditorSection;
+use crate::app::editor_stage::floor_flow_graph_config_editor::FloorFlowGraphEditorSection;
 use crate::app::editor_stage::floor_part_adjacency_config_editor::FloorPartAdjacencyConfigEditorSection;
 
 pub mod unit_config_editor;
@@ -21,6 +22,7 @@ pub mod item_config_editor;
 pub mod floor_part_editor;
 pub mod floor_part_adjacency_config_editor;
 pub mod floor_config_editor;
+pub mod floor_flow_graph_config_editor;
 pub mod tag_config_editor;
 pub mod parameter_config_editor;
 pub mod image_widgets;
@@ -45,6 +47,7 @@ pub struct EditorStage {
     floor_part_section: FloorPartConfigEditorSection,
     floor_part_adjacency_section: FloorPartAdjacencyConfigEditorSection,
     floor_section: FloorConfigEditorSection,
+    floor_flow_graph_section: FloorFlowGraphEditorSection,
     tag_section: TagConfigEditorSection,
     parameter_section: ParameterConfigEditorSection,
 }
@@ -61,6 +64,7 @@ impl EditorStage {
             floor_part_section: Default::default(),
             floor_part_adjacency_section: Default::default(),
             floor_section: Default::default(),
+            floor_flow_graph_section: Default::default(),
             tag_section: Default::default(),
             parameter_section: Default::default(),
         }
@@ -203,6 +207,7 @@ impl EditorStage {
                     AssetKind::FloorPartConfig => self.draw_floor_part_editor(ui),
                     AssetKind::FloorPartAdjacencyConfig => self.draw_floor_part_adjacency_editor(ui),
                     AssetKind::FloorConfig => self.draw_floor_config_editor(ui),
+                    AssetKind::FloorFlowGraphConfig => self.draw_floor_flow_graph_editor(ui),
                     AssetKind::TagConfig => self.draw_tag_editor(ui),
                     AssetKind::ParameterConfig => self.draw_parameter_editor(ui),
                     _ => {} // todo
@@ -210,9 +215,6 @@ impl EditorStage {
             });
         });
         result_status
-    }
-    fn draw_floor_graph_selector(&mut self, _ui: &mut Ui) {
-        // todo
     }
 }
 

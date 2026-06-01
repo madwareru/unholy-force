@@ -201,6 +201,12 @@ impl EditorStage {
                             update_state = UpdateState::Changed;
                         }
                     });
+                    ui.horizontal(|ui| {
+                        ui.label("Название:");
+                        if ui.add(TextEdit::singleline(&mut current_floor_config.name).desired_width(f32::INFINITY)).changed() {
+                            update_state = UpdateState::Changed;
+                        }
+                    });
 
                     ui.columns_const(|[loot_ui, spawn_ui]| {
                         CollapsingHeader::new("Возможные предметы на этаже")

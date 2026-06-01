@@ -41,7 +41,9 @@ impl FloorNode {
     }
 }
 
-const FLOOR_COLOR: Color32 = Color32::from_rgb(0x00, 0xb0, 0x00);
+const START_FLOOR_COLOR: Color32 = Color32::from_rgb(177 / 3, 93 / 3, 62 / 3);
+const FLOOR_COLOR: Color32 = Color32::from_rgb(158 / 3, 177 / 3, 62 / 3);
+const FLOOR_PIN_COLOR: Color32 = Color32::from_rgb(158, 177, 62);
 
 pub struct FloorFlowGraphViewer;
 
@@ -49,7 +51,10 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
     fn title(&mut self, node: &FloorFlowNode) -> String {
         match node {
             FloorFlowNode::StartFloor(_) => "Стартовый этаж".to_owned(),
-            FloorFlowNode::Floor(_) => "Этаж".to_owned(),
+            FloorFlowNode::Floor(FloorNode{ num_in_passages, .. }) => match num_in_passages {
+                1 => "Этаж с 1 входом".to_owned(),
+                x => format!("Этаж с {x} входами")
+            }
         }
     }
 
@@ -62,8 +67,8 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         snarl: &Snarl<FloorFlowNode>,
     ) -> egui::Frame {
         match snarl[node] {
-            FloorFlowNode::StartFloor(_) => frame.fill(Color32::from_rgb(70, 70, 80)),
-            FloorFlowNode::Floor(_) => frame.fill(Color32::from_rgb(70, 66, 40)),
+            FloorFlowNode::StartFloor(_) => frame.fill(START_FLOOR_COLOR),
+            FloorFlowNode::Floor(_) => frame.fill(FLOOR_COLOR),
         }
     }
 
@@ -89,19 +94,19 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
                 match &*pin.remotes {
                     [] => {
                         ui.label("None");
-                        PinInfo::circle().with_fill(FLOOR_COLOR)
+                        PinInfo::square().with_fill(FLOOR_PIN_COLOR)
                     },
                     [remote] => match snarl[remote.node] {
                         FloorFlowNode::StartFloor(ref data) => {
                             ui.label(data.floor_name());
-                            PinInfo::circle().with_fill(FLOOR_COLOR).with_wire_style(
-                                WireStyle::Bezier3,
+                            PinInfo::square().with_fill(FLOOR_PIN_COLOR).with_wire_style(
+                                WireStyle::Bezier5,
                             )
                         },
                         | FloorFlowNode::Floor(ref data) => {
                             ui.label(data.floor_name());
-                            PinInfo::circle().with_fill(FLOOR_COLOR).with_wire_style(
-                                WireStyle::Bezier3,
+                            PinInfo::square().with_fill(FLOOR_PIN_COLOR).with_wire_style(
+                                WireStyle::Bezier5,
                             )
                         }
                     },
@@ -152,9 +157,9 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
                         }
                     },
                 );
-                PinInfo::circle()
-                    .with_fill(FLOOR_COLOR)
-                    .with_wire_style(WireStyle::Bezier3)
+                PinInfo::square()
+                    .with_fill(FLOOR_PIN_COLOR)
+                    .with_wire_style(WireStyle::Bezier5)
             },
             FloorFlowNode::Floor(ref mut value) => {
                 let response = ui.button(value.floor_name());
@@ -182,9 +187,38 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
                         }
                     },
                 );
-                PinInfo::circle()
-                    .with_fill(FLOOR_COLOR)
-                    .with_wire_style(WireStyle::Bezier3)
+                PinInfo::square()
+                    .with_fill(FLOOR_PIN_COLOR)
+                    .with_wire_style(WireStyle::Bezier5)
+            }
+        }
+    }
+
+    fn has_body(&mut self, node: &FloorFlowNode) -> bool {
+        matches!(node, FloorFlowNode::Floor(_))
+    }
+
+    fn show_body(
+        &mut self,
+        node: NodeId,
+        _inputs: &[InPin],
+        _outputs: &[OutPin],
+        ui: &mut Ui,
+        _scale: f32,
+        snarl: &mut Snarl<FloorFlowNode>
+    ) {
+        let Some(node_data) = snarl.get_node_mut(node) else {
+            return;
+        };
+        match node_data {
+            FloorFlowNode::StartFloor(_) => {}
+            FloorFlowNode::Floor(data) => {
+                ui.horizontal(|ui| {
+                    ui.label("Количество входов:");
+                    ui.add(egui::DragValue::new(&mut data.num_in_passages)
+                        .range(1..=8)
+                    );
+                });
             }
         }
     }
@@ -209,8 +243,22 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
             snarl.insert_node(pos, FloorFlowNode::StartFloor(Default::default()));
             ui.close_menu();
         }
-        if ui.button("Этаж").clicked() {
-            snarl.insert_node(pos, FloorFlowNode::Floor(Default::default()));
+        if ui.button("Этаж с 1 входом").clicked() {
+            snarl.insert_node(pos, FloorFlowNode::Floor(
+                FloorNode { num_in_passages: 1, ..Default::default() }
+            ));
+            ui.close_menu();
+        }
+        if ui.button("Этаж с 2 входами").clicked() {
+            snarl.insert_node(pos, FloorFlowNode::Floor(
+                FloorNode { num_in_passages: 2, ..Default::default() }
+            ));
+            ui.close_menu();
+        }
+        if ui.button("Этаж с 3 входами").clicked() {
+            snarl.insert_node(pos, FloorFlowNode::Floor(
+                FloorNode { num_in_passages: 3, ..Default::default() }
+            ));
             ui.close_menu();
         }
     }
