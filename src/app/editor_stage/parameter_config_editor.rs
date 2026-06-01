@@ -21,7 +21,7 @@ use crate::{
 use egui::{PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
 use crate::app::editor_stage::text_completion::Completer;
-use crate::game_config::parameters::TagConfig;
+use crate::game_config::parameters::{ParameterOperator, TagConfig};
 
 #[derive(Default)]
 pub struct ParameterConfigEditorSection {
@@ -51,6 +51,10 @@ impl EditorStage {
 
         if let (Some(config_id), Some(current_parameter_config)) = (section.selected_parameter_config_id, cur_param) {
             completer.clear_words();
+            
+            for standard_foo_name in ParameterOperator::standard_function_names() {
+                completer.add_word(standard_foo_name);
+            }
 
             for (id, _) in asset_db.list_all_assets(AssetKind::ParameterConfig) {
                 if id.eq(&config_id) {

@@ -377,7 +377,7 @@ impl EditorStage {
                                         for entry in &effect_entries {
                                             if ui.button(&entry.label).clicked() {
                                                 current_tag_config.effect_mechanic = Some(
-                                                    crate::game_config::ConfigId::from_uuid(entry.uuid)
+                                                    ConfigId::from_uuid(entry.uuid)
                                                 );
                                                 update_state = UpdateState::Changed;
                                                 ui.memory_mut(|mem| mem.close_popup());

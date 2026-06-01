@@ -236,6 +236,20 @@ impl ParsedExpressionParameter {
 }
 
 impl ParameterOperator {
+    pub fn standard_function_names() -> &'static [&'static str] {
+        &[
+            "clamp",
+            "min",
+            "max",
+            "round",
+            "rand",
+        ]
+    }
+
+    pub fn is_valid_prefix_for_completion(chr: char) -> bool {
+        Self::standard_function_names().iter().any(|&name| name.starts_with(chr))
+    }
+
     fn from_prefix_token(token: &str) -> Option<Self> {
         match token {
             "+" => Some(Self::Plus),

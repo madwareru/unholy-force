@@ -5,10 +5,23 @@
 */
 
 use std::collections::BTreeSet;
-use egui::{Color32, Event, Modifiers, Sense, Stroke, TextBuffer};
-use egui::text_edit::TextEditOutput;
-use egui::text_selection::text_cursor_state::ccursor_previous_word;
+use egui::{
+    show_tooltip_for,
+    Color32,
+    Event,
+    Id,
+    Modifiers,
+    Sense,
+    Stroke,
+    TextBuffer,
+    TextWrapMode,
+    scroll_area::ScrollBarVisibility,
+    text::LayoutJob,
+    text_edit::TextEditOutput,
+    text_selection::text_cursor_state::ccursor_previous_word
+};
 use trie::Trie;
+use crate::game_config::parameters::ParameterOperator;
 
 pub mod trie;
 
@@ -22,7 +35,7 @@ pub struct Completer {
     words: Trie,
     variant_id: usize,
     completions: BTreeSet<String>,
-    pub text_edit_id: Option<egui::Id>,
+    pub text_edit_id: Option<Id>,
 }
 
 impl Completer {
@@ -123,10 +136,8 @@ impl Completer {
             let mut cursor = range.primary;
             cursor.index = cursor.index.min(galley.job.text.chars().count());
             let cursor_pos_in_galley = galley.pos_from_ccursor(cursor);
-            let cursor_rect =
-                cursor_pos_in_galley.translate(editor_output.response.rect.left_top().to_vec2());
-            // let cursor_on_screen = editor_output.response.rect.left_top()
-            // + cursor_pos_in_galley.left_bottom().to_vec2();
+            let cursor_rect = cursor_pos_in_galley
+                .translate(editor_output.response.rect.left_top().to_vec2());
             let word_start = ccursor_previous_word(galley.text(), cursor);
             if self.cursor != cursor.index {
                 self.cursor = cursor.index;
@@ -145,7 +156,11 @@ impl Completer {
             let next_char_allows = galley
                 .chars()
                 .nth(cursor.index)
-                .is_none_or(|c| !(c.is_alphanumeric() || c == '_' || c == '{' || c == '['));
+                .is_none_or(|c| !(c.is_alphanumeric() ||
+                    c == '_' ||
+                    c == '{' ||
+                    c == '[' ||
+                    ParameterOperator::is_valid_prefix_for_completion(c)));
             let next_char_allows = next_char_allows || range.secondary.index > range.primary.index;
 
             self.prefix = if next_char_allows {
@@ -154,7 +169,12 @@ impl Completer {
                     .char_range(word_start.index..cursor.index)
                     .to_string();
                 if let Some((_, tail)) = prefix.rsplit_once(|c: char| {
-                    !(c.is_alphanumeric() || c == '_' || c == '{' || c == '[')
+                    !(c.is_alphanumeric() ||
+                        c == '_' ||
+                        c == '{' ||
+                        c == '[' ||
+                        ParameterOperator::is_valid_prefix_for_completion(c)
+                    )
                 }) {
                     tail.to_string()
                 } else {
@@ -164,14 +184,14 @@ impl Completer {
                 String::new()
             };
             if !(self.prefix.is_empty() || self.completions.is_empty()) {
-                egui::show_tooltip_for(
+                show_tooltip_for(
                     &ctx,
                     editor_output.response.layer_id,
-                    egui::Id::new("Completer"),
+                    Id::new("Completer"),
                     &cursor_rect,
                     |ui| {
                         ui.response().sense = Sense::empty();
-                        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+                        ui.style_mut().wrap_mode = Some(TextWrapMode::Extend);
                         let height = (fontsize
                             + ui.style().visuals.widgets.hovered.bg_stroke.width * 2.0
                             + ui.style().spacing.button_padding.y * 2.0
@@ -182,23 +202,25 @@ impl Completer {
 
                         egui::ScrollArea::vertical()
                             .auto_shrink([true, true])
-                            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                            .scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden)
                             .show(ui, |ui| {
                                 for (i, completion) in self.completions.iter().enumerate() {
                                     let word = format!("{}{completion}", &self.prefix);
                                     let fmt = format_token(fontsize, &word);
-                                    let colored_text = egui::text::LayoutJob::single_section(word, fmt);
+                                    let colored_text = LayoutJob::single_section(word, fmt);
                                     let selected = i == self.variant_id;
+
+                                    let hovered_style = &ui.style().visuals.widgets.hovered;
 
                                     let button = ui.add(
                                         egui::Button::new(colored_text)
                                             .sense(Sense::empty())
                                             .frame(true)
-                                            .fill(ui.style().visuals.widgets.hovered.bg_fill)
+                                            .fill(hovered_style.bg_fill)
                                             .stroke(if selected {
                                                 Stroke::new(
-                                                    ui.style().visuals.widgets.hovered.bg_stroke.width,
-                                                    ui.style().visuals.widgets.hovered.bg_stroke.color,
+                                                    hovered_style.bg_stroke.width,
+                                                    hovered_style.bg_stroke.color,
                                                 )
                                             } else {
                                                 Stroke::NONE
