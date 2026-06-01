@@ -18,3 +18,4 @@ bumpalo = { version = "3.20.2", features = ["collections"] }
 egui-snarl = { version = "0.7.1", features = ["serde"] }
 simple-tiled-wfc = "0.7.7"
 bitsetium = "0.0.2"
+egui_code_editor = { git = "https://github.com/p4ymak/egui_code_editor", rev = "1566784e20e6ef5e6ebf4004f4972e164d240ebf" }

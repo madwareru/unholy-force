@@ -236,8 +236,8 @@ impl ParsedExpressionParameter {
 }
 
 impl ParameterOperator {
-    pub fn standard_function_names() -> &'static [&'static str] {
-        &[
+    pub fn standard_function_names() -> [&'static str; 5] {
+        [
             "clamp",
             "min",
             "max",

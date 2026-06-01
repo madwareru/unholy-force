@@ -18,7 +18,8 @@ use crate::{
     },
     graphics::SPRITE_ATLAS_DEF
 };
-use egui::{PopupCloseBehavior, TextEdit, Ui};
+use egui::{PopupCloseBehavior, TextEdit};
+use egui_code_editor::{CodeEditor, ColorTheme};
 use uuid::Uuid;
 use crate::app::editor_stage::text_completion::Completer;
 use crate::game_config::parameters::{ParameterOperator, TagConfig};
@@ -51,7 +52,7 @@ impl EditorStage {
 
         if let (Some(config_id), Some(current_parameter_config)) = (section.selected_parameter_config_id, cur_param) {
             completer.clear_words();
-            
+
             for standard_foo_name in ParameterOperator::standard_function_names() {
                 completer.add_word(standard_foo_name);
             }
@@ -96,7 +97,7 @@ impl EditorStage {
         }
     }
 
-    pub(crate) fn draw_parameter_selector(&mut self, ui: &mut Ui) {
+    pub(crate) fn draw_parameter_selector(&mut self, ui: &mut egui::Ui) {
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
                 let full_width = ui.available_width();
@@ -220,7 +221,7 @@ impl EditorStage {
         }
     }
 
-    pub(crate) fn draw_parameter_editor(&mut self, ui: &mut Ui) {
+    pub(crate) fn draw_parameter_editor(&mut self, ui: &mut egui::Ui) {
         let texture_id: egui::TextureId;
         if let Some(handle) = &self.atlas_texture {
             texture_id = handle.id();
@@ -420,13 +421,18 @@ impl EditorStage {
                                         ui.horizontal(|ui| {
                                             ui.label("Выражение:");
                                         });
+                                        let syntax = completer.syntax().clone();
                                         if completer.show_on_text_widget(
                                             ui,
                                             |ui| {
-                                                TextEdit::singleline(source)
-                                                    .desired_width(f32::INFINITY)
-                                                    .code_editor()
-                                                    .show(ui)
+                                                CodeEditor::default()
+                                                    .id_source("редактор выражений")
+                                                    .with_rows(4)
+                                                    .with_fontsize(14.0)
+                                                    .with_theme(ColorTheme::GITHUB_DARK)
+                                                    .with_syntax(syntax.clone())
+                                                    .with_numlines(true)
+                                                    .show(ui, source)
                                             }
                                         ).response.changed() {
                                             update_state = UpdateState::Changed;

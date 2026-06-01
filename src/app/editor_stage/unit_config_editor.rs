@@ -362,5 +362,4 @@ impl EditorStage {
             _ => {}
         }
     }
-
 }

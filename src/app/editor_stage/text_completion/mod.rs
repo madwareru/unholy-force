@@ -20,15 +20,17 @@ use egui::{
     text_edit::TextEditOutput,
     text_selection::text_cursor_state::ccursor_previous_word
 };
+use egui_code_editor::Syntax;
 use trie::Trie;
 use crate::game_config::parameters::ParameterOperator;
 
 pub mod trie;
 
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 /// Постановщик кода с попапом поверх редактора текста
 pub struct Completer {
+    syntax: Syntax,
     prefix: String,
     cursor: usize,
     ignore_cursor: Option<usize>,
@@ -38,13 +40,39 @@ pub struct Completer {
     pub text_edit_id: Option<Id>,
 }
 
+impl Default for Completer {
+    fn default() -> Self {
+        Self {
+            syntax: calculated_param_syntax(),
+            prefix: String::new(),
+            cursor: 0,
+            ignore_cursor: None,
+            words: Trie::new(),
+            variant_id: 0,
+            completions: BTreeSet::new(),
+            text_edit_id: None,
+        }
+    }
+}
+
 impl Completer {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(syntax: Syntax) -> Self {
+        Self {
+            syntax,
+            ..Default::default()
+        }
+    }
+
+    pub fn syntax(&self) -> &Syntax {
+        &self.syntax
     }
 
     pub fn clear_words(&mut self) {
         self.words.clear();
+    }
+
+    pub fn words(&self) -> Vec<String> {
+        self.words.words()
     }
 
     pub fn add_word(&mut self, word: &str) {
@@ -250,4 +278,11 @@ fn format_token(fontsize: f32, word: &str) -> egui::text::TextFormat {
     };
 
     egui::text::TextFormat::simple(font_id, color)
+}
+
+
+fn calculated_param_syntax() -> Syntax {
+    Syntax::new("вычисляемые черты")
+        .with_case_sensitive(true)
+        .with_keywords(ParameterOperator::standard_function_names())
 }
