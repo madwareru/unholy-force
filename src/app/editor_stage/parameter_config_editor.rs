@@ -1,11 +1,27 @@
+use crate::{
+    app::{
+        editor_stage::{
+            image_widgets::sprite_pivot_editor,
+            EditorStage,
+            UpdateState
+        }
+    },
+    assets::{AssetDb, AssetKind},
+    game_config::{
+        parameters::{
+            CompiledExpressionParameterNode,
+            ParameterConfig,
+            ParameterType,
+            PARAMETER_CACHE
+        },
+        ConfigId
+    },
+    graphics::SPRITE_ATLAS_DEF
+};
 use egui::{PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
-use crate::app::editor_stage::{EditorStage, UpdateState};
-use crate::assets::{AssetDb, AssetKind};
-use crate::game_config::parameters::{CompiledExpressionParameterNode, ParameterConfig, ParameterType, PARAMETER_CACHE};
-use crate::app::editor_stage::image_widgets::{sprite_holder_visualizer, sprite_pivot_editor};
-use crate::game_config::ConfigId;
-use crate::graphics::SPRITE_ATLAS_DEF;
+use crate::app::editor_stage::text_completion::Completer;
+use crate::game_config::parameters::TagConfig;
 
 #[derive(Default)]
 pub struct ParameterConfigEditorSection {
@@ -13,20 +29,56 @@ pub struct ParameterConfigEditorSection {
     selected_parameter_config_id: Option<Uuid>,
     selected_parameter_name: String,
     current_parameter_config: Option<ParameterConfig>,
+    completer: Completer
 }
 
 impl EditorStage {
     fn update_current_parameter_config(
         &mut self,
         asset_db: &mut AssetDb,
-        foo: impl FnOnce(&AssetDb, ConfigId<ParameterConfig>, &mut String, &mut ParameterConfig) -> UpdateState,
+        foo: impl FnOnce(
+            &AssetDb,
+            ConfigId<ParameterConfig>,
+            &mut String,
+            &mut ParameterConfig,
+            &mut Completer,
+        ) -> UpdateState,
     ) {
         let section = &mut self.parameter_section;
         let name = &mut section.selected_parameter_name;
         let cur_param = &mut section.current_parameter_config;
+        let completer = &mut section.completer;
 
         if let (Some(config_id), Some(current_parameter_config)) = (section.selected_parameter_config_id, cur_param) {
-            if foo(asset_db, ConfigId::from_uuid(config_id), name, current_parameter_config) == UpdateState::Changed {
+            completer.clear_words();
+
+            for (id, _) in asset_db.list_all_assets(AssetKind::ParameterConfig) {
+                if id.eq(&config_id) {
+                    continue;
+                }
+
+                let config_text = asset_db.load_json5_asset(AssetKind::ParameterConfig, id);
+                let config: ParameterConfig = json5::from_str(config_text)
+                    .expect("Failed to load parameter config");
+                let name = format!("{{{}}}", config.bound_name);
+                completer.add_word(&name);
+            }
+
+            for (id, _) in asset_db.list_all_assets(AssetKind::TagConfig) {
+                let config_text = asset_db.load_json5_asset(AssetKind::TagConfig, id);
+                let config: TagConfig = json5::from_str(&config_text)
+                    .expect("Failed to load tag config");
+                let name = format!("[{}]", config.bound_name);
+                completer.add_word(&name);
+            }
+
+            if foo(
+                asset_db,
+                ConfigId::from_uuid(config_id),
+                name,
+                current_parameter_config,
+                completer
+            ) == UpdateState::Changed {
                 match section.selected_parameter_config_id {
                     Some(id) => {
                         let config_text = json5::to_string(current_parameter_config)
@@ -177,7 +229,7 @@ impl EditorStage {
             Ok(mut asset_db) => {
                 self.update_current_parameter_config(
                     &mut asset_db,
-                    |asset_db, current_config_id, param_name, current_param_config| {
+                    |asset_db, current_config_id, param_name, current_param_config, completer| {
                         let mut update_state = UpdateState::Unchanged;
                         ui.vertical(|ui| {
                             ui.group(|ui| {
@@ -341,15 +393,17 @@ impl EditorStage {
                                         PopupCloseBehavior::CloseOnClickOutside,
                                         |ui| {
                                             if ui.button("Константа").clicked() {
-                                                current_param_config.parameter_type = ParameterType::Constant;
-                                                update_state = UpdateState::Changed;
+                                                if !matches!(current_param_config.parameter_type, ParameterType::Constant) {
+                                                    current_param_config.parameter_type = ParameterType::Constant;
+                                                    update_state = UpdateState::Changed;
+                                                }
                                                 ui.memory_mut(|mem| mem.close_popup());
                                             }
                                             if ui.button("Выражение").clicked() {
-                                                if matches!(current_param_config.parameter_type, ParameterType::Constant) {
+                                                if !matches!(current_param_config.parameter_type, ParameterType::Expression(_)) {
                                                     current_param_config.parameter_type = ParameterType::Expression(String::new());
+                                                    update_state = UpdateState::Changed;
                                                 }
-                                                update_state = UpdateState::Changed;
                                                 ui.memory_mut(|mem| mem.close_popup());
                                             }
                                         },
@@ -362,13 +416,17 @@ impl EditorStage {
                                         ui.horizontal(|ui| {
                                             ui.label("Выражение:");
                                         });
-                                        if ui.add(
-                                            TextEdit::multiline(source)
-                                                .desired_width(f32::INFINITY)
-                                                .code_editor()
-                                        ).changed() {
+                                        if completer.show_on_text_widget(
+                                            ui,
+                                            |ui| {
+                                                TextEdit::singleline(source)
+                                                    .desired_width(f32::INFINITY)
+                                                    .code_editor()
+                                                    .show(ui)
+                                            }
+                                        ).response.changed() {
                                             update_state = UpdateState::Changed;
-                                        };
+                                        }
 
                                         if let Ok(mut cache) = PARAMETER_CACHE.lock() {
                                             current_param_config.compile_expression(&asset_db, &mut cache);
@@ -393,33 +451,6 @@ impl EditorStage {
                 );
             }
             _ => {}
-        }
-    }
-
-    pub(crate) fn draw_parameter_preview_in_level(&self, ui: &mut Ui) {
-        let texture_id: egui::TextureId;
-        if let Some(handle) = &self.atlas_texture {
-            texture_id = handle.id();
-        } else {
-            unreachable!()
-        };
-        let atlas_size = self.atlas_size;
-        if let Some(param_config) = &self.parameter_section.current_parameter_config {
-            if param_config.sprite_name.is_empty() {
-                return;
-            }
-            ui.vertical(|ui| {
-                ui.add_space(6f32);
-                ui.group(|ui| {
-                    ui.label("Предпросмотр на игровом поле:");
-                    sprite_holder_visualizer(
-                        ui,
-                        texture_id,
-                        atlas_size,
-                        param_config
-                    )
-                });
-            });
         }
     }
 }

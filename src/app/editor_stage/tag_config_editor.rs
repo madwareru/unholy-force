@@ -4,7 +4,7 @@ use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::effects::EffectMechanicConfig;
 use crate::game_config::parameters::{TagConfig, PARAMETER_CACHE};
-use crate::app::editor_stage::image_widgets::{sprite_holder_visualizer, sprite_pivot_editor};
+use crate::app::editor_stage::image_widgets::{sprite_pivot_editor};
 use crate::game_config::ConfigId;
 use crate::graphics::SPRITE_ATLAS_DEF;
 
@@ -393,33 +393,6 @@ impl EditorStage {
                 });
             }
             _ => {}
-        }
-    }
-
-    pub(crate) fn draw_tag_preview_in_level(&self, ui: &mut Ui) {
-        let texture_id: egui::TextureId;
-        if let Some(handle) = &self.atlas_texture {
-            texture_id = handle.id();
-        } else {
-            unreachable!()
-        };
-        let atlas_size = self.atlas_size;
-        if let Some(tag_config) = &self.tag_section.current_tag_config {
-            if tag_config.sprite_name.is_empty() {
-                return;
-            }
-            ui.vertical(|ui| {
-                ui.add_space(6f32);
-                ui.group(|ui| {
-                    ui.label("Предпросмотр на игровом поле:");
-                    sprite_holder_visualizer(
-                        ui,
-                        texture_id,
-                        atlas_size,
-                        tag_config
-                    )
-                });
-            });
         }
     }
 }

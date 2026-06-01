@@ -24,7 +24,7 @@ pub mod floor_config_editor;
 pub mod tag_config_editor;
 pub mod parameter_config_editor;
 pub mod image_widgets;
-
+pub mod text_completion;
 #[derive(Copy, Clone, Deserialize)]
 pub enum EditorCommand {
     BackToMainMenu
@@ -188,8 +188,8 @@ impl EditorStage {
                             AssetKind::FloorPartConfig => self.draw_floor_part_editor_tools(ui),
                             AssetKind::FloorPartAdjacencyConfig => self.draw_adjacency_visualizer(ui),
                             AssetKind::FloorConfig => self.draw_floor_editor_tools(ui),
-                            AssetKind::TagConfig => self.draw_tag_preview_in_level(ui),
-                            AssetKind::ParameterConfig => self.draw_parameter_preview_in_level(ui),
+                            AssetKind::TagConfig => {},
+                            AssetKind::ParameterConfig => {},
                             _ => {}
                         }
                     });
