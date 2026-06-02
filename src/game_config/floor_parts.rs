@@ -3,12 +3,78 @@ use crate::game_config::items::{ItemConfig, ItemRarity};
 use crate::game_config::units::{UnitConfig, UnitDanger};
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
 use std::io::{Result, Error, ErrorKind, Write, Read};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::app::editor_stage::image_widgets::{EditableFloorData, FloorDataHolderConst, FloorTilesHolderConst, WallTilesHolderConst};
+use crate::app::editor_stage::image_widgets::{EditableFloorData};
 use crate::game_config::effects::EffectMechanicConfig;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+pub const NO_EXTRA: &str = "Нет экстра данных";
+pub const SPAWN_UNIT_HINT_EXTRA: &str = "Случайный персонаж";
+pub const SPAWN_LOOT_HINT_EXTRA: &str = "Случайный предмет";
+pub const SPAWN_UNIT_EXTRA: &str = "Ставить персонажа";
+pub const SPAWN_LOOT_EXTRA: &str = "Положить предмет";
+pub const LADDER_DOWN_HINT_EXTRA: &str = "Ставить лестницу вниз";
+pub const LADDER_UP_HINT_EXTRA: &str = "Ставить лестницу вверх";
+pub const PLAYER_START_HINT_EXTRA: &str = "Старт игры";
+pub const TRIGGER_EFFECT_EXTRA: &str = "Спровоцировать эффект";
+
+pub const FLOOR_CELL_EXTRA_MODES: &[
+    (
+        &str,
+        fn(&FloorCellExtra) -> bool,
+        fn() -> FloorCellExtra
+    )
+] = &[
+    (
+        NO_EXTRA,
+        |it| matches!(it, FloorCellExtra::None),
+        || FloorCellExtra::None
+    ),
+    (
+        SPAWN_UNIT_HINT_EXTRA,
+        |it| matches!(it, FloorCellExtra::SpawnUnitHint(_)),
+        || FloorCellExtra::SpawnUnitHint(UnitDanger::Harmless)
+    ),
+    (
+        SPAWN_LOOT_HINT_EXTRA,
+        |it| matches!(it, FloorCellExtra::SpawnLootHint(_)),
+        || FloorCellExtra::SpawnLootHint(ItemRarity::Generic)
+    ),
+    (
+        SPAWN_UNIT_EXTRA,
+        |it| matches!(it, FloorCellExtra::SpawnUnit(_)),
+        || FloorCellExtra::SpawnUnit(ConfigId::INVALID)
+    ),
+    (
+        SPAWN_LOOT_EXTRA,
+        |it| matches!(it, FloorCellExtra::SpawnLoot(_)),
+        || FloorCellExtra::SpawnLoot(ConfigId::INVALID)
+    ),
+    (
+        LADDER_DOWN_HINT_EXTRA,
+        |it| matches!(it, FloorCellExtra::LadderDownHint),
+        || FloorCellExtra::LadderDownHint
+    ),
+    (
+        LADDER_UP_HINT_EXTRA,
+        |it| matches!(it, FloorCellExtra::LadderUpHint),
+        || FloorCellExtra::LadderUpHint
+    ),
+    (
+        PLAYER_START_HINT_EXTRA,
+        |it| matches!(it, FloorCellExtra::PlayerStartHint),
+        || FloorCellExtra::PlayerStartHint
+    ),
+    (
+        TRIGGER_EFFECT_EXTRA,
+        |it| matches!(it, FloorCellExtra::TriggerEffect(_)),
+        || FloorCellExtra::TriggerEffect(ConfigId::INVALID)
+    ),
+];
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub enum FloorCellExtra {
+    #[default]
     None,
     SpawnUnitHint(UnitDanger), // 1..6
     SpawnLootHint(ItemRarity), // 7..10
@@ -43,9 +109,6 @@ impl FloorCellExtra {
         }
     }
 }
-impl Default for FloorCellExtra {
-    fn default() -> Self { FloorCellExtra::None }
-}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FloorPartConfig {
@@ -55,47 +118,35 @@ pub struct FloorPartConfig {
     pub payload_count: u8,
 }
 
-impl FloorTilesHolderConst<5, 5> for FloorPartConfig {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 5]; 5] {
-        &self.floor_data
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 5]; 5] {
-        &mut self.floor_data
-    }
-}
-
-impl WallTilesHolderConst<5, 5> for FloorPartConfig {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 5]; 5] {
-        &self.wall_data
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 5]; 5] {
-        &mut self.wall_data
-    }
-}
-
 impl EditableFloorData for FloorPartConfig {
     fn width(&self) -> usize { self.floor_data[0].len() }
 
     fn height(&self) -> usize { self.floor_data.len() }
 
     fn get_floor_data(&self, [x, y]: [usize; 2]) -> &FloorGraphicsTileGroup {
-        &self.floor_data()[y][x]
+        &self.floor_data[y][x]
     }
 
     fn get_floor_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut FloorGraphicsTileGroup {
-        &mut self.floor_data_mut()[y][x]
+        &mut self.floor_data[y][x]
     }
 
     fn get_wall_data(&self, [x, y]: [usize; 2]) -> &WallGraphicsTileGroup {
-        &self.wall_data()[y][x]
+        &self.wall_data[y][x]
     }
 
     fn get_wall_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut WallGraphicsTileGroup {
-        &mut self.wall_data_mut()[y][x]
+        &mut self.wall_data[y][x]
+    }
+
+    fn get_cell_extra_data(&self, [x, y]: [usize; 2]) -> &FloorCellExtra {
+        &self.extra_data[y][x]
+    }
+
+    fn get_cell_extra_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut FloorCellExtra {
+        &mut self.extra_data[y][x]
     }
 }
-
-impl FloorDataHolderConst<5, 5> for FloorPartConfig {}
 
 
 impl FloorPartConfig {

@@ -9,7 +9,7 @@ use crate::{
         FloorVariant,
     },
     app::editor_stage::image_widgets::{
-        EditableFloorData, FloorTilesHolderConst, WallTilesHolderConst
+        EditableFloorData
     },
     app::game_stage::grid_math::{traverse_area_inward},
     game_config::floors::{AuthoredFloor, GeneratedFloor},
@@ -21,6 +21,7 @@ use bitsetium::{BitEmpty, BitIntersection, BitSet, BitTest, BitUnset};
 use rand::RngExt;
 use simple_tiled_wfc::{make_initial_probabilities, BitsIterator};
 use crate::app::game_stage::grid_math::get_island_mapping;
+use crate::game_config::floor_parts::FloorCellExtra;
 
 pub enum FloorGeneratorResult {
     Size15x15(AuthoredFloorSize15x15),
@@ -58,49 +59,73 @@ impl EditableFloorData for FloorGeneratorResult {
 
     fn get_floor_data(&self, [x, y]: [usize; 2]) -> &FloorGraphicsTileGroup {
         match self {
-            FloorGeneratorResult::Size15x15(data) => &data.floor_data()[y][x],
-            FloorGeneratorResult::Size20x20(data) => &data.floor_data()[y][x],
-            FloorGeneratorResult::Size25x25(data) => &data.floor_data()[y][x],
-            FloorGeneratorResult::Size30x30(data) => &data.floor_data()[y][x],
-            FloorGeneratorResult::Size40x40(data) => &data.floor_data()[y][x],
-            FloorGeneratorResult::Size60x60(data) => &data.floor_data()[y][x],
-            FloorGeneratorResult::Size80x80(data) => &data.floor_data()[y][x]
+            FloorGeneratorResult::Size15x15(data) => &data.floor_data[y][x],
+            FloorGeneratorResult::Size20x20(data) => &data.floor_data[y][x],
+            FloorGeneratorResult::Size25x25(data) => &data.floor_data[y][x],
+            FloorGeneratorResult::Size30x30(data) => &data.floor_data[y][x],
+            FloorGeneratorResult::Size40x40(data) => &data.floor_data[y][x],
+            FloorGeneratorResult::Size60x60(data) => &data.floor_data[y][x],
+            FloorGeneratorResult::Size80x80(data) => &data.floor_data[y][x]
         }
     }
 
     fn get_floor_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut FloorGraphicsTileGroup {
         match self {
-            FloorGeneratorResult::Size15x15(data) => &mut data.floor_data_mut()[y][x],
-            FloorGeneratorResult::Size20x20(data) => &mut data.floor_data_mut()[y][x],
-            FloorGeneratorResult::Size25x25(data) => &mut data.floor_data_mut()[y][x],
-            FloorGeneratorResult::Size30x30(data) => &mut data.floor_data_mut()[y][x],
-            FloorGeneratorResult::Size40x40(data) => &mut data.floor_data_mut()[y][x],
-            FloorGeneratorResult::Size60x60(data) => &mut data.floor_data_mut()[y][x],
-            FloorGeneratorResult::Size80x80(data) => &mut data.floor_data_mut()[y][x]
+            FloorGeneratorResult::Size15x15(data) => &mut data.floor_data[y][x],
+            FloorGeneratorResult::Size20x20(data) => &mut data.floor_data[y][x],
+            FloorGeneratorResult::Size25x25(data) => &mut data.floor_data[y][x],
+            FloorGeneratorResult::Size30x30(data) => &mut data.floor_data[y][x],
+            FloorGeneratorResult::Size40x40(data) => &mut data.floor_data[y][x],
+            FloorGeneratorResult::Size60x60(data) => &mut data.floor_data[y][x],
+            FloorGeneratorResult::Size80x80(data) => &mut data.floor_data[y][x]
         }
     }
 
     fn get_wall_data(&self, [x, y]: [usize; 2]) -> &WallGraphicsTileGroup {
         match self {
-            FloorGeneratorResult::Size15x15(data) => &data.wall_data()[y][x],
-            FloorGeneratorResult::Size20x20(data) => &data.wall_data()[y][x],
-            FloorGeneratorResult::Size25x25(data) => &data.wall_data()[y][x],
-            FloorGeneratorResult::Size30x30(data) => &data.wall_data()[y][x],
-            FloorGeneratorResult::Size40x40(data) => &data.wall_data()[y][x],
-            FloorGeneratorResult::Size60x60(data) => &data.wall_data()[y][x],
-            FloorGeneratorResult::Size80x80(data) => &data.wall_data()[y][x]
+            FloorGeneratorResult::Size15x15(data) => &data.wall_data[y][x],
+            FloorGeneratorResult::Size20x20(data) => &data.wall_data[y][x],
+            FloorGeneratorResult::Size25x25(data) => &data.wall_data[y][x],
+            FloorGeneratorResult::Size30x30(data) => &data.wall_data[y][x],
+            FloorGeneratorResult::Size40x40(data) => &data.wall_data[y][x],
+            FloorGeneratorResult::Size60x60(data) => &data.wall_data[y][x],
+            FloorGeneratorResult::Size80x80(data) => &data.wall_data[y][x]
         }
     }
 
     fn get_wall_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut WallGraphicsTileGroup {
         match self {
-            FloorGeneratorResult::Size15x15(data) => &mut data.wall_data_mut()[y][x],
-            FloorGeneratorResult::Size20x20(data) => &mut data.wall_data_mut()[y][x],
-            FloorGeneratorResult::Size25x25(data) => &mut data.wall_data_mut()[y][x],
-            FloorGeneratorResult::Size30x30(data) => &mut data.wall_data_mut()[y][x],
-            FloorGeneratorResult::Size40x40(data) => &mut data.wall_data_mut()[y][x],
-            FloorGeneratorResult::Size60x60(data) => &mut data.wall_data_mut()[y][x],
-            FloorGeneratorResult::Size80x80(data) => &mut data.wall_data_mut()[y][x]
+            FloorGeneratorResult::Size15x15(data) => &mut data.wall_data[y][x],
+            FloorGeneratorResult::Size20x20(data) => &mut data.wall_data[y][x],
+            FloorGeneratorResult::Size25x25(data) => &mut data.wall_data[y][x],
+            FloorGeneratorResult::Size30x30(data) => &mut data.wall_data[y][x],
+            FloorGeneratorResult::Size40x40(data) => &mut data.wall_data[y][x],
+            FloorGeneratorResult::Size60x60(data) => &mut data.wall_data[y][x],
+            FloorGeneratorResult::Size80x80(data) => &mut data.wall_data[y][x]
+        }
+    }
+
+    fn get_cell_extra_data(&self, [x, y]: [usize; 2]) -> &FloorCellExtra {
+        match self {
+            FloorGeneratorResult::Size15x15(data) => &data.extra_data[y][x],
+            FloorGeneratorResult::Size20x20(data) => &data.extra_data[y][x],
+            FloorGeneratorResult::Size25x25(data) => &data.extra_data[y][x],
+            FloorGeneratorResult::Size30x30(data) => &data.extra_data[y][x],
+            FloorGeneratorResult::Size40x40(data) => &data.extra_data[y][x],
+            FloorGeneratorResult::Size60x60(data) => &data.extra_data[y][x],
+            FloorGeneratorResult::Size80x80(data) => &data.extra_data[y][x]
+        }
+    }
+
+    fn get_cell_extra_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut FloorCellExtra {
+        match self {
+            FloorGeneratorResult::Size15x15(data) => &mut data.extra_data[y][x],
+            FloorGeneratorResult::Size20x20(data) => &mut data.extra_data[y][x],
+            FloorGeneratorResult::Size25x25(data) => &mut data.extra_data[y][x],
+            FloorGeneratorResult::Size30x30(data) => &mut data.extra_data[y][x],
+            FloorGeneratorResult::Size40x40(data) => &mut data.extra_data[y][x],
+            FloorGeneratorResult::Size60x60(data) => &mut data.extra_data[y][x],
+            FloorGeneratorResult::Size80x80(data) => &mut data.extra_data[y][x]
         }
     }
 }

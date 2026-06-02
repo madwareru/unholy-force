@@ -13,10 +13,7 @@ use crate::graphics::{
     WANG_MASK_SOUTH_WEST, WallGraphicsTileGroup,
 };
 use egui::text::LayoutJob;
-use egui::{
-    Align, Align2, Color32, CornerRadius, Layout, Rect, Response, Sense, Stroke, StrokeKind,
-    TextStyle, TextureId, Ui, UiBuilder, Vec2, pos2, vec2,
-};
+use egui::{Align, Align2, Color32, CornerRadius, Layout, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId, Ui, UiBuilder, Vec2, pos2, vec2, Id, PopupCloseBehavior};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug)]
@@ -258,7 +255,7 @@ pub fn sprite_holder_visualizer<Holder: SpriteHolder>(
             StrokeKind::Inside,
         );
 
-        draw_floors_w_h(
+        draw_floors(
             ui,
             texture_id,
             atlas_size,
@@ -297,16 +294,6 @@ pub fn sprite_holder_visualizer<Holder: SpriteHolder>(
     }
 }
 
-pub trait FloorTilesHolderConst<const W: usize, const H: usize> {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; W]; H];
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; W]; H];
-}
-
-pub trait WallTilesHolderConst<const W: usize, const H: usize> {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; W]; H];
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; W]; H];
-}
-
 pub trait EditableFloorData {
     fn width(&self) -> usize;
     fn height(&self) -> usize;
@@ -314,31 +301,8 @@ pub trait EditableFloorData {
     fn get_floor_data_mut(&mut self, coords: [usize; 2]) -> &mut FloorGraphicsTileGroup;
     fn get_wall_data(&self, coords: [usize; 2]) -> &WallGraphicsTileGroup;
     fn get_wall_data_mut(&mut self, coords: [usize; 2]) -> &mut WallGraphicsTileGroup;
-}
-
-pub trait FloorDataHolderConst<const W: usize, const H: usize>:
-    FloorTilesHolderConst<W, H> + WallTilesHolderConst<W, H>
-{
-}
-impl<const W: usize, const H: usize> FloorTilesHolderConst<W, H>
-    for Box<[[FloorGraphicsTileGroup; W]; H]>
-{
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; W]; H] {
-        self
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; W]; H] {
-        self
-    }
-}
-impl<const W: usize, const H: usize> WallTilesHolderConst<W, H>
-    for Box<[[WallGraphicsTileGroup; W]; H]>
-{
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; W]; H] {
-        self
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; W]; H] {
-        self
-    }
+    fn get_cell_extra_data(&self, coords: [usize; 2]) -> &FloorCellExtra;
+    fn get_cell_extra_data_mut(&mut self, coords: [usize; 2]) -> &mut FloorCellExtra;
 }
 
 pub fn floor_data_holder_editor(
@@ -368,8 +332,9 @@ pub fn floor_data_holder_editor(
             StrokeKind::Inside,
         );
 
-        draw_floors_w_h(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
-        draw_walls_w_h(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
+        draw_floors(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
+        draw_extra(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
+        draw_walls(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
     }
 
     let mut result = None;
@@ -717,7 +682,7 @@ pub fn visualize_floor_part_adjacency_in_rect<
         east_rect.size() / east_sides as f32
     };
 
-    draw_floors_w_h(
+    draw_floors(
         ui,
         texture_id,
         atlas_size,
@@ -726,7 +691,7 @@ pub fn visualize_floor_part_adjacency_in_rect<
         tile_size,
         central_rect,
     );
-    draw_walls_w_h(
+    draw_walls(
         ui,
         texture_id,
         atlas_size,
@@ -878,10 +843,10 @@ fn do_neighbour_draw<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPart
                     let side_part = FloorPartConfig::load_from_slice(bytes)
                         .expect("Failed to load FloorPartConfig");
 
-                    draw_floors_w_h(
+                    draw_floors(
                         ui, texture_id, atlas_size, &side_part, zoom, tile_size, sub_rect,
                     );
-                    draw_walls_w_h(
+                    draw_walls(
                         ui, texture_id, atlas_size, &side_part, zoom, tile_size, sub_rect,
                     );
                 }
@@ -896,7 +861,7 @@ fn do_neighbour_draw<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPart
                             .expect("Failed to load FloorPartConfig")
                     })
                 {
-                    draw_floors_w_h(
+                    draw_floors(
                         ui,
                         texture_id,
                         atlas_size,
@@ -905,7 +870,7 @@ fn do_neighbour_draw<'a, TNeighbours: IntoIterator<Item = &'a ConfigId<FloorPart
                         tile_size,
                         sub_rect,
                     );
-                    draw_walls_w_h(
+                    draw_walls(
                         ui,
                         texture_id,
                         atlas_size,
@@ -1082,7 +1047,7 @@ pub fn visualize_floor_part_adjacency<
             east_rect.size() / east_sides as f32
         };
 
-        draw_floors_w_h(
+        draw_floors(
             ui,
             texture_id,
             atlas_size,
@@ -1091,7 +1056,7 @@ pub fn visualize_floor_part_adjacency<
             tile_size,
             central_rect,
         );
-        draw_walls_w_h(
+        draw_walls(
             ui,
             texture_id,
             atlas_size,
@@ -1178,7 +1143,7 @@ pub fn visualize_floor_part_adjacency<
     }
 }
 
-fn draw_floors_w_h(
+fn draw_floors(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
@@ -1514,7 +1479,115 @@ fn draw_floors_w_h(
     }
 }
 
-fn draw_walls_w_h(
+fn draw_extra(
+    ui: &mut Ui,
+    texture_id: TextureId,
+    atlas_size: [u16; 2],
+    data: &impl EditableFloorData,
+    zoom: f32,
+    tile_size: [f32; 2],
+    rect: Rect,
+) {
+    let point_on_rect = |x: usize, y: usize| {
+        pos2(
+            rect.left() + (x as f32 + 0.5) * tile_size[0] * zoom,
+            rect.top() + (y as f32 + 0.5) * tile_size[1] * zoom,
+        )
+    };
+
+    for j in 0..data.height() {
+        for i in 0..data.width() {
+            let extra_data = *data.get_cell_extra_data([i, j]);
+
+            let tile_size = [tile_size[0] as u16, tile_size[1] as u16];
+
+            let (portal, label) = match extra_data {
+                FloorCellExtra::None => (None, None),
+                FloorCellExtra::SpawnUnitHint(unit_danger) => {
+                    (
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def("Портал")),
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def(unit_danger.display_name()))
+                    )
+                }
+                FloorCellExtra::SpawnLootHint(item_rarity) => {
+                    (
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def("Портал")),
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def(item_rarity.display_name()))
+                    )
+                }
+                FloorCellExtra::SpawnUnit(unit_config_id) => {
+                    // todo: draw sprite for unit
+                    (None, None)
+                }
+                FloorCellExtra::SpawnLoot(_) => {
+                    // todo: draw sprite for item
+                    (None, None)
+                }
+                FloorCellExtra::LadderDownHint => {
+                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Лестница вниз")), None)
+                }
+                FloorCellExtra::LadderUpHint => {
+                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Лестница вверх")), None)
+                }
+                FloorCellExtra::PlayerStartHint => {
+                    (
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def("Портал")),
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def("Старт"))
+                    )
+                }
+                FloorCellExtra::TriggerEffect(_) => {
+                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Эффект")), None)
+                }
+            };
+
+            if let Some(portal) = portal {
+                let atlas_rect = AtlasSpriteRect::from_u16(
+                    atlas_size,
+                    [
+                        portal.coords[0] as u16 * tile_size[0],
+                        portal.coords[1] as u16 * tile_size[1],
+                    ],
+                    [
+                        portal.size[0] as u16 * tile_size[0],
+                        portal.size[1] as u16 * tile_size[1]
+                    ],
+                );
+
+                let pt = point_on_rect(i - 1, j - 1);
+                let image_rect = Rect::from_min_max(
+                    pt,
+                    [pt.x + atlas_rect.rect_px.width() * zoom, pt.y + atlas_rect.rect_px.height() * zoom].into(),
+                );
+
+                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+            }
+
+            if let Some(label) = label {
+                let atlas_rect = AtlasSpriteRect::from_u16(
+                    atlas_size,
+                    [
+                        label.coords[0] as u16 * tile_size[0],
+                        label.coords[1] as u16 * tile_size[1],
+                    ],
+                    [
+                        label.size[0] as u16 * tile_size[0],
+                        label.size[1] as u16 * tile_size[1]
+                    ],
+                );
+                // надпись рисуется со сдвигом на один тайл вверх
+                let pt = point_on_rect(i - 1, j - 2);
+                let image_rect = Rect::from_min_max(
+                    pt,
+                    [pt.x + atlas_rect.rect_px.width() * zoom, pt.y + atlas_rect.rect_px.height() * zoom].into(),
+                );
+                ui.painter().image(texture_id, image_rect, atlas_rect.uv_rect(), Color32::WHITE);
+            }
+        }
+    }
+}
+
+
+fn draw_walls(
     ui: &mut Ui,
     texture_id: TextureId,
     atlas_size: [u16; 2],
@@ -2361,4 +2434,134 @@ pub fn split_2_horizontal<R>(
     let size = vec2(ui.available_width().max(total_required_width), max_height);
     ui.advance_cursor_after_rect(Rect::from_min_size(top_left, size));
     Some(result)
+}
+
+pub fn unit_selector_popup(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    popup_id: Id,
+    response: &Response,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    mut foo: impl FnMut(ConfigId<UnitConfig>) -> ()
+) {
+    egui::popup_below_widget(
+        ui,
+        popup_id,
+        response,
+        PopupCloseBehavior::IgnoreClicks,
+        |ui| {
+            ui.set_min_width(300f32);
+            ui.label("Для отмены выбора нажмите ESC");
+            ui.vertical(|ui|{
+                for (uuid, _) in asset_db.list_all_assets(AssetKind::UnitConfig) {
+                    let config_id = ConfigId::from_uuid(uuid);
+                    ui.add_space(4f32);
+
+                    let response = unit_config_id_button(
+                        ui,
+                        asset_db,
+                        false,
+                        atlas_texture,
+                        atlas_size,
+                        config_id,
+                    );
+
+                    if response.clicked() {
+                        foo(config_id);
+                        ui.memory_mut(|mem| mem.close_popup());
+                    }
+                }
+            });
+        },
+    );
+}
+
+pub fn item_selector_popup(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    popup_id: Id,
+    response: &Response,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    mut foo: impl FnMut(ConfigId<ItemConfig>) -> ()
+) {
+    egui::popup_below_widget(
+        ui,
+        popup_id,
+        response,
+        PopupCloseBehavior::IgnoreClicks,
+        |ui| {
+            ui.set_min_width(300f32);
+            ui.label("Для отмены выбора нажмите ESC");
+            ui.vertical(|ui|{
+                for (uuid, _) in asset_db.list_all_assets(AssetKind::ItemConfig) {
+                    let config_id = ConfigId::from_uuid(uuid);
+                    ui.add_space(4f32);
+
+                    let response = item_config_id_button(
+                        ui,
+                        asset_db,
+                        false,
+                        atlas_texture,
+                        atlas_size,
+                        config_id,
+                    );
+
+                    if response.clicked() {
+                        foo(config_id);
+                        ui.memory_mut(|mem| mem.close_popup());
+                    }
+                }
+            });
+        },
+    );
+}
+
+pub fn fpa_selector_popup(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    popup_id: Id,
+    response: &Response,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    mut foo: impl FnMut(ConfigId<FloorPartAdjacencyConfig>) -> ()
+) {
+    egui::popup_below_widget(
+        ui,
+        popup_id,
+        response,
+        PopupCloseBehavior::IgnoreClicks,
+        |ui| {
+            ui.set_min_width(300f32);
+            ui.label("Для отмены выбора нажмите ESC");
+            ui.vertical(|ui|{
+                const NUM_COLUMNS: usize = 4;
+                let mut offset = 0;
+                ui.columns(NUM_COLUMNS, |uis| {
+                    for (uuid, _) in asset_db.list_all_assets(AssetKind::FloorPartAdjacencyConfig) {
+                        let ui = &mut uis[offset];
+                        offset = (offset + 1) % NUM_COLUMNS;
+                        let config_id = ConfigId::from_uuid(uuid);
+                        ui.add_space(4f32);
+
+                        let response = fpa_id_button(
+                            ui,
+                            asset_db,
+                            false,
+                            atlas_texture,
+                            atlas_size,
+                            60f32,
+                            config_id,
+                        );
+
+                        if response.clicked() {
+                            foo(config_id);
+                            ui.memory_mut(|mem| mem.close_popup());
+                        }
+                    }
+                });
+            });
+        },
+    );
 }

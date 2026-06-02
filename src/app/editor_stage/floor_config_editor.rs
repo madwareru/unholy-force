@@ -1,16 +1,16 @@
-use egui::{Align2, Button, CollapsingHeader, Id, PointerButton, PopupCloseBehavior, Response, ScrollArea, TextEdit, TextureId, Ui};
-use uuid::Uuid;
-use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::app::editor_stage::floor_part_editor::{FloorPartEditorTool, FloorPartToolsSubSection};
-use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, fpa_id_button, item_config_id_button, split_2_horizontal, unit_config_id_button, EditableFloorData};
+use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, fpa_id_button, fpa_selector_popup, item_config_id_button, item_selector_popup, split_2_horizontal, unit_config_id_button, unit_selector_popup, EditableFloorData};
+use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::app::game_stage::floor_generator::{generate, FloorGeneratorResult};
 use crate::assets::{AssetDb, AssetKind};
+use crate::game_config::floor_parts::{FloorCellExtra, FLOOR_CELL_EXTRA_MODES};
+use crate::game_config::floors::{AuthoredFloor, FloorConfig, FloorVariant, FloorVariantTag, GeneratedFloor, LootTableEntry, SpawnTableEntry};
+use crate::game_config::items::ItemRarity;
+use crate::game_config::units::UnitDanger;
 use crate::game_config::ConfigId;
-use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
-use crate::game_config::floors::{FloorConfig, FloorVariant, FloorVariantTag, LootTableEntry, SpawnTableEntry, AuthoredFloor, GeneratedFloor};
-use crate::game_config::items::ItemConfig;
-use crate::game_config::units::UnitConfig;
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
+use egui::{Align2, Button, CollapsingHeader, PointerButton, PopupCloseBehavior, ScrollArea, TextEdit, TextureId, Ui};
+use uuid::Uuid;
 
 #[derive(Default)]
 pub struct FloorConfigEditorSection {
@@ -489,6 +489,10 @@ impl EditorStage {
                                                 *authored_floor.get_wall_data_mut([x, y]) =
                                                     current_tool_section.wall_tile_group;
                                             }
+                                            FloorPartEditorTool::PlaceExtra => {
+                                                *authored_floor.get_cell_extra_data_mut([x, y]) =
+                                                    current_tool_section.extra;
+                                            }
                                         }
                                         update_state = UpdateState::Changed;
                                     }
@@ -583,6 +587,18 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_floor_editor_tools(&mut self, ui: &mut Ui) {
+        let asset_db = crate::assets::ASSET_DATABASE.lock()
+            .expect("Failed to lock asset database");
+
+        let texture_id: TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+
+        let atlas_size = self.atlas_size;
+
         match &self.floor_section.current_config {
             Some(cfg) if cfg.floor_variant.is_generated() => {
                 return;
@@ -609,6 +625,14 @@ impl EditorStage {
                     "Расстановка стен"
                 ).clicked() {
                     sub_section.current_tool = FloorPartEditorTool::PlaceWall;
+                }
+                if thick_selector_button(
+                    ui,
+                    sub_section.current_tool == FloorPartEditorTool::PlaceExtra,
+                    Align2::CENTER_CENTER,
+                    "Экстра данные"
+                ).clicked() {
+                    sub_section.current_tool = FloorPartEditorTool::PlaceExtra;
                 }
                 match sub_section.current_tool {
                     FloorPartEditorTool::PlaceFloor => {
@@ -649,138 +673,104 @@ impl EditorStage {
                             }
                         });
                     }
+                    FloorPartEditorTool::PlaceExtra => {
+                        const NUM_COLUMNS: usize = 3;
+                        ui.columns(NUM_COLUMNS, |uis| {
+                            let mut offset = 0;
+                            for (title, checker, constructor) in FLOOR_CELL_EXTRA_MODES {
+                                let ui = &mut uis[offset];
+                                if thick_selector_button(
+                                    ui,
+                                    checker(&sub_section.extra),
+                                    Align2::CENTER_CENTER,
+                                    title
+                                ).clicked() {
+                                    sub_section.extra = constructor();
+                                }
+                                offset = (offset + 1) % NUM_COLUMNS;
+                            }
+                        });
+                        match sub_section.extra {
+                            FloorCellExtra::SpawnUnitHint(ref mut unit_danger) => {
+                                egui::ComboBox::from_id_salt("danger")
+                                    .selected_text(unit_danger.display_name())
+                                    .show_ui(ui, |ui| {
+                                        for v in [
+                                            UnitDanger::Harmless,
+                                            UnitDanger::Weak,
+                                            UnitDanger::Moderate,
+                                            UnitDanger::Challenging,
+                                            UnitDanger::Horror,
+                                            UnitDanger::Nightmare
+                                        ] {
+                                            ui.selectable_value(
+                                                unit_danger,
+                                                v,
+                                                v.display_name()
+                                            );
+                                        }
+                                    });
+                            }
+                            FloorCellExtra::SpawnLootHint(ref mut item_rarity) => {
+                                egui::ComboBox::from_id_salt("rarity")
+                                    .selected_text(item_rarity.display_name())
+                                    .show_ui(ui, |ui| {
+                                        for v in [
+                                            ItemRarity::Generic,
+                                            ItemRarity::Rare,
+                                            ItemRarity::Unique,
+                                            ItemRarity::Legendary
+                                        ] {
+                                            ui.selectable_value(
+                                                item_rarity,
+                                                v,
+                                                v.display_name()
+                                            );
+                                        }
+                                    });
+                            }
+                            FloorCellExtra::SpawnUnit(ref mut unit_config_id) => {
+                                let popup_id = ui.make_persistent_id("Добавление записи для предмета");
+                                let response = unit_config_id_button(
+                                    ui,
+                                    &asset_db,
+                                    false,
+                                    texture_id,
+                                    atlas_size,
+                                    *unit_config_id
+                                );
+                                if response.clicked() {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
+                                unit_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
+                                    *unit_config_id = config_id;
+                                });
+                            }
+                            FloorCellExtra::SpawnLoot(ref mut item_config_id) => {
+                                let popup_id = ui.make_persistent_id("Добавление записи для предмета");
+                                let response = item_config_id_button(
+                                    ui,
+                                    &asset_db,
+                                    false,
+                                    texture_id,
+                                    atlas_size,
+                                    *item_config_id
+                                );
+                                if response.clicked() {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
+                                item_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
+                                    *item_config_id = config_id;
+                                });
+                            }
+                            FloorCellExtra::TriggerEffect(ref mut _trigger_config_id) => {
+                                // todo: выбор эффекта
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             });
         });
     }
-}
-
-fn unit_selector_popup(
-    ui: &mut Ui,
-    asset_db: &AssetDb,
-    popup_id: Id,
-    response: &Response,
-    atlas_texture: TextureId,
-    atlas_size: [u16; 2],
-    mut foo: impl FnMut(ConfigId<UnitConfig>) -> ()
-) {
-    egui::popup_below_widget(
-        ui,
-        popup_id,
-        response,
-        PopupCloseBehavior::IgnoreClicks,
-        |ui| {
-            ui.set_min_width(300f32);
-            ui.label("Для отмены выбора нажмите ESC");
-            ui.vertical(|ui|{
-                for (uuid, _) in asset_db.list_all_assets(AssetKind::UnitConfig) {
-                    let config_id = ConfigId::from_uuid(uuid);
-                    ui.add_space(4f32);
-
-                    let response = unit_config_id_button(
-                        ui,
-                        asset_db,
-                        false,
-                        atlas_texture,
-                        atlas_size,
-                        config_id,
-                    );
-
-                    if response.clicked() {
-                        foo(config_id);
-                        ui.memory_mut(|mem| mem.close_popup());
-                    }
-                }
-            });
-        },
-    );
-}
-
-fn item_selector_popup(
-    ui: &mut Ui,
-    asset_db: &AssetDb,
-    popup_id: Id,
-    response: &Response,
-    atlas_texture: TextureId,
-    atlas_size: [u16; 2],
-    mut foo: impl FnMut(ConfigId<ItemConfig>) -> ()
-) {
-    egui::popup_below_widget(
-        ui,
-        popup_id,
-        response,
-        PopupCloseBehavior::IgnoreClicks,
-        |ui| {
-            ui.set_min_width(300f32);
-            ui.label("Для отмены выбора нажмите ESC");
-            ui.vertical(|ui|{
-                for (uuid, _) in asset_db.list_all_assets(AssetKind::ItemConfig) {
-                    let config_id = ConfigId::from_uuid(uuid);
-                    ui.add_space(4f32);
-
-                    let response = item_config_id_button(
-                        ui,
-                        asset_db,
-                        false,
-                        atlas_texture,
-                        atlas_size,
-                        config_id,
-                    );
-
-                    if response.clicked() {
-                        foo(config_id);
-                        ui.memory_mut(|mem| mem.close_popup());
-                    }
-                }
-            });
-        },
-    );
-}
-
-fn fpa_selector_popup(
-    ui: &mut Ui,
-    asset_db: &AssetDb,
-    popup_id: Id,
-    response: &Response,
-    atlas_texture: TextureId,
-    atlas_size: [u16; 2],
-    mut foo: impl FnMut(ConfigId<FloorPartAdjacencyConfig>) -> ()
-) {
-    egui::popup_below_widget(
-        ui,
-        popup_id,
-        response,
-        PopupCloseBehavior::IgnoreClicks,
-        |ui| {
-            ui.set_min_width(300f32);
-            ui.label("Для отмены выбора нажмите ESC");
-            ui.vertical(|ui|{
-                const NUM_COLUMNS: usize = 4;
-                let mut offset = 0;
-                ui.columns(NUM_COLUMNS, |uis| {
-                    for (uuid, _) in asset_db.list_all_assets(AssetKind::FloorPartAdjacencyConfig) {
-                        let ui = &mut uis[offset];
-                        offset = (offset + 1) % NUM_COLUMNS;
-                        let config_id = ConfigId::from_uuid(uuid);
-                        ui.add_space(4f32);
-
-                        let response = fpa_id_button(
-                            ui,
-                            asset_db,
-                            false,
-                            atlas_texture,
-                            atlas_size,
-                            60f32,
-                            config_id,
-                        );
-
-                        if response.clicked() {
-                            foo(config_id);
-                            ui.memory_mut(|mem| mem.close_popup());
-                        }
-                    }
-                });
-            });
-        },
-    );
 }

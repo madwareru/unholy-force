@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
-use crate::app::editor_stage::image_widgets::{EditableFloorData, FloorDataHolderConst, FloorTilesHolderConst, WallTilesHolderConst};
+use crate::app::editor_stage::image_widgets::{EditableFloorData};
 use crate::game_config::{Config, ConfigId};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
+use crate::game_config::floor_parts::FloorCellExtra;
 use crate::game_config::items::ItemConfig;
 use crate::game_config::units::UnitConfig;
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
@@ -15,186 +16,81 @@ pub trait GeneratedFloorSize {
 pub struct AuthoredFloorSize15x15 {
     pub floor_data: Box<[[FloorGraphicsTileGroup; 15]; 15]>,
     pub wall_data: Box<[[WallGraphicsTileGroup; 15]; 15]>,
+    #[serde(default)]
+    pub extra_data: Box<[[FloorCellExtra; 15]; 15]>,
 }
-impl FloorTilesHolderConst<15, 15> for AuthoredFloorSize15x15 {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 15]; 15] {
-        self.floor_data.floor_data()
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 15]; 15] {
-        self.floor_data.floor_data_mut()
-    }
-}
-impl WallTilesHolderConst<15, 15> for AuthoredFloorSize15x15 {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 15]; 15] {
-        self.wall_data.wall_data()
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 15]; 15] {
-        self.wall_data.wall_data_mut()
-    }   
-}
-impl FloorDataHolderConst<15, 15> for AuthoredFloorSize15x15 {}
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 pub struct AuthoredFloorSize20x20 {
     pub floor_data: Box<[[FloorGraphicsTileGroup; 20]; 20]>,
     pub wall_data: Box<[[WallGraphicsTileGroup; 20]; 20]>,
+    #[serde(default)]
+    pub extra_data: Box<[[FloorCellExtra; 20]; 20]>,
 }
-impl FloorTilesHolderConst<20, 20> for AuthoredFloorSize20x20 {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 20]; 20] {
-        self.floor_data.floor_data()
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 20]; 20] {
-        self.floor_data.floor_data_mut()
-    }
-}
-impl WallTilesHolderConst<20, 20> for AuthoredFloorSize20x20 {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 20]; 20] {
-        self.wall_data.wall_data()
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 20]; 20] {
-        self.wall_data.wall_data_mut()
-    }
-}
-impl FloorDataHolderConst<20, 20> for AuthoredFloorSize20x20 {}
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 pub struct AuthoredFloorSize25x25 {
     pub floor_data: Box<[[FloorGraphicsTileGroup; 25]; 25]>,
     pub wall_data: Box<[[WallGraphicsTileGroup; 25]; 25]>,
+    #[serde(default)]
+    pub extra_data: Box<[[FloorCellExtra; 25]; 25]>,
 }
-impl FloorTilesHolderConst<25, 25> for AuthoredFloorSize25x25 {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 25]; 25] {
-        self.floor_data.floor_data()
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 25]; 25] {
-        self.floor_data.floor_data_mut()
-    }
-}
-impl WallTilesHolderConst<25, 25> for AuthoredFloorSize25x25 {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 25]; 25] {
-        self.wall_data.wall_data()
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 25]; 25] {
-        self.wall_data.wall_data_mut()
-    }
-}
-impl FloorDataHolderConst<25, 25> for AuthoredFloorSize25x25 {}
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 pub struct AuthoredFloorSize30x30 {
     pub floor_data: Box<[[FloorGraphicsTileGroup; 30]; 30]>,
     pub wall_data: Box<[[WallGraphicsTileGroup; 30]; 30]>,
+    #[serde(default)]
+    pub extra_data: Box<[[FloorCellExtra; 30]; 30]>,
 }
-impl FloorTilesHolderConst<30, 30> for AuthoredFloorSize30x30 {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 30]; 30] {
-        self.floor_data.floor_data()
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 30]; 30] {
-        self.floor_data.floor_data_mut()
-    }
-}
-impl WallTilesHolderConst<30, 30> for AuthoredFloorSize30x30 {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 30]; 30] {
-        self.wall_data.wall_data()
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 30]; 30] {
-        self.wall_data.wall_data_mut()
-    }
-}
-impl FloorDataHolderConst<30, 30> for AuthoredFloorSize30x30 {}
 
 #[derive(Clone, Debug)]
 pub struct FloorSize40x40 {
     pub floor_data: Box<[[FloorGraphicsTileGroup; 40]; 40]>,
     pub wall_data: Box<[[WallGraphicsTileGroup; 40]; 40]>,
+    pub extra_data: Box<[[FloorCellExtra; 40]; 40]>,
 }
 impl Default for FloorSize40x40 {
     fn default() -> Self {
         Self {
-            floor_data: Box::new([[FloorGraphicsTileGroup::default(); 40]; 40]),
-            wall_data: Box::new([[WallGraphicsTileGroup::default(); 40]; 40]),
+            floor_data: Box::new([[Default::default(); 40]; 40]),
+            wall_data: Box::new([[Default::default(); 40]; 40]),
+            extra_data: Box::new([[Default::default(); 40]; 40]),
         }
     }
 }
-impl FloorTilesHolderConst<40, 40> for FloorSize40x40 {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 40]; 40] {
-        self.floor_data.floor_data()
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 40]; 40] {
-        self.floor_data.floor_data_mut()
-    }
-}
-impl WallTilesHolderConst<40, 40> for FloorSize40x40 {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 40]; 40] {
-        self.wall_data.wall_data()
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 40]; 40] {
-        self.wall_data.wall_data_mut()
-    }
-}
-impl FloorDataHolderConst<40, 40> for FloorSize40x40 {}
 
 #[derive(Clone, Debug)]
 pub struct FloorSize60x60 {
     pub floor_data: Box<[[FloorGraphicsTileGroup; 60]; 60]>,
     pub wall_data: Box<[[WallGraphicsTileGroup; 60]; 60]>,
+    pub extra_data: Box<[[FloorCellExtra; 60]; 60]>,
 }
 impl Default for FloorSize60x60 {
     fn default() -> Self {
         Self {
-            floor_data: Box::new([[FloorGraphicsTileGroup::default(); 60]; 60]),
-            wall_data: Box::new([[WallGraphicsTileGroup::default(); 60]; 60]),
+            floor_data: Box::new([[Default::default(); 60]; 60]),
+            wall_data: Box::new([[Default::default(); 60]; 60]),
+            extra_data: Box::new([[Default::default(); 60]; 60]),
         }
     }
 }
-impl FloorTilesHolderConst<60, 60> for FloorSize60x60 {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 60]; 60] {
-        self.floor_data.floor_data()
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 60]; 60] {
-        self.floor_data.floor_data_mut()
-    }
-}
-impl WallTilesHolderConst<60, 60> for FloorSize60x60 {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 60]; 60] {
-        self.wall_data.wall_data()
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 60]; 60] {
-        self.wall_data.wall_data_mut()
-    }
-}
-impl FloorDataHolderConst<60, 60> for FloorSize60x60 {}
 
 #[derive(Clone, Debug)]
 pub struct FloorSize80x80 {
     pub floor_data: Box<[[FloorGraphicsTileGroup; 80]; 80]>,
     pub wall_data: Box<[[WallGraphicsTileGroup; 80]; 80]>,
+    pub extra_data: Box<[[FloorCellExtra; 80]; 80]>,
 }
 impl Default for FloorSize80x80 {
     fn default() -> Self {
         Self {
-            floor_data: Box::new([[FloorGraphicsTileGroup::default(); 80]; 80]),
-            wall_data: Box::new([[WallGraphicsTileGroup::default(); 80]; 80]),
+            floor_data: Box::new([[Default::default(); 80]; 80]),
+            wall_data: Box::new([[Default::default(); 80]; 80]),
+            extra_data: Box::new([[Default::default(); 80]; 80]),
         }
     }
 }
-impl FloorTilesHolderConst<80, 80> for FloorSize80x80 {
-    fn floor_data(&self) -> &[[FloorGraphicsTileGroup; 80]; 80] {
-        self.floor_data.floor_data()
-    }
-    fn floor_data_mut(&mut self) -> &mut [[FloorGraphicsTileGroup; 80]; 80] {
-        self.floor_data.floor_data_mut()
-    }
-}
-impl WallTilesHolderConst<80, 80> for FloorSize80x80 {
-    fn wall_data(&self) -> &[[WallGraphicsTileGroup; 80]; 80] {
-        self.wall_data.wall_data()
-    }
-    fn wall_data_mut(&mut self) -> &mut [[WallGraphicsTileGroup; 80]; 80] {
-        self.wall_data.wall_data_mut()
-    }
-}
-impl FloorDataHolderConst<80, 80> for FloorSize80x80 {}
 
 #[derive(Copy, Clone, Serialize, Deserialize, Default, Debug)]
 pub struct PartsSize<const W: usize, const H: usize>;
@@ -264,69 +160,55 @@ impl EditableFloorData for AuthoredFloor {
 
     fn get_floor_data(&self, [x, y]: [usize; 2]) -> &FloorGraphicsTileGroup {
         match self {
-            AuthoredFloor::Size15x15(data) => {
-                &data.floor_data()[y][x]
-            }
-            AuthoredFloor::Size20x20(data) => {
-                &data.floor_data()[y][x]
-            }
-            AuthoredFloor::Size25x25(data) => {
-                &data.floor_data()[y][x]
-            }
-            AuthoredFloor::Size30x30(data) => {
-                &data.floor_data()[y][x]
-            }
+            AuthoredFloor::Size15x15(data) => &data.floor_data[y][x],
+            AuthoredFloor::Size20x20(data) => &data.floor_data[y][x],
+            AuthoredFloor::Size25x25(data) => &data.floor_data[y][x],
+            AuthoredFloor::Size30x30(data) => &data.floor_data[y][x],
         }
     }
 
     fn get_floor_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut FloorGraphicsTileGroup {
         match self {
-            AuthoredFloor::Size15x15(data) => {
-                &mut data.floor_data_mut()[y][x]
-            }
-            AuthoredFloor::Size20x20(data) => {
-                &mut data.floor_data_mut()[y][x]
-            }
-            AuthoredFloor::Size25x25(data) => {
-                &mut data.floor_data_mut()[y][x]
-            }
-            AuthoredFloor::Size30x30(data) => {
-                &mut data.floor_data_mut()[y][x]
-            }
+            AuthoredFloor::Size15x15(data) => &mut data.floor_data[y][x],
+            AuthoredFloor::Size20x20(data) => &mut data.floor_data[y][x],
+            AuthoredFloor::Size25x25(data) => &mut data.floor_data[y][x],
+            AuthoredFloor::Size30x30(data) => &mut data.floor_data[y][x],
         }
     }
 
     fn get_wall_data(&self, [x, y]: [usize; 2]) -> &WallGraphicsTileGroup {
         match self {
-            AuthoredFloor::Size15x15(data) => {
-                &data.wall_data()[y][x]
-            }
-            AuthoredFloor::Size20x20(data) => {
-                &data.wall_data()[y][x]
-            }
-            AuthoredFloor::Size25x25(data) => {
-                &data.wall_data()[y][x]
-            }
-            AuthoredFloor::Size30x30(data) => {
-                &data.wall_data()[y][x]
-            }
+            AuthoredFloor::Size15x15(data) => &data.wall_data[y][x],
+            AuthoredFloor::Size20x20(data) => &data.wall_data[y][x],
+            AuthoredFloor::Size25x25(data) => &data.wall_data[y][x],
+            AuthoredFloor::Size30x30(data) => &data.wall_data[y][x],
         }
     }
 
     fn get_wall_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut WallGraphicsTileGroup {
         match self {
-            AuthoredFloor::Size15x15(data) => {
-                &mut data.wall_data_mut()[y][x]
-            }
-            AuthoredFloor::Size20x20(data) => {
-                &mut data.wall_data_mut()[y][x]
-            }
-            AuthoredFloor::Size25x25(data) => {
-                &mut data.wall_data_mut()[y][x]
-            }
-            AuthoredFloor::Size30x30(data) => {
-                &mut data.wall_data_mut()[y][x]
-            }
+            AuthoredFloor::Size15x15(data) => &mut data.wall_data[y][x],
+            AuthoredFloor::Size20x20(data) => &mut data.wall_data[y][x],
+            AuthoredFloor::Size25x25(data) => &mut data.wall_data[y][x],
+            AuthoredFloor::Size30x30(data) => &mut data.wall_data[y][x],
+        }
+    }
+
+    fn get_cell_extra_data(&self, [x, y]: [usize; 2]) -> &FloorCellExtra {
+        match self {
+            AuthoredFloor::Size15x15(data) => &data.extra_data[y][x],
+            AuthoredFloor::Size20x20(data) => &data.extra_data[y][x],
+            AuthoredFloor::Size25x25(data) => &data.extra_data[y][x],
+            AuthoredFloor::Size30x30(data) => &data.extra_data[y][x],
+        }
+    }
+
+    fn get_cell_extra_data_mut(&mut self, [x, y]: [usize; 2]) -> &mut FloorCellExtra {
+        match self {
+            AuthoredFloor::Size15x15(data) => &mut data.extra_data[y][x],
+            AuthoredFloor::Size20x20(data) => &mut data.extra_data[y][x],
+            AuthoredFloor::Size25x25(data) => &mut data.extra_data[y][x],
+            AuthoredFloor::Size30x30(data) => &mut data.extra_data[y][x],
         }
     }
 }

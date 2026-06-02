@@ -1,11 +1,13 @@
-use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, floor_part_id_button};
+use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, floor_part_id_button, item_config_id_button, item_selector_popup, unit_config_id_button, unit_selector_popup};
 use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
-use crate::game_config::floor_parts::FloorPartConfig;
+use crate::game_config::floor_parts::{FloorCellExtra, FloorPartConfig, FLOOR_CELL_EXTRA_MODES};
 use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
-use egui::{Align2, PointerButton, PopupCloseBehavior, TextEdit, Ui};
+use egui::{Align2, PointerButton, PopupCloseBehavior, TextEdit, TextureId, Ui};
 use uuid::Uuid;
 use crate::game_config::ConfigId;
+use crate::game_config::items::ItemRarity;
+use crate::game_config::units::UnitDanger;
 
 #[derive(Default)]
 pub struct FloorPartConfigEditorSection {
@@ -21,6 +23,7 @@ pub enum FloorPartEditorTool {
     #[default]
     PlaceFloor,
     PlaceWall,
+    PlaceExtra
 }
 
 #[derive(Copy, Clone, Default)]
@@ -28,6 +31,7 @@ pub struct FloorPartToolsSubSection {
     pub(crate) current_tool: FloorPartEditorTool,
     pub(crate) floor_tile_group: FloorGraphicsTileGroup,
     pub(crate) wall_tile_group: WallGraphicsTileGroup,
+    pub(crate) extra: FloorCellExtra,
 }
 
 impl EditorStage {
@@ -45,8 +49,8 @@ impl EditorStage {
                 match section.selected_floor_part_config_id {
                     Some(id) => {
                         asset_db.update_asset_mut(
-                            AssetKind::FloorPartConfig, 
-                            id, 
+                            AssetKind::FloorPartConfig,
+                            id,
                             |buffer| current_floor_part_config.write(buffer)
                         );
                         asset_db.rename_asset(AssetKind::FloorPartConfig, id, &name);
@@ -173,7 +177,7 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_floor_part_editor(&mut self, ui: &mut Ui) {
-        let texture_id: egui::TextureId;
+        let texture_id: TextureId;
         if let Some(handle) = &self.atlas_texture {
             texture_id = handle.id();
         } else {
@@ -216,6 +220,10 @@ impl EditorStage {
                                 current_floor_part_config.wall_data[y][x] =
                                     current_tool_section.wall_tile_group;
                             }
+                            FloorPartEditorTool::PlaceExtra => {
+                                current_floor_part_config.extra_data[y][x] =
+                                    current_tool_section.extra;
+                            }
                         }
                         update_state = UpdateState::Changed;
                     }
@@ -227,6 +235,18 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_floor_part_editor_tools(&mut self, ui: &mut Ui) {
+        let asset_db = crate::assets::ASSET_DATABASE.lock()
+            .expect("Failed to lock asset database");
+
+        let texture_id: TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+
+        let atlas_size = self.atlas_size;
+
         let sub_section = &mut self.floor_part_section.tools_sub_section;
         ui.vertical(|ui| {
             ui.add_space(6f32);
@@ -246,6 +266,14 @@ impl EditorStage {
                     "Расстановка стен"
                 ).clicked() {
                     sub_section.current_tool = FloorPartEditorTool::PlaceWall;
+                }
+                if thick_selector_button(
+                    ui,
+                    sub_section.current_tool == FloorPartEditorTool::PlaceExtra,
+                    Align2::CENTER_CENTER,
+                    "Экстра данные"
+                ).clicked() {
+                    sub_section.current_tool = FloorPartEditorTool::PlaceExtra;
                 }
                 match sub_section.current_tool {
                     FloorPartEditorTool::PlaceFloor => {
@@ -285,6 +313,102 @@ impl EditorStage {
                                 }
                             }
                         });
+                    }
+                    FloorPartEditorTool::PlaceExtra => {
+                        const NUM_COLUMNS: usize = 3;
+                        ui.columns(NUM_COLUMNS, |uis| {
+                            let mut offset = 0;
+                            for (title, checker, constructor) in FLOOR_CELL_EXTRA_MODES {
+                                let ui = &mut uis[offset];
+                                if thick_selector_button(
+                                    ui,
+                                    checker(&sub_section.extra),
+                                    Align2::CENTER_CENTER,
+                                    title
+                                ).clicked() {
+                                    sub_section.extra = constructor();
+                                }
+                                offset = (offset + 1) % NUM_COLUMNS;
+                            }
+                        });
+                        match sub_section.extra {
+                            FloorCellExtra::SpawnUnitHint(ref mut unit_danger) => {
+                                egui::ComboBox::from_id_salt("danger")
+                                    .selected_text(unit_danger.display_name())
+                                    .show_ui(ui, |ui| {
+                                        for v in [
+                                            UnitDanger::Harmless,
+                                            UnitDanger::Weak,
+                                            UnitDanger::Moderate,
+                                            UnitDanger::Challenging,
+                                            UnitDanger::Horror,
+                                            UnitDanger::Nightmare
+                                        ] {
+                                            ui.selectable_value(
+                                                unit_danger,
+                                                v,
+                                                v.display_name()
+                                            );
+                                        }
+                                    });
+                            }
+                            FloorCellExtra::SpawnLootHint(ref mut item_rarity) => {
+                                egui::ComboBox::from_id_salt("rarity")
+                                    .selected_text(item_rarity.display_name())
+                                    .show_ui(ui, |ui| {
+                                        for v in [
+                                            ItemRarity::Generic,
+                                            ItemRarity::Rare,
+                                            ItemRarity::Unique,
+                                            ItemRarity::Legendary
+                                        ] {
+                                            ui.selectable_value(
+                                                item_rarity,
+                                                v,
+                                                v.display_name()
+                                            );
+                                        }
+                                    });
+                            }
+                            FloorCellExtra::SpawnUnit(ref mut unit_config_id) => {
+                                let popup_id = ui.make_persistent_id("Добавление записи для предмета");
+                                let response = unit_config_id_button(
+                                    ui,
+                                    &asset_db,
+                                    false,
+                                    texture_id,
+                                    atlas_size,
+                                    *unit_config_id
+                                );
+                                if response.clicked() {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
+                                unit_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
+                                    *unit_config_id = config_id;
+                                });
+                            }
+                            FloorCellExtra::SpawnLoot(ref mut item_config_id) => {
+                                let popup_id = ui.make_persistent_id("Добавление записи для предмета");
+                                let response = item_config_id_button(
+                                    ui,
+                                    &asset_db,
+                                    false,
+                                    texture_id,
+                                    atlas_size,
+                                    *item_config_id
+                                );
+                                if response.clicked() {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
+                                item_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
+                                    *item_config_id = config_id;
+                                });
+                            }
+                            FloorCellExtra::TriggerEffect(ref mut _trigger_config_id) => {
+                                // todo: выбор эффекта
+                            }
+                            _ => {}
+                        }
                     }
                 }
             });
