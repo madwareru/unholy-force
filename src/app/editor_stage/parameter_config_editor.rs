@@ -86,9 +86,11 @@ impl EditorStage {
             ) == UpdateState::Changed {
                 match section.selected_parameter_config_id {
                     Some(id) => {
-                        let config_text = json5::to_string(current_parameter_config)
-                            .expect("Failed to serialize parameter config");
-                        asset_db.update_json5_asset(AssetKind::ParameterConfig, id, &config_text);
+                        asset_db.update_asset_mut(
+                            AssetKind::ParameterConfig,
+                            id,
+                            |buffer| json5::to_writer(buffer, &current_parameter_config)
+                        );
                         asset_db.rename_asset(AssetKind::ParameterConfig, id, &name);
                     }
                     _ => {}

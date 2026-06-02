@@ -67,6 +67,7 @@ impl AssetDb {
         let mut parameter_assets = HashMap::new();
         let mut tag_assets = HashMap::new();
         let mut effect_mechanic_assets = HashMap::new();
+        let mut game_config_assets = HashMap::new();
 
         for (kind, map, ext) in [
             (AssetKind::UnitConfig, &mut unit_assets, ".json5"),
@@ -77,6 +78,8 @@ impl AssetDb {
             (AssetKind::FloorFlowGraphConfig, &mut floor_flow_graph_assets, ".json5"),
             (AssetKind::ParameterConfig, &mut parameter_assets, ".json5"),
             (AssetKind::TagConfig, &mut tag_assets, ".json5"),
+            (AssetKind::EffectMechanicConfig, &mut effect_mechanic_assets, ".json5"),
+            (AssetKind::GameGonfig, &mut game_config_assets, ".json5")
         ] {
             let asset_dir = get_or_create_asset_dir(kind);
             if let Ok(dir) = std::fs::read_dir(asset_dir) {
@@ -119,6 +122,7 @@ impl AssetDb {
         assets.insert(AssetKind::ParameterConfig, parameter_assets);
         assets.insert(AssetKind::TagConfig, tag_assets);
         assets.insert(AssetKind::EffectMechanicConfig, effect_mechanic_assets);
+        assets.insert(AssetKind::GameGonfig, game_config_assets);
 
         Self {
             assets,
@@ -164,19 +168,16 @@ impl AssetDb {
         &self.assets[&kind][&uuid].1
     }
 
-    pub fn update_asset(&mut self, kind: AssetKind, uuid: Uuid, data: &[u8]) {
+    pub fn update_asset_mut<T, E : std::fmt::Debug>(
+        &mut self,
+        kind: AssetKind,
+        uuid: Uuid,
+        update_fn: impl FnOnce(&mut Vec<u8>) -> Result<T, E>
+    ) {
         if let Some(assets) = self.assets.get_mut(&kind) {
             if let Some(asset) = assets.get_mut(&uuid) {
-                asset.1 = data.to_vec();
-                self.changed_assets.insert((kind, uuid));
-            }
-        }
-    }
-
-    pub fn update_json5_asset(&mut self, kind: AssetKind, uuid: Uuid, text: &str) {
-        if let Some(assets) = self.assets.get_mut(&kind) {
-            if let Some(asset) = assets.get_mut(&uuid) {
-                asset.1 = text.as_bytes().to_vec();
+                asset.1.clear();
+                update_fn(&mut asset.1).unwrap();
                 self.changed_assets.insert((kind, uuid));
             }
         }
@@ -185,10 +186,11 @@ impl AssetDb {
     pub fn rename_asset(&mut self, kind: AssetKind, uuid: Uuid, name: &str) {
         if let Some(assets) = self.assets.get_mut(&kind) {
             if let Some(asset) = assets.get_mut(&uuid) {
-                asset.0 = String::from(name);
+                asset.0.clear();
+                asset.0 += name;
+                self.changed_assets.insert((kind, uuid));
             }
         }
-
     }
 
     pub fn delete_asset(&mut self, kind: AssetKind, uuid: Uuid) {

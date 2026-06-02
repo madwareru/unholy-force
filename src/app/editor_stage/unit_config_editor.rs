@@ -28,9 +28,11 @@ impl EditorStage {
             if foo(name, current_unit_config) == UpdateState::Changed {
                 match section.selected_unit_config_id {
                     Some(id) => {
-                        let config_text = json5::to_string(current_unit_config)
-                            .expect("Failed to serialize unit config");
-                        asset_db.update_json5_asset(AssetKind::UnitConfig, id, &config_text);
+                        asset_db.update_asset_mut(
+                            AssetKind::UnitConfig,
+                            id,
+                            |buffer| json5::to_writer(buffer, &current_unit_config)
+                        );
                         asset_db.rename_asset(AssetKind::UnitConfig, id, &name);
                     }
                     _ => {}

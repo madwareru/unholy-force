@@ -44,10 +44,11 @@ impl EditorStage {
             if foo(name, current_floor_part_config) == UpdateState::Changed {
                 match section.selected_floor_part_config_id {
                     Some(id) => {
-                        let mut buffer: Vec<u8> = Vec::new();
-                        current_floor_part_config.write(&mut buffer)
-                            .expect("Failed to serialize floor part config");
-                        asset_db.update_asset(AssetKind::FloorPartConfig, id, &buffer);
+                        asset_db.update_asset_mut(
+                            AssetKind::FloorPartConfig, 
+                            id, 
+                            |buffer| current_floor_part_config.write(buffer)
+                        );
                         asset_db.rename_asset(AssetKind::FloorPartConfig, id, &name);
                     }
                     _ => {}

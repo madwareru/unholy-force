@@ -214,12 +214,10 @@ impl EditorStage {
             if hash_before != hash_after {
                 if let Some(id) = section_id {
                     if let Ok(mut asset_db) = crate::assets::ASSET_DATABASE.lock() {
-                        let config_text = json5::to_string(config)
-                            .expect("Failed to serialize floor flow graph config");
-                        asset_db.update_json5_asset(
+                        asset_db.update_asset_mut(
                             AssetKind::FloorFlowGraphConfig,
                             id,
-                            &config_text
+                            |buffer| json5::to_writer(buffer, config)
                         );
                     }
                 }

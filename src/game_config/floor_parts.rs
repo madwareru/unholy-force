@@ -99,7 +99,6 @@ impl FloorDataHolderConst<5, 5> for FloorPartConfig {}
 
 
 impl FloorPartConfig {
-    const MAX_PAYLOAD_COUNT: u8 = 4;
 
     pub fn write(&self, writer: &mut impl Write) -> Result<()> {
         let mut payload_count = 0;
@@ -113,10 +112,6 @@ impl FloorPartConfig {
 
         if self.payload_count != payload_count {
             return Err(Error::new(ErrorKind::InvalidInput, "Payload count mismatch"));
-        }
-
-        if payload_count > Self::MAX_PAYLOAD_COUNT {
-            return Err(Error::new(ErrorKind::InvalidInput, "Payload count exceeds maximum"));
         }
 
         writer.write(&[self.payload_count])?;
@@ -168,11 +163,9 @@ impl FloorPartConfig {
         let size_expected = if data[0] == 0 {
             payload_count = 0;
             30
-        } else if data[0] <= Self::MAX_PAYLOAD_COUNT {
+        } else {
             payload_count = data[0];
             30 + (payload_count as usize) * 16
-        } else {
-            return Err(Error::new(ErrorKind::InvalidInput, "Invalid payload count"));
         };
 
         if size_expected < data.len() {

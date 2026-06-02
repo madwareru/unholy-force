@@ -35,9 +35,11 @@ impl EditorStage {
             if foo(asset_db, ConfigId::from_uuid(uuid), name, current_tag_config) == UpdateState::Changed {
                 match section.selected_tag_config_id {
                     Some(id) => {
-                        let config_text = json5::to_string(current_tag_config)
-                            .expect("Failed to serialize tag config");
-                        asset_db.update_json5_asset(AssetKind::TagConfig, id, &config_text);
+                        asset_db.update_asset_mut(
+                            AssetKind::TagConfig,
+                            id,
+                            |buffer| json5::to_writer(buffer, &current_tag_config)
+                        );
                         asset_db.rename_asset(AssetKind::TagConfig, id, &name);
                     }
                     _ => {}

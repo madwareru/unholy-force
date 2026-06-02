@@ -36,9 +36,11 @@ impl EditorStage {
             if foo(asset_db, name, current_config) == UpdateState::Changed {
                 match section.selected_config_id {
                     Some(id) => {
-                        let config_text = json5::to_string(&current_config)
-                            .expect("Failed to serialize floor config");
-                        asset_db.update_json5_asset(AssetKind::FloorConfig, id, &config_text);
+                        asset_db.update_asset_mut(
+                            AssetKind::FloorConfig,
+                            id,
+                            |buffer| json5::to_writer(buffer, current_config)
+                        );
                         asset_db.rename_asset(AssetKind::FloorConfig, id, &name);
                     }
                     _ => {}
