@@ -241,7 +241,7 @@ impl EditorStage {
                                         ui.columns(COLUMNS_COUNT, |uis| {
                                             let mut current_column = 0;
 
-                                            for sprite in crate::graphics::SPRITE_ATLAS_DEF.sprites.keys() {
+                                            for sprite in crate::graphics::SPRITE_ATLAS_DEF.sprite_keys() {
                                                 let sprite_name = sprite.as_str();
 
                                                 let ui = &mut uis[current_column];
@@ -267,63 +267,60 @@ impl EditorStage {
                                     },
                                 );
                             });
-                            let entry = SPRITE_ATLAS_DEF
-                                .sprites
-                                .get(&current_unit_config.sprite_name);
-                            match entry {
-                                None => {}
-                                Some(sprite_data) => {
-                                    let w = ui.available_width();
-                                    let zoom = if sprite_data.size[0] == 0 {
-                                        1f32
-                                    } else {
-                                        w / (sprite_data.size[0] as f32 * 16f32)
-                                    };
-                                    let old_pivot = current_unit_config.sprite_pivot;
-                                    sprite_pivot_editor(
-                                        ui,
-                                        texture_id,
-                                        atlas_size,
-                                        current_unit_config,
-                                        zoom,
-                                    );
-                                    if !old_pivot.eq(&current_unit_config.sprite_pivot) {
-                                        update_state = UpdateState::Changed;
-                                    }
 
-                                    ui.horizontal(|ui| {
-                                        ui.label("Опорная точка:");
+                            let sprite_data = SPRITE_ATLAS_DEF.get_sprite_def(
+                                &current_unit_config.sprite_name
+                            );
 
-                                        let available_width = ui.available_width();
-                                        let slider_width = available_width / 2f32;
-
-                                        if ui
-                                            .add_sized(
-                                                [slider_width, ui.spacing().interact_size.y],
-                                                egui::Slider::new(
-                                                    &mut current_unit_config.sprite_pivot[0],
-                                                    0..=sprite_data.size[0] * 16 - 1,
-                                                )
-                                            )
-                                            .changed()
-                                        {
-                                            update_state = UpdateState::Changed;
-                                        }
-                                        if ui
-                                            .add_sized(
-                                                [slider_width, ui.spacing().interact_size.y],
-                                                egui::Slider::new(
-                                                    &mut current_unit_config.sprite_pivot[1],
-                                                    0..=sprite_data.size[1] * 16 - 1,
-                                                )
-                                            )
-                                            .changed()
-                                        {
-                                            update_state = UpdateState::Changed;
-                                        }
-                                    });
-                                }
+                            let w = ui.available_width();
+                            let zoom = if sprite_data.size[0] == 0 {
+                                1f32
+                            } else {
+                                w / (sprite_data.size[0] as f32 * 16f32)
+                            };
+                            let old_pivot = current_unit_config.sprite_pivot;
+                            sprite_pivot_editor(
+                                ui,
+                                texture_id,
+                                atlas_size,
+                                current_unit_config,
+                                zoom,
+                            );
+                            if !old_pivot.eq(&current_unit_config.sprite_pivot) {
+                                update_state = UpdateState::Changed;
                             }
+
+                            ui.horizontal(|ui| {
+                                ui.label("Опорная точка:");
+
+                                let available_width = ui.available_width();
+                                let slider_width = available_width / 2f32;
+
+                                if ui
+                                    .add_sized(
+                                        [slider_width, ui.spacing().interact_size.y],
+                                        egui::Slider::new(
+                                            &mut current_unit_config.sprite_pivot[0],
+                                            0..=sprite_data.size[0] * 16 - 1,
+                                        )
+                                    )
+                                    .changed()
+                                {
+                                    update_state = UpdateState::Changed;
+                                }
+                                if ui
+                                    .add_sized(
+                                        [slider_width, ui.spacing().interact_size.y],
+                                        egui::Slider::new(
+                                            &mut current_unit_config.sprite_pivot[1],
+                                            0..=sprite_data.size[1] * 16 - 1,
+                                        )
+                                    )
+                                    .changed()
+                                {
+                                    update_state = UpdateState::Changed;
+                                }
+                            });
 
                             ui.horizontal(|ui| {
                                 ui.label("Опасность:");

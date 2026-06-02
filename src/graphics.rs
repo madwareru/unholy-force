@@ -1,3 +1,4 @@
+use std::collections::hash_map::Keys;
 use lazy_static::lazy_static;
 use macroquad::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -174,5 +175,29 @@ pub struct SpriteGraphicsAtlasDef {
     pub floor_tile_groups: HashMap<FloorGraphicsTileGroup, TileGroupGraphicsDef>,
     pub wall_tile_groups: HashMap<WallGraphicsTileGroup, TileGroupGraphicsDef>,
     pub visibility_tile_groups: HashMap<VisibilityGraphicsTileGroup, TileGroupGraphicsDef>,
-    pub sprites: HashMap<String, SpriteGraphicsDef>,
+    sprites: HashMap<String, SpriteGraphicsDef>,
+}
+
+const UNKNOWN_SPRITE: SpriteGraphicsDef = SpriteGraphicsDef {
+    coords: [62, 62],
+    size: [2, 2],
+};
+
+const EMPTY_SPRITE: SpriteGraphicsDef = SpriteGraphicsDef {
+    coords: [63, 61],
+    size: [1, 1],
+};
+
+impl SpriteGraphicsAtlasDef {
+    pub fn sprite_keys(&self) -> Keys<'_, String, SpriteGraphicsDef> {
+        self.sprites.keys()
+    }
+
+    pub fn get_sprite_def(&self, sprite_name: &str) -> SpriteGraphicsDef {
+        if !sprite_name.is_empty() {
+            self.sprites.get(sprite_name).copied().unwrap_or(UNKNOWN_SPRITE)
+        } else {
+            EMPTY_SPRITE
+        }
+    }
 }

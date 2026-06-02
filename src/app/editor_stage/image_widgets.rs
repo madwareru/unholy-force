@@ -81,7 +81,7 @@ pub fn atlas_sprite_button(
     sprite_name: &str,
     size: f32,
 ) -> Response {
-    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[sprite_name];
+    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.get_sprite_def(sprite_name);
     let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
 
     let atlas_rect = AtlasSpriteRect::from_u16(
@@ -170,7 +170,7 @@ pub fn sprite_pivot_editor<Holder: SpriteHolder>(
     sprite_holder: &mut Holder,
     zoom: f32,
 ) -> Response {
-    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[sprite_holder.sprite_name()];
+    let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.get_sprite_def(sprite_holder.sprite_name());
     let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
 
     let sprite = AtlasSpriteRect::from_u16(
@@ -269,7 +269,9 @@ pub fn sprite_holder_visualizer<Holder: SpriteHolder>(
         );
 
         let central_point = rect.center();
-        let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.sprites[sprite_holder.sprite_name()];
+        let sprite_data = crate::graphics::SPRITE_ATLAS_DEF.get_sprite_def(
+            sprite_holder.sprite_name()
+        );
         let sprite_size = [
             sprite_data.size[0] as u16 * tile_size[0] as u16,
             sprite_data.size[1] as u16 * tile_size[1] as u16,
@@ -2103,97 +2105,67 @@ pub fn item_selector_button(
             .rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
         let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
 
-        let sprite_rect =
-            SPRITE_ATLAS_DEF
-                .sprites
-                .get(&item_config.sprite_name)
-                .map(|sprite_data| {
-                    AtlasSpriteRect::from_u16(
-                        atlas_size,
-                        [
-                            sprite_data.coords[0] as u16 * tile_size[0] as u16,
-                            sprite_data.coords[1] as u16 * tile_size[1] as u16,
-                        ],
-                        [
-                            sprite_data.size[0] as u16 * tile_size[0] as u16,
-                            sprite_data.size[1] as u16 * tile_size[1] as u16,
-                        ],
-                    )
-                });
+        let sprite_data = SPRITE_ATLAS_DEF.get_sprite_def(&item_config.sprite_name);
+
+        let sprite_rect =AtlasSpriteRect::from_u16(
+            atlas_size,
+            [
+                sprite_data.coords[0] as u16 * tile_size[0] as u16,
+                sprite_data.coords[1] as u16 * tile_size[1] as u16,
+            ],
+            [
+                sprite_data.size[0] as u16 * tile_size[0] as u16,
+                sprite_data.size[1] as u16 * tile_size[1] as u16,
+            ],
+        );
 
         let y_step = (rect.max.y - rect.min.y) / 3f32;
         let editor_name_y = rect.min.y + y_step / 2f32;
         let name_y = editor_name_y + y_step;
         let rarity_y = name_y + y_step;
 
-        if let Some(sprite_rect) = sprite_rect {
-            let top = rect.min.y + 4f32;
-            let bottom = rect.max.y - 4f32;
+        let top = rect.min.y + 4f32;
+        let bottom = rect.max.y - 4f32;
 
-            let h = bottom - top;
-            let zoom = h / sprite_rect.size_px().y;
-            let w = sprite_rect.size_px().x * zoom;
+        let h = bottom - top;
+        let zoom = h / sprite_rect.size_px().y;
+        let w = sprite_rect.size_px().x * zoom;
 
-            let sp_rect = Rect::from_min_max(
-                [rect.min.x + 4f32, rect.min.y + 4f32].into(),
-                [rect.min.x + 4f32 + w, rect.min.y + 4f32 + h].into(),
-            );
+        let sp_rect = Rect::from_min_max(
+            [rect.min.x + 4f32, rect.min.y + 4f32].into(),
+            [rect.min.x + 4f32 + w, rect.min.y + 4f32 + h].into(),
+        );
 
-            ui.painter().image(
-                atlas_texture,
-                sp_rect,
-                sprite_rect.uv_rect(),
-                Color32::WHITE,
-            );
+        ui.painter().image(
+            atlas_texture,
+            sp_rect,
+            sprite_rect.uv_rect(),
+            Color32::WHITE,
+        );
 
-            ui.painter().text(
-                pos2(rect.min.x + w + 8f32, editor_name_y),
-                Align2::LEFT_CENTER,
-                editor_name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, editor_name_y),
+            Align2::LEFT_CENTER,
+            editor_name,
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
 
-            ui.painter().text(
-                pos2(rect.min.x + w + 8f32, name_y),
-                Align2::LEFT_CENTER,
-                &item_config.name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, name_y),
+            Align2::LEFT_CENTER,
+            &item_config.name,
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
 
-            ui.painter().text(
-                pos2(rect.min.x + w + 8f32, rarity_y),
-                Align2::LEFT_CENTER,
-                item_config.item_rarity.display_name(),
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-        } else {
-            ui.painter().text(
-                pos2(rect.min.x + 8f32, editor_name_y),
-                Align2::LEFT_CENTER,
-                editor_name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                pos2(rect.min.x + 8f32, name_y),
-                Align2::LEFT_CENTER,
-                &item_config.name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                pos2(rect.min.x + 8f32, rarity_y),
-                Align2::LEFT_CENTER,
-                item_config.item_rarity.display_name(),
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-        }
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, rarity_y),
+            Align2::LEFT_CENTER,
+            item_config.item_rarity.display_name(),
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
     }
 
     response
@@ -2265,97 +2237,67 @@ pub fn unit_selector_button(
             .rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
         let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
 
-        let sprite_rect =
-            SPRITE_ATLAS_DEF
-                .sprites
-                .get(&unit_config.sprite_name)
-                .map(|sprite_data| {
-                    AtlasSpriteRect::from_u16(
-                        atlas_size,
-                        [
-                            sprite_data.coords[0] as u16 * tile_size[0] as u16,
-                            sprite_data.coords[1] as u16 * tile_size[1] as u16,
-                        ],
-                        [
-                            sprite_data.size[0] as u16 * tile_size[0] as u16,
-                            sprite_data.size[1] as u16 * tile_size[1] as u16,
-                        ],
-                    )
-                });
+        let sprite_data = SPRITE_ATLAS_DEF.get_sprite_def(&unit_config.sprite_name);
+
+        let sprite_rect =AtlasSpriteRect::from_u16(
+            atlas_size,
+            [
+                sprite_data.coords[0] as u16 * tile_size[0] as u16,
+                sprite_data.coords[1] as u16 * tile_size[1] as u16,
+            ],
+            [
+                sprite_data.size[0] as u16 * tile_size[0] as u16,
+                sprite_data.size[1] as u16 * tile_size[1] as u16,
+            ],
+        );
 
         let y_step = (rect.max.y - rect.min.y) / 3f32;
         let editor_name_y = rect.min.y + y_step / 2f32;
         let name_y = editor_name_y + y_step;
         let rarity_y = name_y + y_step;
 
-        if let Some(sprite_rect) = sprite_rect {
-            let top = rect.min.y + 4f32;
-            let bottom = rect.max.y - 4f32;
+        let top = rect.min.y + 4f32;
+        let bottom = rect.max.y - 4f32;
 
-            let h = bottom - top;
-            let zoom = h / sprite_rect.size_px().y;
-            let w = sprite_rect.size_px().x * zoom;
+        let h = bottom - top;
+        let zoom = h / sprite_rect.size_px().y;
+        let w = sprite_rect.size_px().x * zoom;
 
-            let sp_rect = Rect::from_min_max(
-                [rect.min.x + 4f32, rect.min.y + 4f32].into(),
-                [rect.min.x + 4f32 + w, rect.min.y + 4f32 + h].into(),
-            );
+        let sp_rect = Rect::from_min_max(
+            [rect.min.x + 4f32, rect.min.y + 4f32].into(),
+            [rect.min.x + 4f32 + w, rect.min.y + 4f32 + h].into(),
+        );
 
-            ui.painter().image(
-                atlas_texture,
-                sp_rect,
-                sprite_rect.uv_rect(),
-                Color32::WHITE,
-            );
+        ui.painter().image(
+            atlas_texture,
+            sp_rect,
+            sprite_rect.uv_rect(),
+            Color32::WHITE,
+        );
 
-            ui.painter().text(
-                pos2(rect.min.x + w + 8f32, editor_name_y),
-                Align2::LEFT_CENTER,
-                editor_name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, editor_name_y),
+            Align2::LEFT_CENTER,
+            editor_name,
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
 
-            ui.painter().text(
-                pos2(rect.min.x + w + 8f32, name_y),
-                Align2::LEFT_CENTER,
-                &unit_config.name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, name_y),
+            Align2::LEFT_CENTER,
+            &unit_config.name,
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
 
-            ui.painter().text(
-                pos2(rect.min.x + w + 8f32, rarity_y),
-                Align2::LEFT_CENTER,
-                unit_config.danger.display_name(),
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-        } else {
-            ui.painter().text(
-                pos2(rect.min.x + 8f32, editor_name_y),
-                Align2::LEFT_CENTER,
-                editor_name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                pos2(rect.min.x + 8f32, name_y),
-                Align2::LEFT_CENTER,
-                &unit_config.name,
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-
-            ui.painter().text(
-                pos2(rect.min.x + 8f32, rarity_y),
-                Align2::LEFT_CENTER,
-                unit_config.danger.display_name(),
-                TextStyle::Button.resolve(ui.style()),
-                text_color,
-            );
-        }
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, rarity_y),
+            Align2::LEFT_CENTER,
+            unit_config.danger.display_name(),
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
     }
 
     response
