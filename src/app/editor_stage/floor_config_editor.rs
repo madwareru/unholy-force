@@ -1,15 +1,53 @@
-use crate::app::editor_stage::floor_part_editor::{FloorPartEditorTool, FloorPartToolsSubSection};
-use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, fpa_id_button, fpa_selector_popup, item_config_id_button, item_selector_popup, split_2_horizontal, unit_config_id_button, unit_selector_popup, EditableFloorData};
-use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
-use crate::app::game_stage::floor_generator::{generate, FloorGeneratorResult};
-use crate::assets::{AssetDb, AssetKind};
-use crate::game_config::floor_parts::{FloorCellExtra, FLOOR_CELL_EXTRA_MODES};
-use crate::game_config::floors::{AuthoredFloor, FloorConfig, FloorVariant, FloorVariantTag, GeneratedFloor, LootTableEntry, SpawnTableEntry};
-use crate::game_config::items::ItemRarity;
-use crate::game_config::units::UnitDanger;
-use crate::game_config::ConfigId;
-use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
-use egui::{Align2, Button, CollapsingHeader, PointerButton, PopupCloseBehavior, ScrollArea, TextEdit, TextureId, Ui};
+use crate::{
+    app::{
+        editor_stage::{
+            floor_part_editor::{FloorPartEditorTool, FloorPartToolsSubSection},
+            image_widgets::{
+                floor_data_holder_editor, 
+                fpa_id_button, 
+                fpa_selector_popup, 
+                item_config_id_button, 
+                item_selector_popup, 
+                split_2_horizontal, 
+                unit_config_id_button, 
+                unit_selector_popup, 
+                EditableFloorData
+            },
+            thick_selector_button,
+            EditorStage,
+            UpdateState
+        },
+        game_stage::floor_generator::{generate_from_id, FloorGeneratorResult}
+    },
+    assets::{AssetDb, AssetKind},
+    game_config::{
+        floor_parts::{FloorCellExtra, FLOOR_CELL_EXTRA_MODES},
+        floors::{
+            AuthoredFloor, 
+            FloorConfig, 
+            FloorVariant, 
+            FloorVariantTag, 
+            GeneratedFloor, 
+            LootTableEntry, 
+            SpawnTableEntry
+        },
+        items::ItemRarity,
+        units::UnitDanger,
+        ConfigId
+    },
+    graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup}
+};
+use egui::{
+    Align2, 
+    Button, 
+    CollapsingHeader, 
+    PointerButton, 
+    PopupCloseBehavior, 
+    ScrollArea, 
+    TextEdit, 
+    TextureId, 
+    Ui
+};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -475,6 +513,7 @@ impl EditorStage {
                                 .show(ui, |ui| {
                                     if let Some([x, y]) = floor_data_holder_editor(
                                         ui,
+                                        asset_db,
                                         texture_id,
                                         atlas_size,
                                         authored_floor,
@@ -561,7 +600,7 @@ impl EditorStage {
             update_state
         });
         if generate_requested {
-            self.floor_section.generated_floor = generate(
+            self.floor_section.generated_floor = generate_from_id(
                 &asset_db,
                 ConfigId::from_uuid(floor_config_id)
             );
@@ -576,6 +615,7 @@ impl EditorStage {
                 .show(ui, |ui| {
                     floor_data_holder_editor(
                         ui,
+                        &asset_db,
                         texture_id,
                         atlas_size,
                         generated_result,

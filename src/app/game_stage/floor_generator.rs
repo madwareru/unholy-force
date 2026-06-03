@@ -130,7 +130,7 @@ impl EditableFloorData for FloorGeneratorResult {
     }
 }
 
-pub fn generate(
+pub fn generate_from_id(
     asset_db: &AssetDb,
     floor_config: ConfigId<FloorConfig>,
 ) -> Option<FloorGeneratorResult> {
@@ -415,6 +415,8 @@ pub fn generate(
                             part_config.floor_data[jj][ii];
                         *result_floor.get_wall_data_mut([i_start + ii, j_start + jj]) =
                             part_config.wall_data[jj][ii];
+                        *result_floor.get_cell_extra_data_mut([i_start + ii, j_start + jj]) =
+                            part_config.extra_data[jj][ii];
                     }
                 }
             }

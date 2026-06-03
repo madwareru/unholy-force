@@ -115,7 +115,6 @@ pub struct FloorPartConfig {
     pub floor_data: [[FloorGraphicsTileGroup; 5]; 5],
     pub wall_data: [[WallGraphicsTileGroup; 5]; 5],
     pub extra_data: [[FloorCellExtra; 5]; 5],
-    pub payload_count: u8,
 }
 
 impl EditableFloorData for FloorPartConfig {
@@ -161,13 +160,9 @@ impl FloorPartConfig {
             }
         }
 
-        if self.payload_count != payload_count {
-            return Err(Error::new(ErrorKind::InvalidInput, "Payload count mismatch"));
-        }
+        writer.write(&[payload_count as u8])?;
 
-        writer.write(&[self.payload_count])?;
-
-        if self.payload_count > 0 {
+        if payload_count > 0 {
             for j in 0..5 {
                 for i in 0..5 {
                     match self.extra_data[j][i].get_payload() {
@@ -304,7 +299,6 @@ impl FloorPartConfig {
             floor_data,
             wall_data,
             extra_data,
-            payload_count,
         })
     }
 }
@@ -339,7 +333,6 @@ mod tests {
         }
 
         let mut config = FloorPartConfig::default();
-        config.payload_count = 3;
         config.floor_data[3][3] = FloorGraphicsTileGroup::Lava;
         config.floor_data[2][2] = FloorGraphicsTileGroup::Water;
         config.floor_data[1][1] = FloorGraphicsTileGroup::Tile;
@@ -362,7 +355,6 @@ mod tests {
 
         let buffer_slice = &buffer;
         let deserialized = FloorPartConfig::load_from_slice(buffer_slice).unwrap();
-        assert_eq!(config.payload_count, deserialized.payload_count);
         assert_eq!(&config.floor_data, &deserialized.floor_data);
         assert_eq!(&config.wall_data, &deserialized.wall_data);
         assert_eq!(&config.extra_data, &deserialized.extra_data);

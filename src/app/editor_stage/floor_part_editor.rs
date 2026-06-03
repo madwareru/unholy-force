@@ -38,14 +38,14 @@ impl EditorStage {
     fn update_current_floor_part_config(
         &mut self,
         asset_db: &mut AssetDb,
-        foo: impl FnOnce(&mut String, &mut FloorPartConfig) -> UpdateState,
+        foo: impl FnOnce(&AssetDb, &mut String, &mut FloorPartConfig) -> UpdateState,
     ) {
         let section = &mut self.floor_part_section;
         let name = &mut section.selected_floor_part_name;
         let cur_part = &mut section.current_floor_part_config;
 
         if let Some(current_floor_part_config) = cur_part {
-            if foo(name, current_floor_part_config) == UpdateState::Changed {
+            if foo(asset_db, name, current_floor_part_config) == UpdateState::Changed {
                 match section.selected_floor_part_config_id {
                     Some(id) => {
                         asset_db.update_asset_mut(
@@ -189,49 +189,55 @@ impl EditorStage {
         let mut asset_db = crate::assets::ASSET_DATABASE.lock()
             .expect("Failed to lock asset database");
 
-        self.update_current_floor_part_config(&mut asset_db, |floor_part_name, current_floor_part_config| {
-            let mut update_state = UpdateState::Unchanged;
-            ui.vertical(|ui| {
-                ui.group(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Название для редактора:");
-                        if ui.add(TextEdit::singleline(floor_part_name).desired_width(f32::INFINITY)).changed() {
+        self.update_current_floor_part_config(
+            &mut asset_db,
+            |asset_db, floor_part_name, current_floor_part_config| {
+                let mut update_state = UpdateState::Unchanged;
+                ui.vertical(|ui| {
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Название для редактора:");
+                            if ui.add(TextEdit::singleline(floor_part_name)
+                                .desired_width(f32::INFINITY)
+                            ).changed() {
+                                update_state = UpdateState::Changed;
+                            }
+                        });
+
+                        let full_width = ui.available_width();
+                        let full_height = ui.available_height();
+                        let padding = (full_height - full_width) / 2f32;
+                        ui.add_space(padding);
+                        if let Some([x, y]) = floor_data_holder_editor(
+                            ui,
+                            asset_db,
+                            texture_id,
+                            atlas_size,
+                            current_floor_part_config,
+                            8
+                        ) {
+                            match current_tool_section.current_tool {
+                                FloorPartEditorTool::PlaceFloor => {
+                                    current_floor_part_config.floor_data[y][x] =
+                                        current_tool_section.floor_tile_group;
+                                }
+                                FloorPartEditorTool::PlaceWall => {
+                                    current_floor_part_config.wall_data[y][x] =
+                                        current_tool_section.wall_tile_group;
+                                }
+                                FloorPartEditorTool::PlaceExtra => {
+                                    current_floor_part_config.extra_data[y][x] =
+                                        current_tool_section.extra;
+                                }
+                            }
                             update_state = UpdateState::Changed;
                         }
+                        ui.add_space(padding);
                     });
-
-                    let full_width = ui.available_width();
-                    let full_height = ui.available_height();
-                    let padding = (full_height - full_width) / 2f32;
-                    ui.add_space(padding);
-                    if let Some([x, y]) = floor_data_holder_editor(
-                        ui,
-                        texture_id,
-                        atlas_size,
-                        current_floor_part_config,
-                        8
-                    ) {
-                        match current_tool_section.current_tool {
-                            FloorPartEditorTool::PlaceFloor => {
-                                current_floor_part_config.floor_data[y][x] =
-                                    current_tool_section.floor_tile_group;
-                            }
-                            FloorPartEditorTool::PlaceWall => {
-                                current_floor_part_config.wall_data[y][x] =
-                                    current_tool_section.wall_tile_group;
-                            }
-                            FloorPartEditorTool::PlaceExtra => {
-                                current_floor_part_config.extra_data[y][x] =
-                                    current_tool_section.extra;
-                            }
-                        }
-                        update_state = UpdateState::Changed;
-                    }
-                    ui.add_space(padding);
                 });
-            });
-            update_state
-        });
+                update_state
+            }
+        );
     }
 
     pub(crate) fn draw_floor_part_editor_tools(&mut self, ui: &mut Ui) {
@@ -383,9 +389,15 @@ impl EditorStage {
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                unit_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
-                                    *unit_config_id = config_id;
-                                });
+                                unit_selector_popup(
+                                    ui,
+                                    &asset_db,
+                                    popup_id,
+                                    &response,
+                                    texture_id,
+                                    atlas_size,
+                                    |config_id| *unit_config_id = config_id
+                                );
                             }
                             FloorCellExtra::SpawnLoot(ref mut item_config_id) => {
                                 let popup_id = ui.make_persistent_id("Добавление записи для предмета");
@@ -400,9 +412,15 @@ impl EditorStage {
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                item_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
-                                    *item_config_id = config_id;
-                                });
+                                item_selector_popup(
+                                    ui,
+                                    &asset_db,
+                                    popup_id,
+                                    &response,
+                                    texture_id,
+                                    atlas_size,
+                                    |config_id| *item_config_id = config_id
+                                );
                             }
                             FloorCellExtra::TriggerEffect(ref mut _trigger_config_id) => {
                                 // todo: выбор эффекта

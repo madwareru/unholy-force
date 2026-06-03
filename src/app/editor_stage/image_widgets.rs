@@ -38,7 +38,6 @@ const MOCK_FLOOR_DATA: FloorPartConfig = {
         floor_data: [ALL_DIRT, TILES_INSIDE, TILES_INSIDE, TILES_INSIDE, ALL_DIRT],
         wall_data: [[WallGraphicsTileGroup::None; 5]; 5],
         extra_data: [[FloorCellExtra::None; 5]; 5],
-        payload_count: 0,
     }
 };
 
@@ -307,6 +306,7 @@ pub trait EditableFloorData {
 
 pub fn floor_data_holder_editor(
     ui: &mut Ui,
+    asset_db: &AssetDb,
     texture_id: TextureId,
     atlas_size: [u16; 2],
     data: &impl EditableFloorData,
@@ -333,7 +333,7 @@ pub fn floor_data_holder_editor(
         );
 
         draw_floors(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
-        draw_extra(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
+        draw_extra(ui, asset_db, texture_id, atlas_size, data, zoom, tile_size, rect);
         draw_walls(ui, texture_id, atlas_size, data, zoom, tile_size, rect);
     }
 
@@ -1481,6 +1481,7 @@ fn draw_floors(
 
 fn draw_extra(
     ui: &mut Ui,
+    asset_db: &AssetDb,
     texture_id: TextureId,
     atlas_size: [u16; 2],
     data: &impl EditableFloorData,
@@ -1488,10 +1489,10 @@ fn draw_extra(
     tile_size: [f32; 2],
     rect: Rect,
 ) {
-    let point_on_rect = |x: usize, y: usize| {
+    let point_on_rect = |x: usize, y: usize, [pivot_x, pivot_y]: [u16; 2]| {
         pos2(
-            rect.left() + (x as f32 + 0.5) * tile_size[0] * zoom,
-            rect.top() + (y as f32 + 0.5) * tile_size[1] * zoom,
+            rect.left() - pivot_x as f32 * zoom + (x as f32 + 0.5) * tile_size[0] * zoom,
+            rect.top() - pivot_y as f32 * zoom + (y as f32 + 0.5) * tile_size[1] * zoom,
         )
     };
 
@@ -1501,42 +1502,76 @@ fn draw_extra(
 
             let tile_size = [tile_size[0] as u16, tile_size[1] as u16];
 
-            let (portal, label) = match extra_data {
-                FloorCellExtra::None => (None, None),
+            // Если не обозначено иное, выбираем сдвиг на тайл по горизонтали и вертикали,
+            // так как все тайлы для порталов и меток имеют размер 2x2
+            let default_pivot = SPRITE_ATLAS_DEF.tile_size.map(|it| it as u16);
+
+            let (portal, label, pivot) = match extra_data {
+                FloorCellExtra::None => (None, None, default_pivot),
                 FloorCellExtra::SpawnUnitHint(unit_danger) => {
                     (
                         Some(SPRITE_ATLAS_DEF.get_sprite_def("Портал")),
-                        Some(SPRITE_ATLAS_DEF.get_sprite_def(unit_danger.display_name()))
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def(unit_danger.display_name())),
+                        default_pivot
                     )
                 }
                 FloorCellExtra::SpawnLootHint(item_rarity) => {
                     (
                         Some(SPRITE_ATLAS_DEF.get_sprite_def("Портал")),
-                        Some(SPRITE_ATLAS_DEF.get_sprite_def(item_rarity.display_name()))
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def(item_rarity.display_name())),
+                        default_pivot
                     )
                 }
                 FloorCellExtra::SpawnUnit(unit_config_id) => {
-                    // todo: draw sprite for unit
-                    (None, None)
+                    if !asset_db.has_asset(AssetKind::UnitConfig, unit_config_id.uuid) {
+                        (None, None, default_pivot)
+                    } else {
+                        let text = asset_db.load_json5_asset(
+                            AssetKind::UnitConfig,
+                            unit_config_id.uuid
+                        );
+                        let config: UnitConfig = json5::from_str(text)
+                            .expect("Failed to deserialize UnitConfig");
+                        (
+                            Some(SPRITE_ATLAS_DEF.get_sprite_def(&config.sprite_name)),
+                            None,
+                            config.sprite_pivot.map(|it| it as u16)
+                        )
+                    }
                 }
-                FloorCellExtra::SpawnLoot(_) => {
-                    // todo: draw sprite for item
-                    (None, None)
+                FloorCellExtra::SpawnLoot(item_config_id) => {
+                    if !asset_db.has_asset(AssetKind::ItemConfig, item_config_id.uuid) {
+                        (None, None, default_pivot)
+                    } else {
+                        let text = asset_db.load_json5_asset(
+                            AssetKind::ItemConfig,
+                            item_config_id.uuid
+                        );
+                        let config: ItemConfig = json5::from_str(text)
+                            .expect("Failed to deserialize UnitConfig");
+                        (
+                            Some(SPRITE_ATLAS_DEF.get_sprite_def(&config.sprite_name)),
+                            None,
+                            config.sprite_pivot.map(|it| it as u16)
+                        )
+                    }
                 }
                 FloorCellExtra::LadderDownHint => {
-                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Лестница вниз")), None)
+                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Лестница вниз")), None, default_pivot)
                 }
                 FloorCellExtra::LadderUpHint => {
-                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Лестница вверх")), None)
+                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Лестница вверх")), None, default_pivot)
                 }
                 FloorCellExtra::PlayerStartHint => {
                     (
                         Some(SPRITE_ATLAS_DEF.get_sprite_def("Портал")),
-                        Some(SPRITE_ATLAS_DEF.get_sprite_def("Старт"))
+                        Some(SPRITE_ATLAS_DEF.get_sprite_def("Старт")),
+                        default_pivot
                     )
                 }
                 FloorCellExtra::TriggerEffect(_) => {
-                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Эффект")), None)
+                    // todo: придумать как показать для эффекта какой именно это эффект
+                    (Some(SPRITE_ATLAS_DEF.get_sprite_def("Эффект")), None, default_pivot)
                 }
             };
 
@@ -1553,7 +1588,7 @@ fn draw_extra(
                     ],
                 );
 
-                let pt = point_on_rect(i - 1, j - 1);
+                let pt = point_on_rect(i, j, pivot);
                 let image_rect = Rect::from_min_max(
                     pt,
                     [pt.x + atlas_rect.rect_px.width() * zoom, pt.y + atlas_rect.rect_px.height() * zoom].into(),
@@ -1575,7 +1610,9 @@ fn draw_extra(
                     ],
                 );
                 // надпись рисуется со сдвигом на один тайл вверх
-                let pt = point_on_rect(i - 1, j - 2);
+                let mut pivot = pivot;
+                pivot[1] += tile_size[1];
+                let pt = point_on_rect(i, j, pivot);
                 let image_rect = Rect::from_min_max(
                     pt,
                     [pt.x + atlas_rect.rect_px.width() * zoom, pt.y + atlas_rect.rect_px.height() * zoom].into(),
