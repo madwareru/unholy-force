@@ -180,12 +180,14 @@ impl EditorStage {
                 match node {
                     FloorFlowNode::StartFloor(start) => {
                         0u8.hash(&mut hasher);
-                        start.floor_id.hash(&mut hasher);
+                        start.floor_id().hash(&mut hasher);
+                        start.comment().hash(&mut hasher);
                     }
                     FloorFlowNode::Floor(floor) => {
                         1u8.hash(&mut hasher);
-                        floor.floor_id.hash(&mut hasher);
-                        floor.num_in_passages.hash(&mut hasher);
+                        floor.floor_id().hash(&mut hasher);
+                        floor.num_in_passages().hash(&mut hasher);
+                        floor.comment().hash(&mut hasher);
                     }
                 }
             }

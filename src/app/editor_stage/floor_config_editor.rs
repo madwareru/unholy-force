@@ -3,14 +3,14 @@ use crate::{
         editor_stage::{
             floor_part_editor::{FloorPartEditorTool, FloorPartToolsSubSection},
             image_widgets::{
-                floor_data_holder_editor, 
-                fpa_id_button, 
-                fpa_selector_popup, 
-                item_config_id_button, 
-                item_selector_popup, 
-                split_2_horizontal, 
-                unit_config_id_button, 
-                unit_selector_popup, 
+                floor_data_holder_editor,
+                fpa_id_button,
+                fpa_selector_popup,
+                item_config_id_button,
+                item_selector_popup,
+                split_2_horizontal,
+                unit_config_id_button,
+                unit_selector_popup,
                 EditableFloorData
             },
             thick_selector_button,
@@ -23,12 +23,12 @@ use crate::{
     game_config::{
         floor_parts::{FloorCellExtra, FLOOR_CELL_EXTRA_MODES},
         floors::{
-            AuthoredFloor, 
-            FloorConfig, 
-            FloorVariant, 
-            FloorVariantTag, 
-            GeneratedFloor, 
-            LootTableEntry, 
+            AuthoredFloor,
+            FloorConfig,
+            FloorVariant,
+            FloorVariantTag,
+            GeneratedFloor,
+            LootTableEntry,
             SpawnTableEntry
         },
         items::ItemRarity,
@@ -38,14 +38,14 @@ use crate::{
     graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup}
 };
 use egui::{
-    Align2, 
-    Button, 
-    CollapsingHeader, 
-    PointerButton, 
-    PopupCloseBehavior, 
-    ScrollArea, 
-    TextEdit, 
-    TextureId, 
+    Align2,
+    Button,
+    CollapsingHeader,
+    PointerButton,
+    PopupCloseBehavior,
+    ScrollArea,
+    TextEdit,
+    TextureId,
     Ui
 };
 use uuid::Uuid;
@@ -583,10 +583,17 @@ impl EditorStage {
                                     if response.clicked() {
                                         ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                     }
-                                    fpa_selector_popup(ui, asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
-                                        current_floor_config.available_parts.push(config_id);
-                                        update_state = UpdateState::Changed;
-                                    });
+                                    fpa_selector_popup(
+                                        ui, 
+                                        asset_db, 
+                                        popup_id, 
+                                        &response, 
+                                        texture_id, 
+                                        atlas_size, 
+                                        |config_id| {
+                                            current_floor_config.available_parts.push(config_id);
+                                            update_state = UpdateState::Changed;
+                                        });
                                 });
 
                             if ui.button("Тестовая генерация").clicked() {
@@ -770,7 +777,7 @@ impl EditorStage {
                                     });
                             }
                             FloorCellExtra::SpawnUnit(ref mut unit_config_id) => {
-                                let popup_id = ui.make_persistent_id("Добавление записи для предмета");
+                                let popup_id = ui.make_persistent_id("Выбор персонажа");
                                 let response = unit_config_id_button(
                                     ui,
                                     &asset_db,
@@ -782,12 +789,18 @@ impl EditorStage {
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                unit_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
-                                    *unit_config_id = config_id;
-                                });
+                                unit_selector_popup(
+                                    ui,
+                                    &asset_db,
+                                    popup_id,
+                                    &response,
+                                    texture_id,
+                                    atlas_size,
+                                    |config_id| *unit_config_id = config_id
+                                );
                             }
                             FloorCellExtra::SpawnLoot(ref mut item_config_id) => {
-                                let popup_id = ui.make_persistent_id("Добавление записи для предмета");
+                                let popup_id = ui.make_persistent_id("Выбор предмета");
                                 let response = item_config_id_button(
                                     ui,
                                     &asset_db,
@@ -799,9 +812,15 @@ impl EditorStage {
                                 if response.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
-                                item_selector_popup(ui, &asset_db, popup_id, &response, texture_id, atlas_size, |config_id| {
-                                    *item_config_id = config_id;
-                                });
+                                item_selector_popup(
+                                    ui,
+                                    &asset_db,
+                                    popup_id,
+                                    &response,
+                                    texture_id,
+                                    atlas_size,
+                                    |config_id| *item_config_id = config_id
+                                );
                             }
                             FloorCellExtra::TriggerEffect(ref mut _trigger_config_id) => {
                                 // todo: выбор эффекта

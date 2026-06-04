@@ -1,43 +1,80 @@
-use egui::{Color32, PopupCloseBehavior, Ui};
-use egui_snarl::{InPin, NodeId, OutPin, Snarl};
-use egui_snarl::ui::{AnyPins, PinInfo, SnarlPin, SnarlViewer, WireStyle};
-use serde::{Deserialize, Serialize};
-use crate::assets::{AssetKind, ASSET_DATABASE};
-use crate::game_config::{Config, ConfigId};
+use crate::assets::{ASSET_DATABASE, AssetKind};
 use crate::game_config::floors::FloorConfig;
+use crate::game_config::{Config, ConfigId};
+use egui::{Color32, PopupCloseBehavior, Ui};
+use egui_snarl::ui::{PinInfo, SnarlPin, SnarlViewer, WireStyle};
+use egui_snarl::{InPin, NodeId, OutPin, Snarl};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum FloorFlowNode {
     StartFloor(StartFloorNode),
-    Floor(FloorNode)
+    Floor(FloorNode),
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct StartFloorNode {
-    pub floor_id: ConfigId<FloorConfig>,
+    floor_id: ConfigId<FloorConfig>,
     cached_name: String,
+    #[serde(default)]
+    comment: String,
 }
 impl StartFloorNode {
     fn floor_name(&self) -> &str {
         match self {
-            StartFloorNode { floor_id, cached_name } =>
-                if ConfigId::INVALID.eq(floor_id) { "Нет данных" } else { cached_name.as_str() },
+            StartFloorNode {
+                floor_id,
+                cached_name,
+                ..
+            } => {
+                if ConfigId::INVALID.eq(floor_id) {
+                    "Нет данных"
+                } else {
+                    cached_name.as_str()
+                }
+            }
         }
+    }
+    pub fn floor_id(&self) -> ConfigId<FloorConfig> {
+        self.floor_id
+    }
+    pub fn comment(&self) -> &str {
+        &self.comment
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct FloorNode {
-    pub floor_id: ConfigId<FloorConfig>,
-    pub num_in_passages: u8,
+    floor_id: ConfigId<FloorConfig>,
+    num_in_passages: u8,
     cached_name: String,
+    #[serde(default)]
+    comment: String,
 }
 impl FloorNode {
     fn floor_name(&self) -> &str {
         match self {
-            FloorNode { floor_id, cached_name, .. } =>
-                if ConfigId::INVALID.eq(floor_id) { "Нет данных" } else { cached_name.as_str() },
+            FloorNode {
+                floor_id,
+                cached_name,
+                ..
+            } => {
+                if ConfigId::INVALID.eq(floor_id) {
+                    "Нет данных"
+                } else {
+                    cached_name.as_str()
+                }
+            }
         }
+    }
+    pub fn num_in_passages(&self) -> u8 {
+        self.num_in_passages
+    }
+    pub fn floor_id(&self) -> ConfigId<FloorConfig> {
+        self.floor_id
+    }
+    pub fn comment(&self) -> &str {
+        &self.comment
     }
 }
 
@@ -51,10 +88,12 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
     fn title(&mut self, node: &FloorFlowNode) -> String {
         match node {
             FloorFlowNode::StartFloor(_) => "Стартовый этаж".to_owned(),
-            FloorFlowNode::Floor(FloorNode{ num_in_passages, .. }) => match num_in_passages {
+            FloorFlowNode::Floor(FloorNode {
+                num_in_passages, ..
+            }) => match num_in_passages {
                 1 => "Этаж с 1 входом".to_owned(),
-                x => format!("Этаж с {x} входами")
-            }
+                x => format!("Этаж с {x} входами"),
+            },
         }
     }
 
@@ -75,7 +114,9 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
     fn inputs(&mut self, node: &FloorFlowNode) -> usize {
         match node {
             FloorFlowNode::StartFloor(_) => 0,
-            FloorFlowNode::Floor(FloorNode { num_in_passages, ..} ) => *num_in_passages as usize,
+            FloorFlowNode::Floor(FloorNode {
+                num_in_passages, ..
+            }) => *num_in_passages as usize,
         }
     }
 
@@ -90,29 +131,27 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
             FloorFlowNode::StartFloor(_) => {
                 unreachable!("Number node has no inputs")
             }
-            FloorFlowNode::Floor(_) => {
-                match &*pin.remotes {
-                    [] => {
-                        ui.label("None");
-                        PinInfo::square().with_fill(FLOOR_PIN_COLOR)
-                    },
-                    [remote] => match snarl[remote.node] {
-                        FloorFlowNode::StartFloor(ref data) => {
-                            ui.label(data.floor_name());
-                            PinInfo::square().with_fill(FLOOR_PIN_COLOR).with_wire_style(
-                                WireStyle::Bezier5,
-                            )
-                        },
-                        | FloorFlowNode::Floor(ref data) => {
-                            ui.label(data.floor_name());
-                            PinInfo::square().with_fill(FLOOR_PIN_COLOR).with_wire_style(
-                                WireStyle::Bezier5,
-                            )
-                        }
-                    },
-                    _ => unreachable!(),
+            FloorFlowNode::Floor(_) => match &*pin.remotes {
+                [] => {
+                    ui.label("None");
+                    PinInfo::square().with_fill(FLOOR_PIN_COLOR)
                 }
-            }
+                [remote] => match snarl[remote.node] {
+                    FloorFlowNode::StartFloor(ref data) => {
+                        ui.label(data.floor_name());
+                        PinInfo::square()
+                            .with_fill(FLOOR_PIN_COLOR)
+                            .with_wire_style(WireStyle::Bezier5)
+                    }
+                    FloorFlowNode::Floor(ref data) => {
+                        ui.label(data.floor_name());
+                        PinInfo::square()
+                            .with_fill(FLOOR_PIN_COLOR)
+                            .with_wire_style(WireStyle::Bezier5)
+                    }
+                },
+                _ => unreachable!(),
+            },
         }
     }
 
@@ -144,10 +183,13 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
                     PopupCloseBehavior::CloseOnClickOutside,
                     |ui| {
                         if let Ok(asset_db) = ASSET_DATABASE.lock() {
-                            let floor_config_assets = asset_db.list_all_assets(AssetKind::FloorConfig);
+                            let floor_config_assets =
+                                asset_db.list_all_assets(AssetKind::FloorConfig);
                             for (uuid, _) in floor_config_assets {
-                                let asset_text = asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
-                                let config: FloorConfig = json5::from_str(&asset_text).expect("Failed to load floor config");
+                                let asset_text =
+                                    asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
+                                let config: FloorConfig = json5::from_str(&asset_text)
+                                    .expect("Failed to load floor config");
                                 if ui.button(&config.name).clicked() {
                                     value.floor_id = ConfigId::from_uuid(uuid);
                                     value.cached_name = config.name;
@@ -160,7 +202,7 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
                 PinInfo::square()
                     .with_fill(FLOOR_PIN_COLOR)
                     .with_wire_style(WireStyle::Bezier5)
-            },
+            }
             FloorFlowNode::Floor(ref mut value) => {
                 let response = ui.button(value.floor_name());
                 let popup_id = ui.make_persistent_id("выбор этажа");
@@ -174,10 +216,13 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
                     PopupCloseBehavior::CloseOnClickOutside,
                     |ui| {
                         if let Ok(asset_db) = ASSET_DATABASE.lock() {
-                            let floor_config_assets = asset_db.list_all_assets(AssetKind::FloorConfig);
+                            let floor_config_assets =
+                                asset_db.list_all_assets(AssetKind::FloorConfig);
                             for (uuid, _) in floor_config_assets {
-                                let asset_text = asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
-                                let config: FloorConfig = json5::from_str(&asset_text).expect("Failed to load floor config");
+                                let asset_text =
+                                    asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
+                                let config: FloorConfig = json5::from_str(&asset_text)
+                                    .expect("Failed to load floor config");
                                 if ui.button(&config.name).clicked() {
                                     value.floor_id = ConfigId::from_uuid(uuid);
                                     value.cached_name = config.name;
@@ -194,8 +239,8 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         }
     }
 
-    fn has_body(&mut self, node: &FloorFlowNode) -> bool {
-        matches!(node, FloorFlowNode::Floor(_))
+    fn has_body(&mut self, _: &FloorFlowNode) -> bool {
+        true
     }
 
     fn show_body(
@@ -205,26 +250,29 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         _outputs: &[OutPin],
         ui: &mut Ui,
         _scale: f32,
-        snarl: &mut Snarl<FloorFlowNode>
+        snarl: &mut Snarl<FloorFlowNode>,
     ) {
         let Some(node_data) = snarl.get_node_mut(node) else {
             return;
         };
         match node_data {
-            FloorFlowNode::StartFloor(_) => {}
+            FloorFlowNode::StartFloor(data) => {
+                ui.vertical(|ui| {
+                    ui.label("Комментарий:");
+                    ui.text_edit_multiline(&mut data.comment);
+                });
+            }
             FloorFlowNode::Floor(data) => {
-                ui.horizontal(|ui| {
-                    ui.label("Количество входов:");
-                    ui.add(egui::DragValue::new(&mut data.num_in_passages)
-                        .range(1..=8)
-                    );
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Количество входов:");
+                        ui.add(egui::DragValue::new(&mut data.num_in_passages).range(1..=8));
+                    });
+                    ui.label("Комментарий:");
+                    ui.text_edit_multiline(&mut data.comment);
                 });
             }
         }
-    }
-
-    fn has_on_hover_popup(&mut self, _: &FloorFlowNode) -> bool {
-        false
     }
 
     fn has_graph_menu(&mut self, _pos: egui::Pos2, _snarl: &mut Snarl<FloorFlowNode>) -> bool {
@@ -244,27 +292,25 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
             ui.close_menu();
         }
         if ui.button("Этаж с 1 входом").clicked() {
-            snarl.insert_node(pos, FloorFlowNode::Floor(
-                FloorNode { num_in_passages: 1, ..Default::default() }
-            ));
-            ui.close_menu();
-        }
-        if ui.button("Этаж с 2 входами").clicked() {
-            snarl.insert_node(pos, FloorFlowNode::Floor(
-                FloorNode { num_in_passages: 2, ..Default::default() }
-            ));
+            snarl.insert_node(
+                pos,
+                FloorFlowNode::Floor(FloorNode {
+                    num_in_passages: 1,
+                    ..Default::default()
+                }),
+            );
             ui.close_menu();
         }
         if ui.button("Этаж с 3 входами").clicked() {
-            snarl.insert_node(pos, FloorFlowNode::Floor(
-                FloorNode { num_in_passages: 3, ..Default::default() }
-            ));
+            snarl.insert_node(
+                pos,
+                FloorFlowNode::Floor(FloorNode {
+                    num_in_passages: 3,
+                    ..Default::default()
+                }),
+            );
             ui.close_menu();
         }
-    }
-
-    fn has_dropped_wire_menu(&mut self, _src_pins: AnyPins, _snarl: &mut Snarl<FloorFlowNode>) -> bool {
-        false
     }
 
     fn has_node_menu(&mut self, _node: &FloorFlowNode) -> bool {
@@ -280,8 +326,8 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         _scale: f32,
         snarl: &mut Snarl<FloorFlowNode>,
     ) {
-        ui.label("Node menu");
-        if ui.button("Remove").clicked() {
+        ui.label("Узлы");
+        if ui.button("Добавить узел").clicked() {
             snarl.remove_node(node);
             ui.close_menu();
         }
