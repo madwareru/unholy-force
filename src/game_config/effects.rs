@@ -1,10 +1,15 @@
 use serde::{Deserialize, Serialize};
-use crate::effect_mechanics::EffectMechanicSetting;
+use crate::effect_mechanics::EffectEvaluator;
 use crate::game_config::Config;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct EffectMechanicConfig {
-    pub mechanic_name: EffectMechanicSetting
+pub struct EffectConfig {
 }
 
-impl Config for EffectMechanicConfig {}
+impl EffectConfig {
+    pub(crate) fn create_evaluator(&self) -> Option<Box<dyn EffectEvaluator>> {
+        todo!("Реализовать создание вычислителя эффекта")
+    }
+}
+
+impl Config for EffectConfig {}

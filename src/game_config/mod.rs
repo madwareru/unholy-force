@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::game_config::effects::EffectMechanicConfig;
+use crate::game_config::effects::EffectConfig;
 use crate::game_config::floor_flow_graph::FloorFlowGraphConfig;
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use crate::game_config::floor_parts::FloorPartConfig;
@@ -97,7 +97,7 @@ pub struct ConfigProvider {
     floor_parts: HashMap<Uuid, FloorPartConfig>,
     floor_parts_adjacency: HashMap<Uuid, FloorPartAdjacencyConfig>,
     floors: HashMap<Uuid, FloorConfig>,
-    effect_mechanics: HashMap<Uuid, EffectMechanicConfig>,
+    effects: HashMap<Uuid, EffectConfig>,
     parameters: HashMap<Uuid, ParameterConfig>,
     tags: HashMap<Uuid, TagConfig>,
     floor_flow_graphs: HashMap<Uuid, FloorFlowGraphConfig>,
@@ -124,7 +124,7 @@ impl_provider!(ItemConfig <- items);
 impl_provider!(FloorPartConfig <- floor_parts);
 impl_provider!(FloorPartAdjacencyConfig <- floor_parts_adjacency);
 impl_provider!(FloorConfig <- floors);
-impl_provider!(EffectMechanicConfig <- effect_mechanics);
+impl_provider!(EffectConfig <- effects);
 impl_provider!(ParameterConfig <- parameters);
 impl_provider!(TagConfig <- tags);
 impl_provider!(FloorFlowGraphConfig <- floor_flow_graphs);
@@ -136,7 +136,7 @@ pub struct GameConfig{
     floor_part_configs: Vec<ConfigId<FloorPartConfig>>,
     floor_part_adjacency_configs: Vec<ConfigId<FloorPartAdjacencyConfig>>,
     floor_configs: Vec<ConfigId<FloorConfig>>,
-    effect_mechanic_configs: Vec<ConfigId<EffectMechanicConfig>>,
+    effect_mechanic_configs: Vec<ConfigId<EffectConfig>>,
     parameter_configs: Vec<ConfigId<ParameterConfig>>,
     tag_configs: Vec<ConfigId<TagConfig>>,
     floor_flow_graph_config: ConfigId<FloorFlowGraphConfig>,

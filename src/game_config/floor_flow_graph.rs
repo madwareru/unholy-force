@@ -326,8 +326,8 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         _scale: f32,
         snarl: &mut Snarl<FloorFlowNode>,
     ) {
-        ui.label("Узлы");
-        if ui.button("Добавить узел").clicked() {
+        ui.label("Меню узла");
+        if ui.button("Удалить узел").clicked() {
             snarl.remove_node(node);
             ui.close_menu();
         }
@@ -342,9 +342,7 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
             (FloorFlowNode::StartFloor(_), _) => {}
             (FloorFlowNode::Floor(_), _) => {}
         }
-        for &remote in &to.remotes {
-            snarl.disconnect(remote, to.id);
-        }
+        snarl.drop_inputs(to.id);
         snarl.connect(from.id, to.id);
     }
 }

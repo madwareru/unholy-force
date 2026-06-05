@@ -1,96 +1,147 @@
 use std::collections::{HashMap};
 use bumpalo::{Bump, collections::Vec};
-use serde::{Deserialize, Serialize};
 use crate::app::game_stage::{EntityId, GameWorld};
-
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
-pub enum EffectMechanicSetting {
-    SimpleAttack
-}
+use crate::game_config::{ConfigId, ConfigProvider, ConfigProviderImpl};
+use crate::game_config::effects::EffectConfig;
 
 #[derive(Default)]
-pub struct EffectMechanicRegistry {
+pub struct EffectEvaluatorRegistry {
     bump: Bump,
-    provider: EffectMechanicProvider
+    provider: EffectEvaluatorProvider
 }
 
 #[derive(Default)]
-pub struct EffectMechanicProvider {
-    mechanics: HashMap<EffectMechanicSetting, Box<dyn EffectMechanic>>
+pub struct EffectEvaluatorProvider {
+    effects: HashMap<ConfigId<EffectConfig>, Box<dyn EffectEvaluator>>,
 }
-impl EffectMechanicProvider {
-    fn get_or_create_effect_mechanic(
+impl EffectEvaluatorProvider {
+    fn get_or_create_effect_evaluator(
         &mut self,
-        setting: EffectMechanicSetting
-    ) -> &dyn EffectMechanic {
-        if !self.mechanics.contains_key(&setting) {
-            self.mechanics.insert(
-                setting,
-                match setting {
-                    EffectMechanicSetting::SimpleAttack => todo!()
+        game_config_provider: &ConfigProvider,
+        effect_config_id: ConfigId<EffectConfig>
+    ) -> Option<&dyn EffectEvaluator> {
+        if !self.effects.contains_key(&effect_config_id) {
+            match game_config_provider.get_config(effect_config_id) {
+                None => {
+                    println!("Error! No effect config for {:?} found!!!", effect_config_id);
                 }
-            );
+                Some(effect_config) => {
+                    match effect_config.create_evaluator() {
+                        Some(effect_evaluator) => {
+                            self.effects.insert(
+                                effect_config_id,
+                                effect_evaluator
+                            );
+                        }
+                        _ => {
+                            println!("Error! Failed to create effect evaluator for {:?}!", effect_config_id);
+                        }
+                    }
+                }
+            }
         }
-        let Some(mechanic) = self.mechanics.get(&setting).map(|it| it.as_ref()) else {
-            unreachable!()
-        };
-        mechanic
+        self.effects.get(&effect_config_id).map(|it| it.as_ref())
     }
 }
 
-impl EffectMechanicRegistry {
+impl EffectEvaluatorRegistry {
     pub fn create_effect(
         &mut self,
+        game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
-        setting: EffectMechanicSetting,
+        effect_config_id: ConfigId<EffectConfig>,
         effect_context: EffectContext
     ) {
-        let mechanic = self.provider.get_or_create_effect_mechanic(setting);
-        let effect_id = game_world.spawn((setting, effect_context));
-        mechanic.setup(game_world, effect_id);
+        let Some(evaluator) = self.provider.get_or_create_effect_evaluator(
+            game_config_provider,
+            effect_config_id
+        ) else {
+            return;
+        };
+
+        let bump = &self.bump;
+        let mut queue = DelayedEffectQueue(Vec::new_in(bump));
+
+        let effect_id = game_world.spawn((effect_config_id, effect_context));
+        evaluator.setup(game_world, effect_id, &mut queue);
+
+        let mut offset = 0;
+        while offset < queue.0.len() {
+            let Some(DelayedEffect { effect_config_id, effect_context }) = queue.0.get(offset).copied() else {
+                continue;
+            };
+            offset += 1;
+
+            let Some(evaluator) = self.provider.get_or_create_effect_evaluator(
+                game_config_provider,
+                effect_config_id
+            ) else {
+                continue;
+            };
+
+            let effect_id = game_world.spawn((effect_config_id, effect_context));
+            evaluator.setup(game_world, effect_id, &mut queue);
+        }
     }
 
     pub fn tick(
         &mut self,
+        game_config_provider: &ConfigProvider,
         effect_id: EntityId,
         game_world: &mut GameWorld
     ) {
-        let bump = &self.bump;
-        let mechanic_setting = {
-            match game_world.get::<&EffectMechanicSetting>(effect_id) {
+        let effect_config_id = {
+            match game_world.get::<&ConfigId<EffectConfig>>(effect_id) {
                 Ok(mechanic_setting) => *mechanic_setting,
                 _ => panic!("No effect found for {:?}", effect_id)
             }
         };
 
+        let Some(evaluator) = self.provider.get_or_create_effect_evaluator(
+            game_config_provider,
+            effect_config_id
+        ) else {
+            return;
+        };
+
+        let bump = &self.bump;
         let mut queue = DelayedEffectQueue(Vec::new_in(bump));
-        let mechanic = self.provider.get_or_create_effect_mechanic(mechanic_setting);
-        if let EffectMechanicFlow::Complete = mechanic.tick(game_world, effect_id, &mut queue) {
-            mechanic.on_destroy(game_world, effect_id);
+
+        if let EffectMechanicFlow::Complete = evaluator.tick(game_world, effect_id, &mut queue) {
+            evaluator.on_destroy(game_world, effect_id, &mut queue);
             game_world.despawn(effect_id).expect("Failed to despawn effect");
         }
-        for DelayedEffect { mechanic_setting, effect_context } in queue.drain() {
-            let effect_id = game_world.spawn((mechanic_setting, effect_context));
-            let mechanic = self.provider.get_or_create_effect_mechanic(mechanic_setting);
-            mechanic.setup(game_world, effect_id);
+
+        let mut offset = 0;
+        while offset < queue.0.len() {
+            let Some(DelayedEffect { effect_config_id, effect_context }) = queue.0.get(offset).copied() else {
+                continue;
+            };
+            offset += 1;
+
+            let Some(evaluator) = self.provider.get_or_create_effect_evaluator(
+                game_config_provider,
+                effect_config_id
+            ) else {
+                continue;
+            };
+
+            let effect_id = game_world.spawn((effect_config_id, effect_context));
+            evaluator.setup(game_world, effect_id, &mut queue);
         }
     }
 }
 
 #[derive(Copy, Clone, Debug)]
 struct DelayedEffect {
-    mechanic_setting: EffectMechanicSetting,
+    effect_config_id: ConfigId<EffectConfig>,
     effect_context: EffectContext
 }
 
 pub struct DelayedEffectQueue<'a>(Vec<'a, DelayedEffect>);
 impl<'a> DelayedEffectQueue<'a> {
-    pub fn push(&mut self, mechanic_setting: EffectMechanicSetting, effect_context: EffectContext) {
-        self.0.push(DelayedEffect { mechanic_setting, effect_context } );
-    }
-
-    fn drain(&mut self) -> impl Iterator<Item = DelayedEffect> + '_ {
-        self.0.drain(..)
+    pub fn push(&mut self, effect_config_id: ConfigId<EffectConfig>, effect_context: EffectContext) {
+        self.0.push(DelayedEffect { effect_config_id, effect_context } );
     }
 }
 
@@ -107,9 +158,19 @@ pub enum EffectMechanicFlow {
     Complete
 }
 
-pub trait EffectMechanic {
-    fn setup(&self, _game_world: &mut GameWorld, _effect_id: EntityId) {}
-    fn on_destroy(&self, _game_world: &mut GameWorld, _effect_id: EntityId ) {}
+pub trait EffectEvaluator {
+    fn setup(
+        &self,
+        game_world: &mut GameWorld,
+        effect_id: EntityId,
+        delayed_effect_queue: &mut DelayedEffectQueue
+    );
+    fn on_destroy(
+        &self,
+        game_world: &mut GameWorld,
+        effect_id: EntityId,
+        delayed_effect_queue: &mut DelayedEffectQueue
+    );
     fn tick(
         &self,
         game_world: &mut GameWorld,

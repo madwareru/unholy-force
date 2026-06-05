@@ -30,7 +30,7 @@ pub enum AssetKind {
     FloorFlowGraphConfig,
     ParameterConfig,
     TagConfig,
-    EffectMechanicConfig,
+    EffectConfig,
     GameGonfig
 }
 impl AssetKind {
@@ -44,7 +44,7 @@ impl AssetKind {
             AssetKind::FloorFlowGraphConfig => "Граф этажей",
             AssetKind::ParameterConfig => "Черты",
             AssetKind::TagConfig => "Лычки",
-            AssetKind::EffectMechanicConfig => "Механики эффектов",
+            AssetKind::EffectConfig => "Механики эффектов",
             AssetKind::GameGonfig => "Игры"
         }
     }
@@ -78,7 +78,7 @@ impl AssetDb {
             (AssetKind::FloorFlowGraphConfig, &mut floor_flow_graph_assets, ".json5"),
             (AssetKind::ParameterConfig, &mut parameter_assets, ".json5"),
             (AssetKind::TagConfig, &mut tag_assets, ".json5"),
-            (AssetKind::EffectMechanicConfig, &mut effect_mechanic_assets, ".json5"),
+            (AssetKind::EffectConfig, &mut effect_mechanic_assets, ".json5"),
             (AssetKind::GameGonfig, &mut game_config_assets, ".json5")
         ] {
             let asset_dir = get_or_create_asset_dir(kind);
@@ -121,7 +121,7 @@ impl AssetDb {
         assets.insert(AssetKind::FloorFlowGraphConfig, floor_flow_graph_assets);
         assets.insert(AssetKind::ParameterConfig, parameter_assets);
         assets.insert(AssetKind::TagConfig, tag_assets);
-        assets.insert(AssetKind::EffectMechanicConfig, effect_mechanic_assets);
+        assets.insert(AssetKind::EffectConfig, effect_mechanic_assets);
         assets.insert(AssetKind::GameGonfig, game_config_assets);
 
         Self {
@@ -236,7 +236,7 @@ fn asset_dir(kind: AssetKind) -> PathBuf {
             AssetKind::FloorFlowGraphConfig => "floor_flow_graph",
             AssetKind::ParameterConfig => "parameters",
             AssetKind::TagConfig => "tags",
-            AssetKind::EffectMechanicConfig => "effect_mechanics",
+            AssetKind::EffectConfig => "effect_mechanics",
             AssetKind::GameGonfig => "games"
         }
     )

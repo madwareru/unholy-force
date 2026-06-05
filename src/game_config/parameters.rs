@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::{Config, ConfigId};
-use crate::game_config::effects::EffectMechanicConfig;
+use crate::game_config::effects::EffectConfig;
 
 lazy_static!(
     pub static ref PARAMETER_CACHE: Mutex<ExpressionParameterIdCache> =
@@ -96,7 +96,7 @@ pub struct TagConfig {
     pub sprite_name : String,
     #[serde(default)]
     pub sprite_pivot: [u8; 2],
-    pub effect_mechanic: Option<ConfigId<EffectMechanicConfig>>,
+    pub effect_mechanic: Option<ConfigId<EffectConfig>>,
 }
 
 impl SpriteHolder for TagConfig {

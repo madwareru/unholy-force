@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::app::editor_stage::image_widgets::SpriteHolder;
 use crate::game_config::{Config, ConfigId};
-use crate::game_config::effects::EffectMechanicConfig;
+use crate::game_config::effects::EffectConfig;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Default)]
 pub enum ItemRarity {
@@ -25,9 +25,9 @@ impl ItemRarity {
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum ItemKind {
     Quest,
-    Armor{ equip_effect: ConfigId<EffectMechanicConfig> },
-    Weapon{ attack_effect: ConfigId<EffectMechanicConfig> },
-    Consumable{ use_effect: ConfigId<EffectMechanicConfig> }
+    Armor{ equip_effect: ConfigId<EffectConfig> },
+    Weapon{ attack_effect: ConfigId<EffectConfig> },
+    Consumable{ use_effect: ConfigId<EffectConfig> }
 }
 impl Default for ItemKind {
     fn default() -> Self {

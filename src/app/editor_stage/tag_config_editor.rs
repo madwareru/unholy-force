@@ -2,16 +2,10 @@ use egui::{PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
-use crate::game_config::effects::EffectMechanicConfig;
 use crate::game_config::parameters::{TagConfig, PARAMETER_CACHE};
 use crate::app::editor_stage::image_widgets::{sprite_pivot_editor};
 use crate::game_config::ConfigId;
 use crate::graphics::SPRITE_ATLAS_DEF;
-
-struct EffectMechanicEntry {
-    uuid: Uuid,
-    label: String,
-}
 
 #[derive(Default)]
 pub struct TagConfigEditorSection {
@@ -180,22 +174,26 @@ impl EditorStage {
         };
         let atlas_size = self.atlas_size;
 
-        let effect_entries: Vec<EffectMechanicEntry> =
-            if let Ok(db) = crate::assets::ASSET_DATABASE.lock() {
-                db.list_all_assets(AssetKind::EffectMechanicConfig)
-                    .map(|(uuid, _)| {
-                        let text = db.load_json5_asset(AssetKind::EffectMechanicConfig, uuid);
-                        let config: EffectMechanicConfig = json5::from_str(&text)
-                            .expect("Failed to load effect mechanic config");
-                        EffectMechanicEntry {
-                            uuid,
-                            label: format!("{:?}", config.mechanic_name),
-                        }
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            };
+        // let effect_entries: Vec<EffectMechanicEntry> =
+        //
+        //
+        //     if let Ok(db) = crate::assets::ASSET_DATABASE.lock() {
+        //
+        //
+        //         db.list_all_assets(AssetKind::EffectConfig)
+        //             .map(|(uuid, _)| {
+        //                 let text = db.load_json5_asset(AssetKind::EffectConfig, uuid);
+        //                 let config: EffectConfig = json5::from_str(&text)
+        //                     .expect("Failed to load effect mechanic config");
+        //                 EffectMechanicEntry {
+        //                     uuid,
+        //                     label: format!("{:?}", config.mechanic_name),
+        //                 }
+        //             })
+        //             .collect()
+        //     } else {
+        //         Vec::new()
+        //     };
 
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
@@ -343,19 +341,18 @@ impl EditorStage {
                                 ui.label("Эффект при наложении:");
                                 let full_width = ui.available_width();
                                 let effect_label = match current_tag_config.effect_mechanic {
-                                    Some(ref id) if !id.uuid.is_nil() => {
-                                        effect_entries
-                                            .iter()
-                                            .find(|e| e.uuid == id.uuid)
-                                            .map(|e| e.label.as_str())
-                                            .unwrap_or("Не найден")
-                                            .to_owned()
+                                    Some(id) if !id.uuid.is_nil() => {
+                                        if !asset_db.has_asset(AssetKind::EffectConfig, id.uuid) {
+                                            "Не найден"
+                                        } else {
+                                            asset_db.asset_name(AssetKind::EffectConfig, id.uuid)
+                                        }
                                     }
-                                    _ => "Нет".to_owned()
+                                    _ => "Нет"
                                 };
                                 let response = ui.add_sized(
                                     [full_width, ui.spacing().interact_size.y],
-                                    egui::Button::new(&effect_label),
+                                    egui::Button::new(effect_label),
                                 );
                                 let popup_id = ui.make_persistent_id("выбор эффекта");
                                 if response.clicked() {
@@ -373,10 +370,10 @@ impl EditorStage {
                                             ui.memory_mut(|mem| mem.close_popup());
                                         }
                                         ui.separator();
-                                        for entry in &effect_entries {
-                                            if ui.button(&entry.label).clicked() {
+                                        for (uuid, name) in asset_db.list_all_assets(AssetKind::EffectConfig) {
+                                            if ui.button(name).clicked() {
                                                 current_tag_config.effect_mechanic = Some(
-                                                    ConfigId::from_uuid(entry.uuid)
+                                                    ConfigId::from_uuid(uuid)
                                                 );
                                                 update_state = UpdateState::Changed;
                                                 ui.memory_mut(|mem| mem.close_popup());
