@@ -20,6 +20,7 @@ use std::collections::{HashMap, HashSet};
 use bitsetium::{BitEmpty, BitIntersection, BitSet, BitTest, BitUnset};
 use rand::RngExt;
 use simple_tiled_wfc::{make_initial_probabilities, BitsIterator};
+use tracing::warn;
 use crate::app::game_stage::grid_math::get_island_mapping;
 use crate::game_config::floor_parts::FloorCellExtra;
 
@@ -558,7 +559,10 @@ fn connect_islands(result_floor: &mut FloorGeneratorResult) {
         }
 
         let Some(better_corner) = better_corner else {
-            println!("Curious situation: no better corner found to connect islands.");
+            warn!(
+                target: "Генерация уровней",
+                "Странная ситуация: не найден перекрёсток для соединения островов."
+            );
             break;
         };
 
