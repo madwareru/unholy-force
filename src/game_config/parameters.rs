@@ -47,7 +47,7 @@ impl Default for ExpressionParameterNode {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq)]
-pub enum CompiledExpressionParameterNode {
+pub enum CompiledExpression {
     #[default]
     None,
     Error { compile_error: String },
@@ -69,7 +69,7 @@ pub struct ParameterConfig {
     pub parameter_type: ParameterType,
     /// В случае если черта вычисляемая, содержит скомпилированное выражение
     /// (или ошибку, если не удалось скомпилировать)
-    compiled_expression: CompiledExpressionParameterNode
+    compiled_expression: CompiledExpression
 }
 
 impl SpriteHolder for ParameterConfig {
@@ -225,12 +225,12 @@ impl ParsedExpressionParameter {
         !self.errors.is_empty()
     }
 
-    pub fn into_compiled(self) -> CompiledExpressionParameterNode {
+    pub fn into_compiled(self) -> CompiledExpression {
         let ParsedExpressionParameter { node, errors } = self;
         if errors.is_empty() {
-            CompiledExpressionParameterNode::Ok(node)
+            CompiledExpression::Ok(node)
         } else {
-            CompiledExpressionParameterNode::Error { compile_error: errors }
+            CompiledExpression::Error { compile_error: errors }
         }
     }
 }
@@ -788,7 +788,7 @@ pub fn compile_expression_parameter(
     asset_db: &AssetDb,
     source: &str,
     cache: &mut ExpressionParameterIdCache,
-) -> CompiledExpressionParameterNode {
+) -> CompiledExpression {
     parse_expression_parameter(asset_db, source, cache).into_compiled()
 }
 
@@ -854,21 +854,21 @@ impl ParameterConfig {
         }
 
         match &self.compiled_expression {
-            CompiledExpressionParameterNode::None => Ok(()),
-            CompiledExpressionParameterNode::Error { .. } => Ok(()),
-            CompiledExpressionParameterNode::Ok(expression_parameter_node) =>
+            CompiledExpression::None => Ok(()),
+            CompiledExpression::Error { .. } => Ok(()),
+            CompiledExpression::Ok(expression_parameter_node) =>
                 validate_parameter_node(asset_db, &expression_parameter_node)
         }
     }
 
     pub fn compile_expression(&mut self, asset_db: &AssetDb, cache: &mut ExpressionParameterIdCache) {
         self.compiled_expression = match &self.parameter_type {
-            ParameterType::Constant => CompiledExpressionParameterNode::None,
+            ParameterType::Constant => CompiledExpression::None,
             ParameterType::Expression(source) => compile_expression_parameter(asset_db, source, cache),
         };
     }
 
-    pub fn compiled_expression(&self) -> &CompiledExpressionParameterNode {
+    pub fn compiled_expression(&self) -> &CompiledExpression {
         &self.compiled_expression
     }
 }
@@ -877,7 +877,7 @@ impl ParameterConfig {
 mod tests {
     use crate::assets::dummy_asset_db;
     use super::*;
-    use super::CompiledExpressionParameterNode::*;
+    use super::CompiledExpression::*;
     use super::ParameterOperator::*;
     use super::ExpressionParameterNode::*;
 
@@ -925,7 +925,7 @@ mod tests {
         }
     }
 
-    fn compile_for_tests(asset_db: &AssetDb, source: &str) -> CompiledExpressionParameterNode {
+    fn compile_for_tests(asset_db: &AssetDb, source: &str) -> CompiledExpression {
         let mut cache = parameter_cache_for_tests();
         compile_expression_parameter(&asset_db, source, &mut cache)
     }

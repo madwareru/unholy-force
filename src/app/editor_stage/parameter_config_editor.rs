@@ -9,7 +9,7 @@ use crate::{
     assets::{AssetDb, AssetKind},
     game_config::{
         parameters::{
-            CompiledExpressionParameterNode,
+            CompiledExpression,
             ParameterConfig,
             ParameterType,
             PARAMETER_CACHE
@@ -442,11 +442,11 @@ impl EditorStage {
                                         }
 
                                         match current_param_config.compiled_expression() {
-                                            CompiledExpressionParameterNode::None => {}
-                                            CompiledExpressionParameterNode::Error { compile_error } => {
+                                            CompiledExpression::None => {}
+                                            CompiledExpression::Error { compile_error } => {
                                                 ui.colored_label(egui::Color32::RED, compile_error);
                                             }
-                                            CompiledExpressionParameterNode::Ok(_) => {
+                                            CompiledExpression::Ok(_) => {
                                                 ui.colored_label(egui::Color32::GREEN, "Выражение скомпилировано успешно");
                                             }
                                         }

@@ -7,7 +7,7 @@ pub struct EffectConfig {
 }
 
 impl EffectConfig {
-    pub(crate) fn create_root(&self) -> Option<EffectRoot> {
+    pub(crate) fn try_create_root(&self) -> Option<EffectRoot> {
         todo!("Реализовать создание корневого узла эффекта")
     }
 }
