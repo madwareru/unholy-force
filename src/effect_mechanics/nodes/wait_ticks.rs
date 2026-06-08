@@ -11,10 +11,8 @@ use crate::{
         nodes::{
             SharedNodeData,
             ValueSource,
-            get_value_source_entity_id,
             get_effect_env_mut
         },
-        get_entity_parameter_value,
     },
     game_config::{
         ConfigId,
@@ -22,6 +20,7 @@ use crate::{
         parameters::ParameterConfig
     },
 };
+use crate::effect_mechanics::nodes::get_memoized_parameter_value;
 
 pub struct WaitTicksNode {
     shared_node_data: SharedNodeData,
@@ -58,38 +57,29 @@ impl EffectNode for WaitTicksNode {
         effect_id: EntityId,
         delayed_effect_queue: &mut DelayedEffectQueue
     ) -> EffectFlow {
-        let tick_count = {
-            let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
-                error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка получить количество тиков для ожидания провалилась"
-                );
-                return EffectFlow::Complete;
-            };
+        const TICK_COUNT_HASH: &str = "tick_count_elapsed";
 
-            match get_entity_parameter_value(
-                game_config_provider,
-                game_world,
-                value_source_id,
-                self.tick_count_parameter_id
-            ) {
-                Some(tick_count_value) => tick_count_value,
-                _ => {
-                    error!(
-                        target: EFFECT_GRAPH_TARGET,
-                        "Попытка получить количество тиков для ожидания провалилась"
-                    );
-                    return EffectFlow::Complete;
-                }
-            }
+        let Some(ticks_to_wait) = get_memoized_parameter_value(
+            self,
+            game_config_provider,
+            game_world,
+            effect_id,
+            self.value_source,
+            self.tick_count_parameter_id
+        ) else {
+            error!(
+                target: EFFECT_GRAPH_TARGET,
+                "Попытка получить количество тиков для ожидания завершилась неудачей"
+            );
+            return EffectFlow::Complete;
         };
 
         match get_effect_env_mut(game_world, effect_id) {
             Some(mut effect_env) => {
-                let mut tick_count_elapsed = effect_env.get(self, "tick_count_elapsed");
-                if tick_count_elapsed < tick_count {
+                let mut tick_count_elapsed = effect_env.get(self, TICK_COUNT_HASH).unwrap_or(0f32);
+                if tick_count_elapsed < ticks_to_wait {
                     tick_count_elapsed += 1f32;
-                    effect_env.set(self, "tick_count_elapsed", tick_count_elapsed);
+                    effect_env.set(self, TICK_COUNT_HASH, tick_count_elapsed);
                     return EffectFlow::Continue;
                 }
             }

@@ -2,8 +2,23 @@ use egui::Pos2;
 use egui_snarl::NodeId;
 use hecs::{Ref, RefMut};
 use tracing::error;
-use crate::app::game_stage::{EntityId, GameWorld};
-use crate::effect_mechanics::{EffectContext, EffectEnv, EffectFlow, EntityValueHolder, GlobalValuesHolder, EFFECT_GRAPH_TARGET};
+use crate::{
+    effect_mechanics::{
+        get_entity_parameter_value, 
+        EffectContext, 
+        EffectEnv, 
+        EffectNode, 
+        EntityValueHolder, 
+        GlobalValuesHolder,
+        EFFECT_GRAPH_TARGET
+    },
+    app::game_stage::{EntityId, GameWorld},
+    game_config::{
+        ConfigId,
+        ConfigProvider,
+        parameters::ParameterConfig
+    }
+};
 
 pub mod wait_ticks;
 pub mod branch;
@@ -36,6 +51,38 @@ pub fn get_effect_context(game_world: &GameWorld, effect_id: EntityId) -> Option
             None
         }
     }
+}
+
+pub fn get_memoized_parameter_value<N: EffectNode>(
+    node: &N,
+    game_config_provider: &ConfigProvider,
+    game_world: &GameWorld,
+    effect_id: EntityId,
+    value_source: ValueSource,
+    parameter_config_id: ConfigId<ParameterConfig>
+) -> Option<f32> {
+    let value_source_id = get_value_source_entity_id(game_world, effect_id, value_source)?;
+    let memoized_value = get_effect_env(game_world, effect_id)?
+        .get(node, parameter_config_id);
+
+    let value = match memoized_value {
+        Some(value) => value,
+        None => {
+            let value = get_entity_parameter_value(
+                game_config_provider,
+                game_world,
+                value_source_id,
+                parameter_config_id
+            )?;
+
+            get_effect_env_mut(game_world, effect_id)
+                .map(|mut effect_env| effect_env.set(node, parameter_config_id, value));
+
+            value
+        }
+    };
+
+    Some(value)
 }
 
 pub fn get_effect_env(game_world: &GameWorld, effect_id: EntityId) -> Option<Ref<'_, EffectEnv>> {

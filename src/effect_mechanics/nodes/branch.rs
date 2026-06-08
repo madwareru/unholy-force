@@ -1,8 +1,7 @@
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
-        nodes::{get_value_source_entity_id, SharedNodeData, ValueSource},
-        get_entity_parameter_value,
+        nodes::{SharedNodeData, ValueSource},
         DelayedEffectQueue,
         EffectFlow,
         EffectNode,
@@ -14,6 +13,7 @@ use crate::{
 use egui::Pos2;
 use egui_snarl::NodeId;
 use tracing::error;
+use crate::effect_mechanics::nodes::{get_memoized_parameter_value};
 
 pub struct BranchNode {
     shared_node_data: SharedNodeData,
@@ -53,35 +53,26 @@ impl EffectNode for BranchNode {
         effect_id: EntityId,
         delayed_effect_queue: &mut DelayedEffectQueue
     ) -> EffectFlow {
-        let condition = {
-            let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
-                error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка проверить условие в узле ветвления провалилась"
-                );
-                return EffectFlow::Complete;
-            };
-
-            let Some(value) = get_entity_parameter_value(
-                game_config_provider,
-                game_world,
-                value_source_id,
-                self.condition_parameter_id
-            ) else {
-                error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка проверить условие в узле ветвления провалилась"
-                );
-                return EffectFlow::Complete;
-            };
-
-            value
+        let Some(condition) = get_memoized_parameter_value(
+            self,
+            game_config_provider,
+            game_world,
+            effect_id,
+            self.value_source,
+            self.condition_parameter_id
+        ) else {
+            error!(
+                target: EFFECT_GRAPH_TARGET,
+                "Попытка получить значение условия завершилась неудачей"
+            );
+            return EffectFlow::Complete;
         };
 
-        if condition.abs() <= f32::EPSILON {
-            self.else_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
-        } else {
+        // При отрицательности значения считаем, что надо уйти в else ветку, иначе в then
+        if condition > 0f32 {
             self.then_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
+        } else {
+            self.else_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
         }
     }
 }

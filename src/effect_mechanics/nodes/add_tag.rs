@@ -1,11 +1,26 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
-use tracing::error;
-use crate::app::game_stage::{EntityId, GameWorld};
-use crate::effect_mechanics::{add_entity_tag_count, get_entity_parameter_value, DelayedEffectQueue, EffectFlow, EffectNode, EFFECT_GRAPH_TARGET};
-use crate::effect_mechanics::nodes::{get_effect_context, get_value_source_entity_id, SharedNodeData, ValueSource};
-use crate::game_config::{ConfigId, ConfigProvider};
-use crate::game_config::parameters::{ParameterConfig, TagConfig};
+use tracing::{error, info};
+use crate::{
+    game_config::{ConfigId, ConfigProvider},
+    effect_mechanics::{
+        nodes::{
+            get_effect_context,
+            get_effect_env,
+            get_effect_env_mut,
+            get_memoized_parameter_value,
+            SharedNodeData,
+            ValueSource
+        },
+        add_entity_tag_count,
+        DelayedEffectQueue,
+        EffectFlow,
+        EffectNode,
+        EFFECT_GRAPH_TARGET
+    },
+    app::game_stage::{EntityId, GameWorld},
+    game_config::parameters::{ParameterConfig, TagConfig}
+};
 
 pub struct AddTagNode {
     shared_node_data: SharedNodeData,
@@ -49,50 +64,64 @@ impl EffectNode for AddTagNode {
         effect_id: EntityId,
         delayed_effect_queue: &mut DelayedEffectQueue
     ) -> EffectFlow {
-        let value = {
-            let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
-                error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка получить значение для установки лычки провалилась"
-                );
-                return EffectFlow::Complete;
-            };
+        const TAG_GIVEN_HASH: &str = "tag_is_given";
 
-            let Some(value) = get_entity_parameter_value(
-                game_config_provider,
-                game_world,
-                value_source_id,
-                self.value_parameter_id
-            ) else {
-                error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка получить значение для установки лычки провалилась"
-                );
-                return EffectFlow::Complete;
-            };
-
-            value
+        let Some(value) = get_memoized_parameter_value(
+            self,
+            game_config_provider,
+            game_world,
+            effect_id,
+            self.value_source,
+            self.value_parameter_id
+        ) else {
+            error!(
+                target: EFFECT_GRAPH_TARGET,
+                "Не удалось получить количество лычек для добавления"
+            );
+            return EffectFlow::Complete;
         };
 
-        let target_id = match get_effect_context(game_world, effect_id) {
-            Some(effect_context) => effect_context.target_id,
-            None => {
+        let tag_given = match get_effect_env(game_world, effect_id) {
+            Some(effect_env) => effect_env.get(self, TAG_GIVEN_HASH).is_some(),
+            _ => {
                 error!(
                     target: EFFECT_GRAPH_TARGET,
-                    "Попытка получить цель для выдачи лычки провалилась"
+                    "Попытка проверить статус выдачи лычки провалилась"
                 );
                 return EffectFlow::Complete;
             }
         };
 
-        add_entity_tag_count(
-            game_config_provider,
-            game_world,
-            target_id,
-            self.tag_config_id,
-            value,
-            delayed_effect_queue
-        );
+        if !tag_given {
+            let target_id = match get_effect_context(game_world, effect_id) {
+                Some(effect_context) => effect_context.target_id,
+                None => {
+                    error!(
+                        target: EFFECT_GRAPH_TARGET,
+                        "Попытка получить цель для выдачи лычек провалилась"
+                    );
+                    return EffectFlow::Complete;
+                }
+            };
+
+            if !add_entity_tag_count(
+                game_config_provider,
+                game_world,
+                target_id,
+                self.tag_config_id,
+                value,
+                delayed_effect_queue
+            ) {
+                info!(
+                    target: EFFECT_GRAPH_TARGET,
+                    "Сущность, на которую предполагалось наложить лычки, перестала существовать. Цепочка прервана"
+                );
+                return EffectFlow::Complete;
+            }
+
+            get_effect_env_mut(game_world, effect_id)
+                .map(|mut effect_env| effect_env.set(self, TAG_GIVEN_HASH, 1f32));
+        }
 
         self.then_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
     }

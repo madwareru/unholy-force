@@ -3,7 +3,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use bumpalo::{Bump, collections::Vec};
 use egui_snarl::NodeId;
 use rand::RngExt;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 use crate::{
     effect_mechanics::nodes::{get_value_holder, get_value_holder_mut},
@@ -206,9 +206,9 @@ impl EffectEnv {
         Self { buckets: smallvec::SmallVec::new() }
     }
 
-    pub fn get<N: EffectNode, H: Hash>(&self, node: &N, salt_hash: H) -> f32 {
+    pub fn get<N: EffectNode, H: Hash>(&self, node: &N, salt_hash: H) -> Option<f32> {
         let id = get_node_hash(node, salt_hash);
-        self.buckets.iter().find(|it| it.0 == id).map(|it| it.1).unwrap_or(0.0)
+        self.buckets.iter().find(|it| it.0 == id).map(|it| it.1)
     }
 
     pub fn set<N: EffectNode, H: Hash>(&mut self, node: &N, salt_hash: H, value: f32) {
@@ -253,7 +253,7 @@ pub fn get_entity_parameter_value(
     fn eval_expression(
         game_config_provider: &ConfigProvider,
         game_world: &GameWorld,
-        entity: EntityId,
+        entity_id: EntityId,
         parameter_config_id: ConfigId<ParameterConfig>,
         expr_param_node: &ExpressionParameterNode
     ) -> Option<f32> {
@@ -261,23 +261,23 @@ pub fn get_entity_parameter_value(
             ExpressionParameterNode::ParameterValue(param_config_id) => {
                 if *param_config_id == parameter_config_id {
                     error!(
-                                    target: EFFECT_GRAPH_TARGET,
-                                    "Обнаружено рекурсивное выражение в черте с идентификатором {}",
-                                    parameter_config_id.uuid
-                                );
+                        target: EFFECT_GRAPH_TARGET,
+                        "Обнаружено рекурсивное выражение в черте с идентификатором {}",
+                        parameter_config_id.uuid
+                    );
                     return None;
                 }
                 get_entity_parameter_value(
                     game_config_provider,
                     game_world,
-                    entity,
+                    entity_id,
                     *param_config_id
                 )
             }
             ExpressionParameterNode::TagCount(tag_config_id) => {
                 get_entity_tag_count(
                     game_world,
-                    entity,
+                    entity_id,
                     *tag_config_id
                 )
             }
@@ -289,16 +289,16 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Plus => {
                         if operands.is_empty() {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор + с пустым списком операндов в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор + с пустым списком операндов в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let mut acc = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?;
@@ -307,7 +307,7 @@ pub fn get_entity_parameter_value(
                             acc += eval_expression(
                                 game_config_provider,
                                 game_world,
-                                entity,
+                                entity_id,
                                 parameter_config_id,
                                 next
                             )?;
@@ -317,16 +317,16 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Minus => {
                         if operands.is_empty() {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор - с пустым списком операндов в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор - с пустым списком операндов в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let mut acc = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?;
@@ -338,7 +338,7 @@ pub fn get_entity_parameter_value(
                             acc -= eval_expression(
                                 game_config_provider,
                                 game_world,
-                                entity,
+                                entity_id,
                                 parameter_config_id,
                                 next
                             )?;
@@ -348,23 +348,23 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Mul => {
                         if operands.len() < 2 {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор * со списком операндов арности меньше 2 в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор * со списком операндов арности меньше 2 в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let mut acc = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?;
                         acc *= eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(1)?
                         )?;
@@ -373,7 +373,7 @@ pub fn get_entity_parameter_value(
                             acc *= eval_expression(
                                 game_config_provider,
                                 game_world,
-                                entity,
+                                entity_id,
                                 parameter_config_id,
                                 next
                             )?;
@@ -383,23 +383,23 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Div => {
                         if operands.len() < 2 {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор / со списком операндов арности меньше 2 в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор / со списком операндов арности меньше 2 в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let mut acc = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(1)?
                         )?;
                         acc /= eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(1)?
                         )?;
@@ -408,7 +408,7 @@ pub fn get_entity_parameter_value(
                             acc /= eval_expression(
                                 game_config_provider,
                                 game_world,
-                                entity,
+                                entity_id,
                                 parameter_config_id,
                                 next
                             )?;
@@ -418,30 +418,30 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Clamp => {
                         if operands.len() != 3 {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор clamp со списком операндов арности != 3 в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор clamp со списком операндов арности != 3 в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let v = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?;
                         let min = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(1)?
                         )?;
                         let max = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(2)?
                         )?;
@@ -450,23 +450,23 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Min => {
                         if operands.len() != 2 {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор min со списком операндов арности != 2 в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор min со списком операндов арности != 2 в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let lhs = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?;
                         let rhs = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(1)?
                         )?;
@@ -475,23 +475,23 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Max => {
                         if operands.len() != 2 {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор max со списком операндов арности != 2 в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор max со списком операндов арности != 2 в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let lhs = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?;
                         let rhs = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(1)?
                         )?;
@@ -500,16 +500,16 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Round => {
                         if operands.len() != 1 {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор round со списком операндов арности != 1 в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор round со списком операндов арности != 1 в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let rounded = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?.round();
@@ -518,24 +518,24 @@ pub fn get_entity_parameter_value(
                     ParameterOperator::Rand => {
                         if operands.len() != 2 {
                             error!(
-                                            target: EFFECT_GRAPH_TARGET,
-                                            "Обнаружен оператор rand со списком операндов арности != 2 в черте с идентификатором {}",
-                                            parameter_config_id.uuid
-                                        );
+                                target: EFFECT_GRAPH_TARGET,
+                                "Обнаружен оператор rand со списком операндов арности != 2 в черте с идентификатором {}",
+                                parameter_config_id.uuid
+                            );
                             return None;
                         }
                         let mut rng = rand::rng();
                         let start = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(0)?
                         )?;
                         let end = eval_expression(
                             game_config_provider,
                             game_world,
-                            entity,
+                            entity_id,
                             parameter_config_id,
                             operands.get(1)?
                         )?;
@@ -627,7 +627,11 @@ pub fn add_entity_tag_count(
     tag_config_id: ConfigId<TagConfig>,
     value: f32,
     delayed_effect_queue: &mut DelayedEffectQueue
-) {
+) -> bool {
+    if let Err(_) = game_world.entity(entity_id) {
+        return false;
+    }
+    
     if let Some(entity_tag_count) = get_entity_tag_count(game_world, entity_id, tag_config_id)
         && entity_tag_count < 1f32
         && (entity_tag_count + value) >= 1f32
@@ -664,6 +668,7 @@ pub fn add_entity_tag_count(
                 value_holder.tag_buckets.retain(|it| it.0 != tag_config_id.uuid);
             }
         });
+    true
 }
 
 pub fn get_node_hash<N: EffectNode, H: Hash>(node: &N, salt_hash: H) -> u128 {
