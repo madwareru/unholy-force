@@ -2,7 +2,7 @@ use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
         nodes::{SharedNodeData, ValueSource},
-        DelayedEffectQueue,
+        EffectQueue,
         EffectFlow,
         EffectNode,
         EFFECT_GRAPH_TARGET
@@ -12,7 +12,7 @@ use crate::{
 };
 use egui::Pos2;
 use egui_snarl::NodeId;
-use tracing::error;
+use tracing::{error};
 use crate::effect_mechanics::nodes::{get_memoized_parameter_value};
 
 pub struct BranchNode {
@@ -51,7 +51,7 @@ impl EffectNode for BranchNode {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) -> EffectFlow {
         let Some(condition) = get_memoized_parameter_value(
             self,
@@ -70,9 +70,9 @@ impl EffectNode for BranchNode {
 
         // При отрицательности значения считаем, что надо уйти в else ветку, иначе в then
         if condition > 0f32 {
-            self.then_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
+            self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
         } else {
-            self.else_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
+            self.else_node.tick(game_config_provider, game_world, effect_id, effect_queue)
         }
     }
 }

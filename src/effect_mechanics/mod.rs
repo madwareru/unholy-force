@@ -23,28 +23,24 @@ use crate::{
         }
     }
 };
+use crate::effect_mechanics::nodes::effect_context_is_expired;
 
 pub mod nodes;
 
 pub const EFFECT_GRAPH_TARGET: &str = "Эффект граф";
 
 #[derive(Default)]
-pub struct EffectEvaluatorRegistry {
-    bump: Bump,
-    provider: EffectRootProvider
+pub struct EffectRegistry {
+    effect_roots: HashMap<ConfigId<EffectConfig>, EffectRoot>
 }
 
-#[derive(Default)]
-pub struct EffectRootProvider {
-    effects: HashMap<ConfigId<EffectConfig>, EffectRoot>,
-}
-impl EffectRootProvider {
+impl EffectRegistry {
     fn get_or_create_effect_root(
         &mut self,
         game_config_provider: &ConfigProvider,
         effect_config_id: ConfigId<EffectConfig>
     ) -> Option<&EffectRoot> {
-        if !self.effects.contains_key(&effect_config_id) {
+        if !self.effect_roots.contains_key(&effect_config_id) {
             match game_config_provider.get_config(effect_config_id) {
                 None => {
                     error!(
@@ -56,7 +52,7 @@ impl EffectRootProvider {
                 Some(effect_config) => {
                     match effect_config.try_create_root() {
                         Some(effect_evaluator) => {
-                            self.effects.insert(
+                            self.effect_roots.insert(
                                 effect_config_id,
                                 effect_evaluator
                             );
@@ -72,31 +68,29 @@ impl EffectRootProvider {
                 }
             }
         }
-        self.effects.get(&effect_config_id)
+        self.effect_roots.get(&effect_config_id)
     }
-}
 
-impl EffectEvaluatorRegistry {
     pub fn create_effect(
         &mut self,
+        bump: &Bump,
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_config_id: ConfigId<EffectConfig>,
         effect_context: EffectContext
     ) {
-        let bump = &self.bump;
-        let mut queue = DelayedEffectQueue(Vec::new_in(bump));
+        let mut queue = EffectQueue::new_in(bump);
 
         queue.push(effect_config_id, effect_context);
 
         let mut offset = 0;
         while offset < queue.0.len() {
-            let Some(DelayedEffect { effect_config_id, effect_context }) = queue.0.get(offset).copied() else {
+            let Some(ScheduledEffect { effect_config_id, effect_context }) = queue.0.get(offset).copied() else {
                 continue;
             };
             offset += 1;
 
-            let Some(root_node) = self.provider.get_or_create_effect_root(
+            let Some(root_node) = self.get_or_create_effect_root(
                 game_config_provider,
                 effect_config_id
             ) else {
@@ -111,6 +105,7 @@ impl EffectEvaluatorRegistry {
 
     pub fn tick(
         &mut self,
+        bump: &Bump,
         game_config_provider: &ConfigProvider,
         effect_id: EntityId,
         game_world: &mut GameWorld
@@ -122,15 +117,14 @@ impl EffectEvaluatorRegistry {
             }
         };
 
-        let Some(root_node) = self.provider.get_or_create_effect_root(
+        let Some(root_node) = self.get_or_create_effect_root(
             game_config_provider,
             effect_config_id
         ) else {
             return;
         };
 
-        let bump = &self.bump;
-        let mut queue = DelayedEffectQueue(Vec::new_in(bump));
+        let mut queue = EffectQueue(Vec::new_in(bump));
 
         if let EffectFlow::Complete = root_node.tick(game_config_provider, game_world, effect_id, &mut queue) {
             root_node.on_destroy(game_config_provider, game_world, effect_id, &mut queue);
@@ -139,12 +133,12 @@ impl EffectEvaluatorRegistry {
 
         let mut offset = 0;
         while offset < queue.0.len() {
-            let Some(DelayedEffect { effect_config_id, effect_context }) = queue.0.get(offset).copied() else {
+            let Some(ScheduledEffect { effect_config_id, effect_context }) = queue.0.get(offset).copied() else {
                 continue;
             };
             offset += 1;
 
-            let Some(root_node) = self.provider.get_or_create_effect_root(
+            let Some(root_node) = self.get_or_create_effect_root(
                 game_config_provider,
                 effect_config_id
             ) else {
@@ -159,19 +153,36 @@ impl EffectEvaluatorRegistry {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct DelayedEffect {
+pub struct ScheduledEffect {
     effect_config_id: ConfigId<EffectConfig>,
     effect_context: EffectContext
 }
 
-pub struct DelayedEffectQueue<'a>(Vec<'a, DelayedEffect>);
-impl<'a> DelayedEffectQueue<'a> {
+impl ScheduledEffect {
+    pub fn effect_config_id(&self) -> ConfigId<EffectConfig> {
+        self.effect_config_id
+    }
+    pub fn effect_context(&self) -> EffectContext {
+        self.effect_context
+    }
+}
+
+pub struct EffectQueue<'a>(Vec<'a, ScheduledEffect>);
+impl<'a> EffectQueue<'a> {
+    pub fn new_in(bump: &'a Bump) -> Self {
+        EffectQueue(Vec::new_in(bump))
+    }
+
     pub fn push(
         &mut self,
         effect_config_id: ConfigId<EffectConfig>,
         effect_context: EffectContext
     ) {
-        self.0.push(DelayedEffect { effect_config_id, effect_context } );
+        self.0.push(ScheduledEffect { effect_config_id, effect_context } );
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item =ScheduledEffect> {
+        self.0.drain(..)
     }
 }
 
@@ -626,12 +637,12 @@ pub fn add_entity_tag_count(
     entity_id: EntityId,
     tag_config_id: ConfigId<TagConfig>,
     value: f32,
-    delayed_effect_queue: &mut DelayedEffectQueue
+    delayed_effect_queue: &mut EffectQueue
 ) -> bool {
     if let Err(_) = game_world.entity(entity_id) {
         return false;
     }
-    
+
     if let Some(entity_tag_count) = get_entity_tag_count(game_world, entity_id, tag_config_id)
         && entity_tag_count < 1f32
         && (entity_tag_count + value) >= 1f32
@@ -696,7 +707,7 @@ pub trait EffectNode {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) -> EffectFlow;
 }
 
@@ -720,17 +731,26 @@ impl EffectRoot {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) {
         let Some(setup) = &self.setup else {
             return;
         };
 
+        if effect_context_is_expired(game_world, effect_id) {
+            info!(
+                target: EFFECT_GRAPH_TARGET,
+                "Актуальность контекста эффекта {:?} утеряна, установка проигнорирована",
+                effect_id
+            );
+            return;
+        }
+
         match setup.tick(
             game_config_provider,
             game_world,
             effect_id,
-            delayed_effect_queue
+            effect_queue
         ) {
             EffectFlow::Continue => {
                 warn!(
@@ -749,13 +769,22 @@ impl EffectRoot {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) -> EffectFlow {
+        if effect_context_is_expired(game_world, effect_id) {
+            info!(
+                target: EFFECT_GRAPH_TARGET,
+                "Цепочка эффекта {:?} прервана ввиду утери актуальности контекста",
+                effect_id
+            );
+            return EffectFlow::Complete;
+        }
+
         self.tick.tick(
             game_config_provider,
             game_world,
             effect_id,
-            delayed_effect_queue
+            effect_queue
         )
     }
 
@@ -764,17 +793,26 @@ impl EffectRoot {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) {
         let Some(on_destroy) = &self.on_destroy else {
             return;
         };
 
+        if effect_context_is_expired(game_world, effect_id) {
+            info!(
+                target: EFFECT_GRAPH_TARGET,
+                "Актуальность контекста эффекта {:?} утеряна, очистка проигнорирована",
+                effect_id
+            );
+            return;
+        }
+
         match on_destroy.tick(
             game_config_provider,
             game_world,
             effect_id,
-            delayed_effect_queue
+            effect_queue
         ) {
             EffectFlow::Continue => {
                 warn!(

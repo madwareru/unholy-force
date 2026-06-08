@@ -13,7 +13,7 @@ use crate::{
             ValueSource
         },
         add_entity_tag_count,
-        DelayedEffectQueue,
+        EffectQueue,
         EffectFlow,
         EffectNode,
         EFFECT_GRAPH_TARGET
@@ -62,7 +62,7 @@ impl EffectNode for AddTagNode {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) -> EffectFlow {
         const TAG_GIVEN_HASH: &str = "tag_is_given";
 
@@ -110,7 +110,7 @@ impl EffectNode for AddTagNode {
                 target_id,
                 self.tag_config_id,
                 value,
-                delayed_effect_queue
+                effect_queue
             ) {
                 info!(
                     target: EFFECT_GRAPH_TARGET,
@@ -123,6 +123,6 @@ impl EffectNode for AddTagNode {
                 .map(|mut effect_env| effect_env.set(self, TAG_GIVEN_HASH, 1f32));
         }
 
-        self.then_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
+        self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
     }
 }

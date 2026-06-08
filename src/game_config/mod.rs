@@ -104,6 +104,10 @@ pub struct ConfigProvider {
     game_config: GameConfig,
 }
 impl ConfigProvider {
+    pub fn make() -> Self {
+        todo!()
+    }
+    
     pub fn get_game_config(&self) -> &GameConfig {
         &self.game_config
     }

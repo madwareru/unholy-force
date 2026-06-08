@@ -1,7 +1,7 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
 use crate::app::game_stage::{EntityId, GameWorld};
-use crate::effect_mechanics::{DelayedEffectQueue, EffectFlow, EffectNode};
+use crate::effect_mechanics::{EffectQueue, EffectFlow, EffectNode};
 use crate::effect_mechanics::nodes::SharedNodeData;
 use crate::game_config::ConfigProvider;
 
@@ -23,7 +23,7 @@ impl EffectNode for TerminatorNode {
         _game_config_provider: &ConfigProvider, 
         _game_world: &mut GameWorld, 
         _effect_id: EntityId, 
-        _delayed_effect_queue: &mut DelayedEffectQueue
+        _effect_queue: &mut EffectQueue
     ) -> EffectFlow {
         EffectFlow::Complete
     }

@@ -1,14 +1,14 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
 use hecs::{Ref, RefMut};
-use tracing::error;
+use tracing::{error, info};
 use crate::{
     effect_mechanics::{
-        get_entity_parameter_value, 
-        EffectContext, 
-        EffectEnv, 
-        EffectNode, 
-        EntityValueHolder, 
+        get_entity_parameter_value,
+        EffectContext,
+        EffectEnv,
+        EffectNode,
+        EntityValueHolder,
         GlobalValuesHolder,
         EFFECT_GRAPH_TARGET
     },
@@ -159,6 +159,38 @@ pub fn get_value_source_entity_id(
                 effect_id
             );
             None
+        }
+    }
+}
+
+pub fn effect_context_is_expired(game_world: &GameWorld, effect_id: EntityId) -> bool {
+    match get_effect_context(game_world, effect_id) {
+        Some(context) =>  {
+            if game_world.entity(context.caster_id).is_err() {
+                info!(
+                    target: EFFECT_GRAPH_TARGET,
+                    "Источник эффекта {:?} перестал существовать",
+                    effect_id
+                );
+                true
+            } else if game_world.entity(context.target_id).is_err() {
+                info!(
+                    target: EFFECT_GRAPH_TARGET,
+                    "Приёмник эффекта {:?} перестал существовать",
+                    effect_id
+                );
+                true
+            } else {
+                false
+            }
+        },
+        _ => {
+            error!(
+                target: EFFECT_GRAPH_TARGET,
+                "Попытка получить источник значений эффекта для {:?} провалилась",
+                effect_id
+            );
+            true
         }
     }
 }

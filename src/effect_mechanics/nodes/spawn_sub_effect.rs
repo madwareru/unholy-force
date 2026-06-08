@@ -2,7 +2,7 @@ use egui::Pos2;
 use egui_snarl::NodeId;
 use tracing::error;
 use crate::app::game_stage::{EntityId, GameWorld};
-use crate::effect_mechanics::{DelayedEffectQueue, EffectFlow, EffectNode, EFFECT_GRAPH_TARGET};
+use crate::effect_mechanics::{EffectQueue, EffectFlow, EffectNode, EFFECT_GRAPH_TARGET};
 use crate::effect_mechanics::nodes::{get_effect_context, get_effect_env, get_effect_env_mut, SharedNodeData};
 use crate::game_config::{ConfigId, ConfigProvider};
 use crate::game_config::effects::EffectConfig;
@@ -37,7 +37,7 @@ impl EffectNode for SpawnSubEffectNode{
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) -> EffectFlow {
         const EFFECT_HAS_SPAWN_HASH: &str = "effect_has_spawn";
 
@@ -55,7 +55,7 @@ impl EffectNode for SpawnSubEffectNode{
         if !effect_has_spawn {
             match get_effect_context(game_world, effect_id) {
                 Some(effect_context) => {
-                    delayed_effect_queue.push(self.effect_config_id, *effect_context);
+                    effect_queue.push(self.effect_config_id, *effect_context);
                 }
                 _ => {
                     error!(
@@ -70,6 +70,6 @@ impl EffectNode for SpawnSubEffectNode{
                 .map(|mut effect_env| effect_env.set(self, EFFECT_HAS_SPAWN_HASH, 1f32));
         }
 
-        self.then_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
+        self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
     }
 }

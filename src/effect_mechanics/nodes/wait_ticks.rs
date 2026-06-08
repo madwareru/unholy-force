@@ -4,7 +4,7 @@ use tracing::error;
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
-        DelayedEffectQueue,
+        EffectQueue,
         EffectFlow,
         EffectNode,
         EFFECT_GRAPH_TARGET,
@@ -55,7 +55,7 @@ impl EffectNode for WaitTicksNode {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        delayed_effect_queue: &mut DelayedEffectQueue
+        effect_queue: &mut EffectQueue
     ) -> EffectFlow {
         const TICK_COUNT_HASH: &str = "tick_count_elapsed";
 
@@ -91,6 +91,6 @@ impl EffectNode for WaitTicksNode {
                 return EffectFlow::Complete;
             }
         }
-        self.then_node.tick(game_config_provider, game_world, effect_id, delayed_effect_queue)
+        self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
     }
 }
