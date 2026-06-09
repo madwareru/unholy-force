@@ -1,4 +1,4 @@
-use crate::app::editor_stage::image_widgets::{floor_part_id_button, fpa_button, visualize_floor_part_adjacency, NeighbourData};
+use crate::app::editor_stage::widgets::{floor_part_id_button, fpa_button, visualize_floor_part_adjacency, NeighbourData};
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;

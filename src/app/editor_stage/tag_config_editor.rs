@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::parameters::{TagConfig, PARAMETER_CACHE};
-use crate::app::editor_stage::image_widgets::{sprite_pivot_editor, tag_selector_button};
+use crate::app::editor_stage::widgets::{sprite_pivot_editor, tag_selector_button};
 use crate::game_config::ConfigId;
 use crate::graphics::SPRITE_ATLAS_DEF;
 
@@ -269,7 +269,7 @@ impl EditorStage {
 
                                                 let ui = &mut uis[current_column];
                                                 ui.add_space(4f32);
-                                                let response = crate::app::editor_stage::image_widgets::atlas_sprite_button(
+                                                let response = crate::app::editor_stage::widgets::atlas_sprite_button(
                                                     ui,
                                                     texture_id,
                                                     atlas_size,

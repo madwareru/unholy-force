@@ -25,7 +25,7 @@ pub mod floor_config_editor;
 pub mod floor_flow_graph_config_editor;
 pub mod tag_config_editor;
 pub mod parameter_config_editor;
-pub mod image_widgets;
+pub mod widgets;
 pub mod text_completion;
 #[derive(Copy, Clone, Deserialize)]
 pub enum EditorCommand {

@@ -1,4 +1,4 @@
-use crate::app::editor_stage::image_widgets::{floor_data_holder_editor, floor_part_id_button, item_config_id_button, item_selector_popup, unit_config_id_button, unit_selector_popup};
+use crate::app::editor_stage::widgets::{floor_data_holder_editor, floor_part_id_button, item_config_id_button, item_selector_popup, unit_config_id_button, unit_selector_popup};
 use crate::app::editor_stage::{thick_selector_button, EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::floor_parts::{FloorCellExtra, FloorPartConfig, FLOOR_CELL_EXTRA_MODES};

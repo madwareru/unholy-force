@@ -86,7 +86,7 @@ impl SpriteHolder for ParameterConfig {
 
 impl Config for ParameterConfig {}
 
-use crate::app::editor_stage::image_widgets::SpriteHolder;
+use crate::app::editor_stage::widgets::SpriteHolder;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct TagConfig {

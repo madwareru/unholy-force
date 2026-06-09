@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::app::editor_stage::image_widgets::SpriteHolder;
+use crate::app::editor_stage::widgets::SpriteHolder;
 use crate::game_config::{Config};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]

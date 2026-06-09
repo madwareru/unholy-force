@@ -1,7 +1,7 @@
 use egui::{PopupCloseBehavior, TextEdit, Ui};
 use uuid::Uuid;
 use crate::app::editor_stage::{EditorStage, UpdateState};
-use crate::app::editor_stage::image_widgets::{atlas_sprite_button, sprite_pivot_editor, sprite_holder_visualizer, unit_selector_button};
+use crate::app::editor_stage::widgets::{atlas_sprite_button, sprite_pivot_editor, sprite_holder_visualizer, unit_selector_button};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::units::{UnitConfig, UnitDanger};
 use crate::graphics::SPRITE_ATLAS_DEF;

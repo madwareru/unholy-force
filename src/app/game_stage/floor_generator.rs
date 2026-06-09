@@ -8,7 +8,7 @@ use crate::{
         AuthoredFloorSize30x30, FloorConfig, FloorSize40x40, FloorSize60x60, FloorSize80x80,
         FloorVariant,
     },
-    app::editor_stage::image_widgets::{
+    app::editor_stage::widgets::{
         EditableFloorData
     },
     app::game_stage::grid_math::{traverse_area_inward},

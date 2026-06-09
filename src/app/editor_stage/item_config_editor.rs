@@ -1,4 +1,4 @@
-use crate::app::editor_stage::image_widgets::{sprite_pivot_editor, item_selector_button, atlas_sprite_button, sprite_holder_visualizer};
+use crate::app::editor_stage::widgets::{sprite_pivot_editor, item_selector_button, atlas_sprite_button, sprite_holder_visualizer};
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::items::{ItemConfig, ItemRarity};

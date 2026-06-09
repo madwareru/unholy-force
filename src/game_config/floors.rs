@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::app::editor_stage::image_widgets::{EditableFloorData};
+use crate::app::editor_stage::widgets::{EditableFloorData};
 use crate::game_config::{Config, ConfigId};
 use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use crate::game_config::floor_parts::FloorCellExtra;

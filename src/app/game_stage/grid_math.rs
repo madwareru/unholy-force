@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::app::editor_stage::image_widgets::EditableFloorData;
+use crate::app::editor_stage::widgets::EditableFloorData;
 use crate::graphics::WallGraphicsTileGroup;
 
 #[derive(Clone, Copy)]

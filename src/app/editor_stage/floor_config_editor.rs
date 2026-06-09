@@ -2,7 +2,7 @@ use crate::{
     app::{
         editor_stage::{
             floor_part_editor::{FloorPartEditorTool, FloorPartToolsSubSection},
-            image_widgets::{
+            widgets::{
                 floor_data_holder_editor,
                 fpa_id_button,
                 fpa_selector_popup,

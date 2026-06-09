@@ -5,7 +5,7 @@ use crate::graphics::{FloorGraphicsTileGroup, WallGraphicsTileGroup};
 use std::io::{Result, Error, ErrorKind, Write, Read};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::app::editor_stage::image_widgets::{EditableFloorData};
+use crate::app::editor_stage::widgets::{EditableFloorData};
 use crate::game_config::effects::EffectConfig;
 
 pub const NO_EXTRA: &str = "Нет экстра данных";

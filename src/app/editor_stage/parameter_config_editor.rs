@@ -1,7 +1,7 @@
 use crate::{
     app::{
         editor_stage::{
-            image_widgets::{sprite_pivot_editor, parameter_selector_button},
+            widgets::{sprite_pivot_editor, parameter_selector_button},
             EditorStage,
             UpdateState
         }
@@ -308,7 +308,7 @@ impl EditorStage {
 
                                                     let ui = &mut uis[current_column];
                                                     ui.add_space(4f32);
-                                                    let response = crate::app::editor_stage::image_widgets::atlas_sprite_button(
+                                                    let response = crate::app::editor_stage::widgets::atlas_sprite_button(
                                                         ui,
                                                         texture_id,
                                                         atlas_size,
