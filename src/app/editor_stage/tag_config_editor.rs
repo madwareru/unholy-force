@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::app::editor_stage::{EditorStage, UpdateState};
 use crate::assets::{AssetDb, AssetKind};
 use crate::game_config::parameters::{TagConfig, PARAMETER_CACHE};
-use crate::app::editor_stage::image_widgets::{sprite_pivot_editor};
+use crate::app::editor_stage::image_widgets::{sprite_pivot_editor, tag_selector_button};
 use crate::game_config::ConfigId;
 use crate::graphics::SPRITE_ATLAS_DEF;
 
@@ -43,6 +43,14 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_tag_selector(&mut self, ui: &mut Ui) {
+        let texture_id: egui::TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+        let atlas_size = self.atlas_size;
+
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
                 let full_width = ui.available_width();
@@ -80,13 +88,13 @@ impl EditorStage {
                             let tag_config: TagConfig = json5::from_str(&config_text)
                                 .expect("Failed to load tag config");
 
-                            let response = ui.selectable_label(
+                            let response = tag_selector_button(
+                                ui,
                                 selected,
-                                if tag_config.bound_name.is_empty() {
-                                    tag_asset_name.to_owned()
-                                } else {
-                                    format!("[{}] {}", tag_config.bound_name, tag_asset_name)
-                                }
+                                texture_id,
+                                atlas_size,
+                                tag_asset_name,
+                                &tag_config,
                             );
 
                             let popup_id = ui.make_persistent_id(format!("выпадающее меню {}", id));

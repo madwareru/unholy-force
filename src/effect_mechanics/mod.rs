@@ -1,5 +1,7 @@
-use std::collections::{HashMap};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::{
+    collections::{HashMap},
+    hash::{DefaultHasher, Hash, Hasher}
+};
 use bumpalo::{Bump, collections::Vec};
 use egui_snarl::NodeId;
 use rand::RngExt;
@@ -50,12 +52,9 @@ impl EffectRegistry {
                     );
                 }
                 Some(effect_config) => {
-                    match effect_config.try_create_root() {
-                        Some(effect_evaluator) => {
-                            self.effect_roots.insert(
-                                effect_config_id,
-                                effect_evaluator
-                            );
+                    match effect_config.try_into() {
+                        Ok(effect_root) => {
+                            self.effect_roots.insert(effect_config_id, effect_root);
                         }
                         _ => {
                             error!(
@@ -712,16 +711,16 @@ pub trait EffectNode {
 }
 
 pub struct EffectRoot {
-    setup: Option<Box<dyn EffectNode>>,
+    setup: Box<dyn EffectNode>,
     tick: Box<dyn EffectNode>,
-    on_destroy: Option<Box<dyn EffectNode>>,
+    on_destroy: Box<dyn EffectNode>,
 }
 
 impl EffectRoot {
     pub fn new(
-        setup: Option<Box<dyn EffectNode>>,
+        setup: Box<dyn EffectNode>,
         tick: Box<dyn EffectNode>,
-        on_destroy: Option<Box<dyn EffectNode>>,
+        on_destroy: Box<dyn EffectNode>,
     ) -> Self {
         Self { setup, tick, on_destroy }
     }
@@ -733,10 +732,6 @@ impl EffectRoot {
         effect_id: EntityId,
         effect_queue: &mut EffectQueue
     ) {
-        let Some(setup) = &self.setup else {
-            return;
-        };
-
         if effect_context_is_expired(game_world, effect_id) {
             info!(
                 target: EFFECT_GRAPH_TARGET,
@@ -746,7 +741,7 @@ impl EffectRoot {
             return;
         }
 
-        match setup.tick(
+        match self.setup.tick(
             game_config_provider,
             game_world,
             effect_id,
@@ -795,10 +790,6 @@ impl EffectRoot {
         effect_id: EntityId,
         effect_queue: &mut EffectQueue
     ) {
-        let Some(on_destroy) = &self.on_destroy else {
-            return;
-        };
-
         if effect_context_is_expired(game_world, effect_id) {
             info!(
                 target: EFFECT_GRAPH_TARGET,
@@ -808,7 +799,7 @@ impl EffectRoot {
             return;
         }
 
-        match on_destroy.tick(
+        match self.on_destroy.tick(
             game_config_provider,
             game_world,
             effect_id,

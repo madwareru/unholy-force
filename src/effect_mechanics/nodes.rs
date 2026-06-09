@@ -1,6 +1,7 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
 use hecs::{Ref, RefMut};
+use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 use crate::{
     effect_mechanics::{
@@ -21,6 +22,7 @@ use crate::{
 };
 
 pub mod wait_ticks;
+pub mod wait_cond;
 pub mod branch;
 pub mod spawn_sub_effect;
 pub mod add_tag;
@@ -32,8 +34,9 @@ pub struct SharedNodeData{
     pub pos: Pos2,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub enum ValueSource {
+    #[default]
     Global,
     Caster,
     Target

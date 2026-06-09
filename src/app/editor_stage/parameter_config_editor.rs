@@ -1,7 +1,7 @@
 use crate::{
     app::{
         editor_stage::{
-            image_widgets::sprite_pivot_editor,
+            image_widgets::{sprite_pivot_editor, parameter_selector_button},
             EditorStage,
             UpdateState
         }
@@ -100,6 +100,14 @@ impl EditorStage {
     }
 
     pub(crate) fn draw_parameter_selector(&mut self, ui: &mut egui::Ui) {
+        let texture_id: egui::TextureId;
+        if let Some(handle) = &self.atlas_texture {
+            texture_id = handle.id();
+        } else {
+            unreachable!()
+        };
+        let atlas_size = self.atlas_size;
+
         match crate::assets::ASSET_DATABASE.lock() {
             Ok(mut asset_db) => {
                 let full_width = ui.available_width();
@@ -138,13 +146,13 @@ impl EditorStage {
                             let param_config: ParameterConfig = json5::from_str(&config_text)
                                 .expect("Failed to load parameter config");
 
-                            let response = ui.selectable_label(
+                            let response = parameter_selector_button(
+                                ui,
                                 selected,
-                                if param_config.bound_name.is_empty() {
-                                    param_asset_name.to_owned()
-                                } else {
-                                    format!("{{{}}} {}", param_config.bound_name, param_asset_name)
-                                }
+                                texture_id,
+                                atlas_size,
+                                param_asset_name,
+                                &param_config,
                             );
 
                             let popup_id =

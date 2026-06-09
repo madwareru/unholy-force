@@ -21,18 +21,10 @@ pub struct StartFloorNode {
 }
 impl StartFloorNode {
     fn floor_name(&self) -> &str {
-        match self {
-            StartFloorNode {
-                floor_id,
-                cached_name,
-                ..
-            } => {
-                if ConfigId::INVALID.eq(floor_id) {
-                    "Нет данных"
-                } else {
-                    cached_name.as_str()
-                }
-            }
+        if ConfigId::INVALID.eq(&self.floor_id) {
+            "Нет данных"
+        } else {
+            self.cached_name.as_str()
         }
     }
     pub fn floor_id(&self) -> ConfigId<FloorConfig> {
@@ -129,7 +121,7 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
     ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node] {
             FloorFlowNode::StartFloor(_) => {
-                unreachable!("Number node has no inputs")
+                unreachable!("Start Floor node has no inputs")
             }
             FloorFlowNode::Floor(_) => match &*pin.remotes {
                 [] => {
@@ -165,73 +157,13 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
     fn show_output(
         &mut self,
         pin: &OutPin,
-        ui: &mut Ui,
+        _ui: &mut Ui,
         _scale: f32,
         snarl: &mut Snarl<FloorFlowNode>,
     ) -> impl SnarlPin + 'static {
         match snarl[pin.id.node] {
-            FloorFlowNode::StartFloor(ref mut value) => {
-                let response = ui.button(value.floor_name());
-                let popup_id = ui.make_persistent_id("выбор стартового этажа");
-                if response.clicked() {
-                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                }
-                egui::popup_below_widget(
-                    ui,
-                    popup_id,
-                    &response,
-                    PopupCloseBehavior::CloseOnClickOutside,
-                    |ui| {
-                        if let Ok(asset_db) = ASSET_DATABASE.lock() {
-                            let floor_config_assets =
-                                asset_db.list_all_assets(AssetKind::FloorConfig);
-                            for (uuid, _) in floor_config_assets {
-                                let asset_text =
-                                    asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
-                                let config: FloorConfig = json5::from_str(&asset_text)
-                                    .expect("Failed to load floor config");
-                                if ui.button(&config.name).clicked() {
-                                    value.floor_id = ConfigId::from_uuid(uuid);
-                                    value.cached_name = config.name;
-                                    ui.memory_mut(|mem| mem.close_popup());
-                                }
-                            }
-                        }
-                    },
-                );
-                PinInfo::square()
-                    .with_fill(FLOOR_PIN_COLOR)
-                    .with_wire_style(WireStyle::Bezier5)
-            }
-            FloorFlowNode::Floor(ref mut value) => {
-                let response = ui.button(value.floor_name());
-                let popup_id = ui.make_persistent_id("выбор этажа");
-                if response.clicked() {
-                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                }
-                egui::popup_below_widget(
-                    ui,
-                    popup_id,
-                    &response,
-                    PopupCloseBehavior::CloseOnClickOutside,
-                    |ui| {
-                        if let Ok(asset_db) = ASSET_DATABASE.lock() {
-                            let floor_config_assets =
-                                asset_db.list_all_assets(AssetKind::FloorConfig);
-                            for (uuid, _) in floor_config_assets {
-                                let asset_text =
-                                    asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
-                                let config: FloorConfig = json5::from_str(&asset_text)
-                                    .expect("Failed to load floor config");
-                                if ui.button(&config.name).clicked() {
-                                    value.floor_id = ConfigId::from_uuid(uuid);
-                                    value.cached_name = config.name;
-                                    ui.memory_mut(|mem| mem.close_popup());
-                                }
-                            }
-                        }
-                    },
-                );
+            | FloorFlowNode::StartFloor(_)
+            | FloorFlowNode::Floor(_) => {
                 PinInfo::square()
                     .with_fill(FLOOR_PIN_COLOR)
                     .with_wire_style(WireStyle::Bezier5)
@@ -258,6 +190,34 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
         match node_data {
             FloorFlowNode::StartFloor(data) => {
                 ui.vertical(|ui| {
+                    let response = ui.button(data.floor_name());
+                    let popup_id = ui.make_persistent_id("выбор стартового этажа");
+                    if response.clicked() {
+                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                    }
+                    egui::popup_below_widget(
+                        ui,
+                        popup_id,
+                        &response,
+                        PopupCloseBehavior::CloseOnClickOutside,
+                        |ui| {
+                            if let Ok(asset_db) = ASSET_DATABASE.lock() {
+                                let floor_config_assets =
+                                    asset_db.list_all_assets(AssetKind::FloorConfig);
+                                for (uuid, _) in floor_config_assets {
+                                    let asset_text =
+                                        asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
+                                    let config: FloorConfig = json5::from_str(&asset_text)
+                                        .expect("Failed to load floor config");
+                                    if ui.button(&config.name).clicked() {
+                                        data.floor_id = ConfigId::from_uuid(uuid);
+                                        data.cached_name = config.name;
+                                        ui.memory_mut(|mem| mem.close_popup());
+                                    }
+                                }
+                            }
+                        },
+                    );
                     ui.label("Комментарий:");
                     ui.text_edit_multiline(&mut data.comment);
                 });
@@ -268,6 +228,34 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
                         ui.label("Количество входов:");
                         ui.add(egui::DragValue::new(&mut data.num_in_passages).range(1..=8));
                     });
+                    let response = ui.button(data.floor_name());
+                    let popup_id = ui.make_persistent_id("выбор этажа");
+                    if response.clicked() {
+                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                    }
+                    egui::popup_below_widget(
+                        ui,
+                        popup_id,
+                        &response,
+                        PopupCloseBehavior::CloseOnClickOutside,
+                        |ui| {
+                            if let Ok(asset_db) = ASSET_DATABASE.lock() {
+                                let floor_config_assets =
+                                    asset_db.list_all_assets(AssetKind::FloorConfig);
+                                for (uuid, _) in floor_config_assets {
+                                    let asset_text =
+                                        asset_db.load_json5_asset(AssetKind::FloorConfig, uuid);
+                                    let config: FloorConfig = json5::from_str(&asset_text)
+                                        .expect("Failed to load floor config");
+                                    if ui.button(&config.name).clicked() {
+                                        data.floor_id = ConfigId::from_uuid(uuid);
+                                        data.cached_name = config.name;
+                                        ui.memory_mut(|mem| mem.close_popup());
+                                    }
+                                }
+                            }
+                        },
+                    );
                     ui.label("Комментарий:");
                     ui.text_edit_multiline(&mut data.comment);
                 });
@@ -348,5 +336,9 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
 }
 
 pub type FloorFlowGraphConfig = Snarl<FloorFlowNode>;
+
+pub fn make_floor_flow_graph() -> FloorFlowGraphConfig {
+    FloorFlowGraphConfig::default()
+}
 
 impl Config for FloorFlowGraphConfig {}

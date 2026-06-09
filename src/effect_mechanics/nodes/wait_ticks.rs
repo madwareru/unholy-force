@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use egui::Pos2;
 use egui_snarl::NodeId;
 use tracing::error;

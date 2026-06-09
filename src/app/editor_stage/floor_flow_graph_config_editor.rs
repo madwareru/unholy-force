@@ -5,7 +5,7 @@ use egui_snarl::ui::{NodeLayout, PinPlacement, PinShape, SnarlStyle};
 use uuid::Uuid;
 use crate::app::editor_stage::EditorStage;
 use crate::assets::AssetKind;
-use crate::game_config::floor_flow_graph::{FloorFlowGraphConfig, FloorFlowGraphViewer, FloorFlowNode};
+use crate::game_config::floor_flow_graph::{make_floor_flow_graph, FloorFlowGraphConfig, FloorFlowGraphViewer, FloorFlowNode};
 
 pub struct FloorFlowGraphEditorSection {
     config_name_filter: String,
@@ -128,9 +128,9 @@ impl EditorStage {
             [full_width, 24f32],
             Button::new("Создать граф этажей"),
         ).clicked() {
-            let default_config = FloorFlowGraphConfig::default();
+            let default_config = make_floor_flow_graph();
             let config_text = json5::to_string(&default_config)
-                .expect("Failed to serialize default floor flow graph config");
+                .expect("Failed to serialize newly created floor flow graph config");
 
             let section = &mut self.floor_flow_graph_section;
             section.current_config = Some(default_config);

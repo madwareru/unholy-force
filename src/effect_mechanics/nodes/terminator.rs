@@ -5,6 +5,9 @@ use crate::effect_mechanics::{EffectQueue, EffectFlow, EffectNode};
 use crate::effect_mechanics::nodes::SharedNodeData;
 use crate::game_config::ConfigProvider;
 
+/// Особый узел, возникающий при случае, когда связь в графе не выставлена.
+/// Не представлен отдельным узлом в эффект графе.
+/// Наследует идентификатор и позицию родительского узла
 pub struct TerminatorNode {
     shared_node_data: SharedNodeData
 }
