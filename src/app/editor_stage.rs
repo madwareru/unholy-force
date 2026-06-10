@@ -108,7 +108,7 @@ impl EditorStage {
                 AssetKind::FloorFlowGraphConfig => f32::INFINITY,
                 AssetKind::ParameterConfig => 450f32,
                 AssetKind::TagConfig => 450f32,
-                AssetKind::EffectConfig => 450f32,
+                AssetKind::EffectConfig => f32::INFINITY,
                 AssetKind::GameGonfig => 450f32,
             };
 
@@ -199,7 +199,6 @@ impl EditorStage {
                             AssetKind::FloorConfig => self.draw_floor_editor_tools(ui),
                             AssetKind::TagConfig => {},
                             AssetKind::ParameterConfig => {},
-                            AssetKind::EffectConfig => self.draw_effect_preview_in_level(ui),
                             _ => {}
                         }
                     });

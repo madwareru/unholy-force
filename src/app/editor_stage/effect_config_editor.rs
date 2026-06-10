@@ -2,11 +2,18 @@ use std::rc::Rc;
 use egui::{PopupCloseBehavior, Stroke, TextEdit, Ui};
 use egui_snarl::ui::{NodeLayout, PinPlacement, PinShape, SnarlStyle};
 use uuid::Uuid;
-use crate::app::editor_stage::{EditorStage, UpdateState};
-use crate::app::editor_stage::widgets::{atlas_sprite_button, effect_selector_button, sprite_holder_visualizer, sprite_pivot_editor};
-use crate::assets::{AssetDb, AssetKind};
-use crate::game_config::effects::EffectConfig;
-use crate::graphics::SPRITE_ATLAS_DEF;
+use crate::{
+    app::{
+        editor_stage::{
+            EditorStage,
+            UpdateState,
+            widgets::{atlas_sprite_button, effect_selector_button, sprite_pivot_editor}
+        }
+    },
+    assets::{AssetDb, AssetKind},
+    game_config::effects::EffectConfig,
+    graphics::SPRITE_ATLAS_DEF
+};
 
 pub struct EffectConfigEditorSection {
     effect_name_filter: String,
@@ -38,14 +45,14 @@ impl EditorStage {
     fn update_current_effect_config(
         &mut self,
         asset_db: &mut AssetDb,
-        foo: impl FnOnce(&mut String, &mut EffectConfig) -> UpdateState,
+        foo: impl FnOnce(&AssetDb, &mut String, &mut EffectConfig) -> UpdateState,
     ) {
         let section = &mut self.effect_section;
         let name = &mut section.selected_effect_name;
         let cur_effect = &mut section.current_effect_config;
 
         if let Some(current_effect_config) = cur_effect {
-            if foo(name, current_effect_config) == UpdateState::Changed {
+            if foo(asset_db, name, current_effect_config) == UpdateState::Changed {
                 if let Some(id) = section.selected_effect_config_id {
                     asset_db.update_asset_mut(
                         AssetKind::EffectConfig,
@@ -183,28 +190,6 @@ impl EditorStage {
         }
     }
 
-    pub(crate) fn draw_effect_preview_in_level(&self, ui: &mut Ui) {
-        let texture_id: egui::TextureId;
-        if let Some(handle) = &self.atlas_texture {
-            texture_id = handle.id();
-        } else {
-            unreachable!()
-        };
-        let atlas_size = self.atlas_size;
-        if let Some(effect_config) = &self.effect_section.current_effect_config {
-            if effect_config.sprite_name.is_empty() {
-                return;
-            }
-            ui.vertical(|ui| {
-                ui.add_space(6f32);
-                ui.group(|ui| {
-                    ui.label("Предпросмотр на игровом поле:");
-                    sprite_holder_visualizer(ui, texture_id, atlas_size, effect_config)
-                });
-            });
-        }
-    }
-
     pub(crate) fn draw_effect_editor(&mut self, ui: &mut Ui) {
         let texture_id: egui::TextureId;
         if let Some(handle) = &self.atlas_texture {
@@ -215,167 +200,149 @@ impl EditorStage {
         let atlas_size = self.atlas_size;
         let style = Rc::clone(&self.effect_section.style);
 
-        match crate::assets::ASSET_DATABASE.lock() {
-            Ok(mut asset_db) => {
-                self.update_current_effect_config(
-                    &mut asset_db,
-                    |effect_name, current_effect_config| {
-                        let mut update_state = UpdateState::Unchanged;
-                        ui.vertical(|ui| {
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label("Название для редактора:");
-                                    if ui
-                                        .add(
-                                            TextEdit::singleline(effect_name)
-                                                .desired_width(f32::INFINITY),
-                                        )
-                                        .changed()
-                                    {
-                                        update_state = UpdateState::Changed;
-                                    }
-                                });
-                                ui.horizontal(|ui| {
-                                    ui.label("Описание:");
-                                    if ui
-                                        .add(
-                                            TextEdit::multiline(
-                                                &mut current_effect_config.description,
-                                            )
-                                            .desired_width(f32::INFINITY),
-                                        )
-                                        .changed()
-                                    {
-                                        update_state = UpdateState::Changed;
-                                    }
-                                });
-                                ui.horizontal(|ui| {
-                                    ui.label("Изображение:");
-                                    let full_width = ui.available_width();
+        let mut asset_db = crate::assets::ASSET_DATABASE.lock()
+            .expect("Failed to lock asset database");
 
-                                    let response = ui.add_sized(
-                                        [full_width, ui.spacing().interact_size.y],
-                                        egui::Button::new(&current_effect_config.sprite_name),
-                                    );
-                                    let popup_id =
-                                        ui.make_persistent_id("выбор изображения");
-                                    if response.clicked() {
-                                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                                    }
-                                    egui::popup_below_widget(
-                                        ui,
-                                        popup_id,
-                                        &response,
-                                        PopupCloseBehavior::CloseOnClickOutside,
-                                        |ui| {
-                                            const COLUMNS_COUNT: usize = 6;
-                                            ui.columns(COLUMNS_COUNT, |uis| {
-                                                let mut current_column = 0;
+        self.update_current_effect_config(
+            &mut asset_db,
+            |asset_db, effect_name, current_effect_config| {
+                let mut update_state = UpdateState::Unchanged;
+                ui.vertical(|ui| {
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Название для редактора:");
+                            if ui
+                                .add(
+                                    TextEdit::singleline(effect_name)
+                                        .desired_width(f32::INFINITY),
+                                )
+                                .changed()
+                            {
+                                update_state = UpdateState::Changed;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Описание:");
+                            if ui
+                                .add(
+                                    TextEdit::multiline(
+                                        &mut current_effect_config.description,
+                                    )
+                                        .desired_width(f32::INFINITY),
+                                )
+                                .changed()
+                            {
+                                update_state = UpdateState::Changed;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Изображение:");
+                            let full_width = ui.available_width();
 
-                                                for sprite in
-                                                    crate::graphics::SPRITE_ATLAS_DEF
-                                                        .sprite_keys()
-                                                {
-                                                    let sprite_name = sprite.as_str();
+                            let response = ui.add_sized(
+                                [full_width, ui.spacing().interact_size.y],
+                                egui::Button::new(&current_effect_config.sprite_name),
+                            );
+                            let popup_id =
+                                ui.make_persistent_id("выбор изображения");
+                            if response.clicked() {
+                                ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                            }
+                            egui::popup_below_widget(
+                                ui,
+                                popup_id,
+                                &response,
+                                PopupCloseBehavior::CloseOnClickOutside,
+                                |ui| {
+                                    const COLUMNS_COUNT: usize = 6;
+                                    ui.columns(COLUMNS_COUNT, |uis| {
+                                        let mut current_column = 0;
 
-                                                    let ui = &mut uis[current_column];
-                                                    ui.add_space(4f32);
-                                                    let response = atlas_sprite_button(
-                                                        ui,
-                                                        texture_id,
-                                                        atlas_size,
-                                                        sprite_name,
-                                                        96f32,
-                                                    );
+                                        for sprite in
+                                            crate::graphics::SPRITE_ATLAS_DEF
+                                                .sprite_keys()
+                                        {
+                                            let sprite_name = sprite.as_str();
 
-                                                    if response.clicked() {
-                                                        current_effect_config
-                                                            .sprite_name
-                                                            .clear();
-                                                        current_effect_config
-                                                            .sprite_name
-                                                            += sprite_name;
-                                                        update_state = UpdateState::Changed;
-                                                        ui.memory_mut(|mem| {
-                                                            mem.close_popup()
-                                                        });
-                                                    }
+                                            let ui = &mut uis[current_column];
+                                            ui.add_space(4f32);
+                                            let response = atlas_sprite_button(
+                                                ui,
+                                                texture_id,
+                                                atlas_size,
+                                                sprite_name,
+                                                96f32,
+                                            );
 
-                                                    current_column =
-                                                        (current_column + 1) % COLUMNS_COUNT;
-                                                }
-                                            });
-                                        },
-                                    );
-                                });
+                                            if response.clicked() {
+                                                current_effect_config
+                                                    .sprite_name
+                                                    .clear();
+                                                current_effect_config
+                                                    .sprite_name
+                                                    += sprite_name;
+                                                update_state = UpdateState::Changed;
+                                                ui.memory_mut(|mem| {
+                                                    mem.close_popup()
+                                                });
+                                            }
 
-                                let sprite_data = SPRITE_ATLAS_DEF
-                                    .get_sprite_def(&current_effect_config.sprite_name);
-
-                                let w = ui.available_width();
-                                let zoom = if sprite_data.size[0] == 0 {
-                                    1f32
-                                } else {
-                                    w / (sprite_data.size[0] as f32 * 16f32)
-                                };
-                                let old_pivot = current_effect_config.sprite_pivot;
-                                sprite_pivot_editor(
-                                    ui,
-                                    texture_id,
-                                    atlas_size,
-                                    current_effect_config,
-                                    zoom,
-                                );
-                                if !old_pivot.eq(&current_effect_config.sprite_pivot) {
-                                    update_state = UpdateState::Changed;
-                                }
-
-                                ui.horizontal(|ui| {
-                                    ui.label("Опорная точка:");
-
-                                    let available_width = ui.available_width();
-                                    let slider_width = available_width / 2f32;
-
-                                    if ui
-                                        .add_sized(
-                                            [slider_width, ui.spacing().interact_size.y],
-                                            egui::Slider::new(
-                                                &mut current_effect_config.sprite_pivot[0],
-                                                0..=sprite_data.size[0] * 16 - 1,
-                                            ),
-                                        )
-                                        .changed()
-                                    {
-                                        update_state = UpdateState::Changed;
-                                    }
-                                    if ui
-                                        .add_sized(
-                                            [slider_width, ui.spacing().interact_size.y],
-                                            egui::Slider::new(
-                                                &mut current_effect_config.sprite_pivot[1],
-                                                0..=sprite_data.size[1] * 16 - 1,
-                                            ),
-                                        )
-                                        .changed()
-                                    {
-                                        update_state = UpdateState::Changed;
-                                    }
-                                });
-                            });
+                                            current_column =
+                                                (current_column + 1) % COLUMNS_COUNT;
+                                        }
+                                    });
+                                },
+                            );
                         });
 
-                        update_state
-                    },
-                );
-            }
-            _ => {}
-        }
+                        let sprite_data = SPRITE_ATLAS_DEF
+                            .get_sprite_def(&current_effect_config.sprite_name);
 
-        match crate::assets::ASSET_DATABASE.lock() {
-            Ok(asset_db) => {
-                if let Some(current_effect_config) =
-                    &mut self.effect_section.current_effect_config
-                {
+                        let zoom = 4f32;
+                        let old_pivot = current_effect_config.sprite_pivot;
+                        sprite_pivot_editor(
+                            ui,
+                            texture_id,
+                            atlas_size,
+                            current_effect_config,
+                            zoom,
+                        );
+                        if !old_pivot.eq(&current_effect_config.sprite_pivot) {
+                            update_state = UpdateState::Changed;
+                        }
+
+                        ui.horizontal(|ui| {
+                            ui.label("Опорная точка:");
+
+                            let available_width = ui.available_width();
+                            let slider_width = available_width / 2f32;
+
+                            if ui
+                                .add_sized(
+                                    [slider_width, ui.spacing().interact_size.y],
+                                    egui::Slider::new(
+                                        &mut current_effect_config.sprite_pivot[0],
+                                        0..=sprite_data.size[0] * 16 - 1,
+                                    ),
+                                )
+                                .changed()
+                            {
+                                update_state = UpdateState::Changed;
+                            }
+                            if ui
+                                .add_sized(
+                                    [slider_width, ui.spacing().interact_size.y],
+                                    egui::Slider::new(
+                                        &mut current_effect_config.sprite_pivot[1],
+                                        0..=sprite_data.size[1] * 16 - 1,
+                                    ),
+                                )
+                                .changed()
+                            {
+                                update_state = UpdateState::Changed;
+                            }
+                        });
+                    });
                     ui.group(|ui| {
                         if current_effect_config.edit_snarl(
                             ui,
@@ -384,28 +351,13 @@ impl EditorStage {
                             atlas_size,
                             &style,
                         ) {
-                            if let Some(id) = self.effect_section.selected_effect_config_id {
-                                drop(asset_db);
-                                if let Ok(mut asset_db) =
-                                    crate::assets::ASSET_DATABASE.lock()
-                                {
-                                    asset_db.update_asset_mut(
-                                        AssetKind::EffectConfig,
-                                        id,
-                                        |buffer| {
-                                            json5::to_writer(
-                                                buffer,
-                                                current_effect_config,
-                                            )
-                                        },
-                                    );
-                                }
-                            }
+                            update_state = UpdateState::Changed;
                         }
-                    });
-                }
-            }
-            _ => {}
-        }
+                    })
+                });
+
+                update_state
+            },
+        );
     }
 }
