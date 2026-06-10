@@ -8,7 +8,7 @@ use crate::{
         get_entity_parameter_value,
         EffectContext,
         EffectEnv,
-        EffectNode,
+        EffectNodeImpl,
         EntityValueHolder,
         GlobalValuesHolder,
         EFFECT_GRAPH_TARGET
@@ -28,20 +28,28 @@ pub mod spawn_sub_effect;
 pub mod add_tag;
 pub mod terminator;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SharedNodeData{
     pub node_id: NodeId,
     pub pos: Pos2,
 }
 
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
 pub enum ValueSource {
     #[default]
     Global,
     Caster,
     Target
 }
-
+impl ValueSource {
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ValueSource::Global => "Глобальное",
+            ValueSource::Caster => "Источник",
+            ValueSource::Target => "Приёмник"
+        }
+    }
+}
 pub fn get_effect_context(game_world: &GameWorld, effect_id: EntityId) -> Option<Ref<'_, EffectContext>> {
     match game_world.get::<&EffectContext>(effect_id) {
         Ok(context) => Some(context),
@@ -56,7 +64,7 @@ pub fn get_effect_context(game_world: &GameWorld, effect_id: EntityId) -> Option
     }
 }
 
-pub fn get_memoized_parameter_value<N: EffectNode>(
+pub fn get_memoized_parameter_value<N: EffectNodeImpl>(
     node: &N,
     game_config_provider: &ConfigProvider,
     game_world: &GameWorld,

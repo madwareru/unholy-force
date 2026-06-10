@@ -4,23 +4,34 @@ use crate::{
         nodes::{SharedNodeData, ValueSource},
         EffectQueue,
         EffectFlow,
+        EffectNodeImpl,
+        EFFECT_GRAPH_TARGET,
         EffectNode,
-        EFFECT_GRAPH_TARGET
+        nodes::{get_memoized_parameter_value}
     },
-    game_config::parameters::ParameterConfig,
-    game_config::{ConfigId, ConfigProvider}
+    game_config::{
+        parameters::ParameterConfig,
+        ConfigId,
+        ConfigProvider
+    }
 };
 use egui::Pos2;
 use egui_snarl::NodeId;
+use serde::{Deserialize, Serialize};
 use tracing::{error};
-use crate::effect_mechanics::nodes::{get_memoized_parameter_value};
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BranchNode {
     shared_node_data: SharedNodeData,
     value_source: ValueSource,
     condition_parameter_id: ConfigId<ParameterConfig>,
-    then_node: Box<dyn EffectNode>,
-    else_node: Box<dyn EffectNode>,
+    then_node: EffectNode,
+    else_node: EffectNode,
+}
+impl Into<EffectNode> for BranchNode {
+    fn into(self) -> EffectNode {
+        EffectNode::BranchNode(Box::new(self))
+    }
 }
 
 impl BranchNode {
@@ -28,8 +39,8 @@ impl BranchNode {
         shared_node_data: SharedNodeData,
         value_source: ValueSource,
         condition_parameter_id: ConfigId<ParameterConfig>,
-        then_node: Box<dyn EffectNode>,
-        else_node: Box<dyn EffectNode>
+        then_node: EffectNode,
+        else_node: EffectNode
     ) -> Self {
         Self {
             shared_node_data,
@@ -41,7 +52,7 @@ impl BranchNode {
     }
 }
 
-impl EffectNode for BranchNode {
+impl EffectNodeImpl for BranchNode {
     fn get_node_id(&self) -> NodeId { self.shared_node_data.node_id }
 
     fn get_node_pos(&self) -> Pos2 { self.shared_node_data.pos }

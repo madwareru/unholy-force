@@ -1,29 +1,48 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
+use serde::{Deserialize, Serialize};
 use tracing::error;
-use crate::app::game_stage::{EntityId, GameWorld};
-use crate::effect_mechanics::{EffectQueue, EffectFlow, EffectNode, EFFECT_GRAPH_TARGET};
-use crate::effect_mechanics::nodes::{get_effect_context, get_effect_env, get_effect_env_mut, SharedNodeData};
-use crate::game_config::{ConfigId, ConfigProvider};
-use crate::game_config::effects::EffectConfig;
+use crate::{
+    app::game_stage::{EntityId, GameWorld},
+    effect_mechanics::{
+        EffectQueue,
+        EffectFlow,
+        EffectNodeImpl,
+        EFFECT_GRAPH_TARGET,
+        EffectNode,
+        nodes::{get_effect_context, get_effect_env, get_effect_env_mut, SharedNodeData}
+    },
+    game_config::{
+        ConfigId,
+        ConfigProvider,
+        effects::EffectConfig
+    }
+};
 
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SpawnSubEffectNode{
     shared_node_data: SharedNodeData,
     effect_config_id: ConfigId<EffectConfig>,
-    then_node: Box<dyn EffectNode>
+    then_node: EffectNode
+}
+impl Into<EffectNode> for SpawnSubEffectNode {
+    fn into(self) -> EffectNode {
+        EffectNode::SpawnSubEffectNode(Box::new(self))
+    }
 }
 
 impl SpawnSubEffectNode {
     pub fn new(
         shared_node_data: SharedNodeData,
         effect_config_id: ConfigId<EffectConfig>,
-        then_node: Box<dyn EffectNode>
+        then_node: EffectNode
     ) -> Self {
         Self { shared_node_data, effect_config_id, then_node }
     }
 }
 
-impl EffectNode for SpawnSubEffectNode{
+impl EffectNodeImpl for SpawnSubEffectNode{
     fn get_node_id(&self) -> NodeId {
         self.shared_node_data.node_id
     }

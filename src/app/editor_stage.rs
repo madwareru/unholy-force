@@ -4,6 +4,7 @@ use crate::{
     app::{
         app_stage::AppStageStatus,
         editor_stage::{
+            effect_config_editor::EffectConfigEditorSection,
             floor_part_editor::FloorPartConfigEditorSection,
             item_config_editor::ItemConfigEditorSection,
             parameter_config_editor::ParameterConfigEditorSection,
@@ -25,6 +26,7 @@ pub mod floor_config_editor;
 pub mod floor_flow_graph_config_editor;
 pub mod tag_config_editor;
 pub mod parameter_config_editor;
+pub mod effect_config_editor;
 pub mod widgets;
 pub mod text_completion;
 #[derive(Copy, Clone, Deserialize)]
@@ -50,6 +52,7 @@ pub struct EditorStage {
     floor_flow_graph_section: FloorFlowGraphEditorSection,
     tag_section: TagConfigEditorSection,
     parameter_section: ParameterConfigEditorSection,
+    effect_section: EffectConfigEditorSection,
 }
 
 impl EditorStage {
@@ -67,6 +70,7 @@ impl EditorStage {
             floor_flow_graph_section: Default::default(),
             tag_section: Default::default(),
             parameter_section: Default::default(),
+            effect_section: Default::default(),
         }
     }
 
@@ -129,6 +133,7 @@ impl EditorStage {
                                     AssetKind::FloorFlowGraphConfig,
                                     AssetKind::ParameterConfig,
                                     AssetKind::TagConfig,
+                                    AssetKind::EffectConfig,
                                 ] {
                                     let ui = &mut ui[offset];
                                     offset = (offset + 1) % COLUMN_COUNT;
@@ -154,7 +159,7 @@ impl EditorStage {
                                 AssetKind::FloorFlowGraphConfig => self.draw_floor_graph_selector(ui),
                                 AssetKind::ParameterConfig => self.draw_parameter_selector(ui),
                                 AssetKind::TagConfig => self.draw_tag_selector(ui),
-                                AssetKind::EffectConfig => todo!(),
+                                AssetKind::EffectConfig => self.draw_effect_selector(ui),
                                 AssetKind::GameGonfig => todo!()
                             }
                         });
@@ -194,6 +199,7 @@ impl EditorStage {
                             AssetKind::FloorConfig => self.draw_floor_editor_tools(ui),
                             AssetKind::TagConfig => {},
                             AssetKind::ParameterConfig => {},
+                            AssetKind::EffectConfig => self.draw_effect_preview_in_level(ui),
                             _ => {}
                         }
                     });
@@ -210,6 +216,7 @@ impl EditorStage {
                     AssetKind::FloorFlowGraphConfig => self.draw_floor_flow_graph_editor(ui),
                     AssetKind::TagConfig => self.draw_tag_editor(ui),
                     AssetKind::ParameterConfig => self.draw_parameter_editor(ui),
+                    AssetKind::EffectConfig => self.draw_effect_editor(ui),
                     _ => {} // todo
                 }
             });

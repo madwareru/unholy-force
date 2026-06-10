@@ -1,8 +1,13 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
+use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 use crate::{
-    game_config::{ConfigId, ConfigProvider},
+    game_config::{
+        ConfigId,
+        ConfigProvider,
+        parameters::{ParameterConfig, TagConfig}
+    },
     effect_mechanics::{
         nodes::{
             get_effect_context,
@@ -15,19 +20,25 @@ use crate::{
         add_entity_tag_count,
         EffectQueue,
         EffectFlow,
-        EffectNode,
-        EFFECT_GRAPH_TARGET
+        EffectNodeImpl,
+        EFFECT_GRAPH_TARGET,
+        EffectNode
     },
     app::game_stage::{EntityId, GameWorld},
-    game_config::parameters::{ParameterConfig, TagConfig}
 };
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddTagNode {
     shared_node_data: SharedNodeData,
     value_source: ValueSource,
     value_parameter_id: ConfigId<ParameterConfig>,
     tag_config_id: ConfigId<TagConfig>,
-    then_node: Box<dyn EffectNode>,
+    then_node: EffectNode,
+}
+impl Into<EffectNode> for AddTagNode {
+    fn into(self) -> EffectNode {
+        EffectNode::AddTagNode(Box::new(self))
+    }
 }
 
 impl AddTagNode {
@@ -36,7 +47,7 @@ impl AddTagNode {
         value_source: ValueSource,
         value_parameter_id: ConfigId<ParameterConfig>,
         tag_config_id: ConfigId<TagConfig>,
-        then_node: Box<dyn EffectNode>,
+        then_node: EffectNode,
     ) -> Self {
         Self {
             shared_node_data,
@@ -48,7 +59,7 @@ impl AddTagNode {
     }
 }
 
-impl EffectNode for AddTagNode {
+impl EffectNodeImpl for AddTagNode {
     fn get_node_id(&self) -> NodeId {
         self.shared_node_data.node_id
     }

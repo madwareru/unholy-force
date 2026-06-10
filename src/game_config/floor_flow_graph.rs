@@ -125,7 +125,7 @@ impl SnarlViewer<FloorFlowNode> for FloorFlowGraphViewer {
             }
             FloorFlowNode::Floor(_) => match &*pin.remotes {
                 [] => {
-                    ui.label("None");
+                    ui.label("Нет данных");
                     PinInfo::square().with_fill(FLOOR_PIN_COLOR)
                 }
                 [remote] => match snarl[remote.node] {

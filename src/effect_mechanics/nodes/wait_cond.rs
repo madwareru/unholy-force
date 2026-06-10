@@ -1,25 +1,36 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
+use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
         get_entity_parameter_value,
         EffectFlow,
-        EffectNode,
+        EffectNodeImpl,
         EffectQueue,
         EFFECT_GRAPH_TARGET,
-        nodes::{get_effect_env, get_effect_env_mut, get_value_source_entity_id, SharedNodeData, ValueSource}
+        nodes::{get_effect_env, get_effect_env_mut, get_value_source_entity_id, SharedNodeData, ValueSource},
+        EffectNode
     },
-    game_config::{ConfigId, ConfigProvider},
-    game_config::parameters::ParameterConfig
+    game_config::{
+        ConfigId,
+        ConfigProvider,
+        parameters::ParameterConfig
+    },
 };
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WaitForConditionNode {
     shared_node_data: SharedNodeData,
     value_source: ValueSource,
     condition_parameter_id: ConfigId<ParameterConfig>,
-    then_node: Box<dyn EffectNode>,
+    then_node: EffectNode,
+}
+impl Into<EffectNode> for WaitForConditionNode {
+    fn into(self) -> EffectNode {
+        EffectNode::WaitForConditionNode(Box::new(self))
+    }
 }
 
 impl WaitForConditionNode {
@@ -27,7 +38,7 @@ impl WaitForConditionNode {
         shared_node_data: SharedNodeData,
         value_source: ValueSource,
         condition_parameter_id: ConfigId<ParameterConfig>,
-        then_node: Box<dyn EffectNode>
+        then_node: EffectNode
     ) -> Self {
         Self {
             shared_node_data,
@@ -38,7 +49,7 @@ impl WaitForConditionNode {
     }
 }
 
-impl EffectNode for WaitForConditionNode {
+impl EffectNodeImpl for WaitForConditionNode {
     fn get_node_id(&self) -> NodeId {
         self.shared_node_data.node_id
     }

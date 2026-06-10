@@ -2,13 +2,27 @@ use std::{
     collections::{HashMap},
     hash::{DefaultHasher, Hash, Hasher}
 };
+use std::fmt::Debug;
 use bumpalo::{Bump, collections::Vec};
 use egui_snarl::NodeId;
 use rand::RngExt;
 use tracing::{error, info, warn};
 use uuid::Uuid;
+use serde::{Deserialize, Serialize};
 use crate::{
-    effect_mechanics::nodes::{get_value_holder, get_value_holder_mut},
+    effect_mechanics::{
+        nodes::{
+            get_value_holder,
+            get_value_holder_mut,
+            add_tag::AddTagNode,
+            branch::BranchNode,
+            effect_context_is_expired,
+            spawn_sub_effect::SpawnSubEffectNode,
+            terminator::TerminatorNode,
+            wait_cond::WaitForConditionNode,
+            wait_ticks::WaitTicksNode
+        }
+    },
     app::game_stage::{EntityId, GameWorld},
     game_config::{
         ConfigId,
@@ -23,9 +37,8 @@ use crate::{
             ParameterType,
             TagConfig
         }
-    }
+    },
 };
-use crate::effect_mechanics::nodes::effect_context_is_expired;
 
 pub mod nodes;
 
@@ -52,18 +65,7 @@ impl EffectRegistry {
                     );
                 }
                 Some(effect_config) => {
-                    match effect_config.try_into() {
-                        Ok(effect_root) => {
-                            self.effect_roots.insert(effect_config_id, effect_root);
-                        }
-                        _ => {
-                            error!(
-                                target: EFFECT_GRAPH_TARGET,
-                                "Не удалось создать корневой узел для эффекта с идентификатором {:?}",
-                                effect_config_id
-                            );
-                        }
-                    }
+                    self.effect_roots.insert(effect_config_id, effect_config.root_node());
                 }
             }
         }
@@ -216,12 +218,12 @@ impl EffectEnv {
         Self { buckets: smallvec::SmallVec::new() }
     }
 
-    pub fn get<N: EffectNode, H: Hash>(&self, node: &N, salt_hash: H) -> Option<f32> {
+    pub fn get<N: EffectNodeImpl, H: Hash>(&self, node: &N, salt_hash: H) -> Option<f32> {
         let id = get_node_hash(node, salt_hash);
         self.buckets.iter().find(|it| it.0 == id).map(|it| it.1)
     }
 
-    pub fn set<N: EffectNode, H: Hash>(&mut self, node: &N, salt_hash: H, value: f32) {
+    pub fn set<N: EffectNodeImpl, H: Hash>(&mut self, node: &N, salt_hash: H, value: f32) {
         let id = get_node_hash(node, salt_hash);
         if self.buckets.iter_mut().find(|it| it.0 == id).map(|it| it.1 = value).is_none() {
             self.buckets.push((id, value));
@@ -681,7 +683,7 @@ pub fn add_entity_tag_count(
     true
 }
 
-pub fn get_node_hash<N: EffectNode, H: Hash>(node: &N, salt_hash: H) -> u128 {
+pub fn get_node_hash<N: EffectNodeImpl, H: Hash>(node: &N, salt_hash: H) -> u128 {
     let mut salt_hasher = DefaultHasher::new();
     salt_hash.hash(&mut salt_hasher);
     let salt_hash = salt_hasher.finish() as u128;
@@ -698,7 +700,7 @@ pub fn get_node_hash<N: EffectNode, H: Hash>(node: &N, salt_hash: H) -> u128 {
     result_hash
 }
 
-pub trait EffectNode {
+pub trait EffectNodeImpl {
     fn get_node_id(&self) -> NodeId;
     fn get_node_pos(&self) -> egui::Pos2;
     fn tick(
@@ -710,17 +712,61 @@ pub trait EffectNode {
     ) -> EffectFlow;
 }
 
+macro_rules! enum_dispatched {
+    (pub enum $name:ident { $($variant:ident),* }) => {
+        #[derive(Clone, Debug, Serialize, Deserialize)]
+        pub enum $name {
+            $($variant(Box<$variant>)),*
+        }
+        impl EffectNodeImpl for $name {
+            fn get_node_id(&self) -> NodeId {
+                match self {
+                    $(Self::$variant(x) => x.get_node_id(),)*
+                }
+            }
+            fn get_node_pos(&self) -> egui::Pos2 {
+                match self {
+                    $(Self::$variant(x) => x.get_node_pos(),)*
+                }
+            }
+            fn tick(
+                &self,
+                game_config_provider: &ConfigProvider,
+                game_world: &mut GameWorld,
+                effect_id: EntityId,
+                effect_queue: &mut EffectQueue
+            ) -> EffectFlow {
+                match self {
+                    $(Self::$variant(x) => x.tick(game_config_provider, game_world, effect_id, effect_queue),)*
+                }
+            }
+        }
+    };
+}
+
+enum_dispatched!(
+    pub enum EffectNode {
+        AddTagNode,
+        BranchNode,
+        SpawnSubEffectNode,
+        TerminatorNode,
+        WaitForConditionNode,
+        WaitTicksNode
+    }
+);
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EffectRoot {
-    setup: Box<dyn EffectNode>,
-    tick: Box<dyn EffectNode>,
-    on_destroy: Box<dyn EffectNode>,
+    setup: EffectNode,
+    tick: EffectNode,
+    on_destroy: EffectNode,
 }
 
 impl EffectRoot {
     pub fn new(
-        setup: Box<dyn EffectNode>,
-        tick: Box<dyn EffectNode>,
-        on_destroy: Box<dyn EffectNode>,
+        setup: EffectNode,
+        tick: EffectNode,
+        on_destroy: EffectNode,
     ) -> Self {
         Self { setup, tick, on_destroy }
     }

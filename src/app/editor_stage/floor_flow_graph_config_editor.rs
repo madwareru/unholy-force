@@ -3,9 +3,11 @@ use std::collections::hash_map::DefaultHasher;
 use egui::{Button, PopupCloseBehavior, Stroke, TextEdit, Ui};
 use egui_snarl::ui::{NodeLayout, PinPlacement, PinShape, SnarlStyle};
 use uuid::Uuid;
-use crate::app::editor_stage::EditorStage;
-use crate::assets::AssetKind;
-use crate::game_config::floor_flow_graph::{make_floor_flow_graph, FloorFlowGraphConfig, FloorFlowGraphViewer, FloorFlowNode};
+use crate::{
+    app::editor_stage::EditorStage,
+    assets::AssetKind,
+    game_config::floor_flow_graph::{make_floor_flow_graph, FloorFlowGraphConfig, FloorFlowGraphViewer, FloorFlowNode}
+};
 
 pub struct FloorFlowGraphEditorSection {
     config_name_filter: String,

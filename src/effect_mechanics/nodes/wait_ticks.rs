@@ -1,18 +1,21 @@
 use egui::Pos2;
 use egui_snarl::NodeId;
+use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
         EffectQueue,
         EffectFlow,
-        EffectNode,
+        EffectNodeImpl,
         EFFECT_GRAPH_TARGET,
         nodes::{
             SharedNodeData,
             ValueSource,
             get_effect_env_mut
         },
+        EffectNode,
+        nodes::get_memoized_parameter_value
     },
     game_config::{
         ConfigId,
@@ -20,13 +23,19 @@ use crate::{
         parameters::ParameterConfig
     },
 };
-use crate::effect_mechanics::nodes::get_memoized_parameter_value;
 
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WaitTicksNode {
     shared_node_data: SharedNodeData,
     value_source: ValueSource,
     tick_count_parameter_id: ConfigId<ParameterConfig>,
-    then_node: Box<dyn EffectNode>
+    then_node: EffectNode
+}
+impl Into<EffectNode> for WaitTicksNode {
+    fn into(self) -> EffectNode {
+        EffectNode::WaitTicksNode(Box::new(self))
+    }
 }
 
 impl WaitTicksNode {
@@ -34,7 +43,7 @@ impl WaitTicksNode {
         shared_node_data: SharedNodeData,
         value_source: ValueSource,
         tick_count_parameter_id: ConfigId<ParameterConfig>,
-        then_node: Box<dyn EffectNode>
+        then_node: EffectNode
     ) -> Self {
         Self {
             shared_node_data,
@@ -45,7 +54,7 @@ impl WaitTicksNode {
     }
 }
 
-impl EffectNode for WaitTicksNode {
+impl EffectNodeImpl for WaitTicksNode {
     fn get_node_id(&self) -> NodeId { self.shared_node_data.node_id }
 
     fn get_node_pos(&self) -> Pos2 { self.shared_node_data.pos }

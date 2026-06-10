@@ -4,6 +4,7 @@ use crate::game_config::floor_part_adjacency::FloorPartAdjacencyConfig;
 use crate::game_config::floor_parts::{FloorCellExtra, FloorPartConfig};
 use crate::game_config::items::ItemConfig;
 use crate::game_config::parameters::{ParameterConfig, TagConfig};
+use crate::game_config::effects::EffectConfig;
 use crate::game_config::units::UnitConfig;
 use crate::graphics::{
     FloorGraphicsTileGroup, SPRITE_ATLAS_DEF, WANG_MASK_CLAMP_EAST_LOOKUP,
@@ -2761,6 +2762,170 @@ pub fn unit_selector_popup(
                     ui.add_space(4f32);
 
                     let response = unit_config_id_button(
+                        ui,
+                        asset_db,
+                        false,
+                        atlas_texture,
+                        atlas_size,
+                        config_id,
+                    );
+
+                    if response.clicked() {
+                        foo(config_id);
+                        ui.memory_mut(|mem| mem.close_popup());
+                    }
+                }
+            });
+        },
+    );
+}
+
+pub fn effect_config_id_button(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    selected: bool,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    effect_config_id: ConfigId<EffectConfig>,
+) -> Response {
+    if !asset_db.has_asset(AssetKind::EffectConfig, effect_config_id.uuid) {
+        let size = [ui.available_width(), ui.spacing().interact_size.y * 4f32];
+        broken_uuid_button(ui, size, effect_config_id.uuid)
+    } else {
+        let config_text = asset_db.load_json5_asset(AssetKind::EffectConfig, effect_config_id.uuid);
+        let config_name = asset_db.asset_name(AssetKind::EffectConfig, effect_config_id.uuid);
+        let config: EffectConfig = json5::from_str(config_text).expect("Failed to parse effect config");
+        effect_selector_button(
+            ui,
+            selected,
+            atlas_texture,
+            atlas_size,
+            config_name,
+            &config,
+        )
+    }
+}
+
+pub fn effect_selector_button(
+    ui: &mut Ui,
+    selected: bool,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    editor_name: &str,
+    effect_config: &EffectConfig,
+) -> Response {
+    let desired_size = vec2(ui.available_width(), ui.spacing().interact_size.y * 4f32);
+
+    let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+
+        let fill = if selected {
+            ui.visuals().selection.bg_fill
+        } else {
+            visuals.bg_fill
+        };
+
+        let stroke = if selected {
+            ui.visuals().selection.stroke
+        } else {
+            visuals.bg_stroke
+        };
+
+        let text_color = if selected {
+            ui.visuals().selection.stroke.color
+        } else {
+            visuals.text_color()
+        };
+
+        let rounding = CornerRadius::same(4);
+
+        ui.painter().rect_filled(rect, rounding, fill);
+        ui.painter()
+            .rect_stroke(rect, rounding, stroke, StrokeKind::Inside);
+        let tile_size = crate::graphics::SPRITE_ATLAS_DEF.tile_size;
+
+        let sprite_data = SPRITE_ATLAS_DEF.get_sprite_def(effect_config.sprite_name());
+
+        let sprite_rect = AtlasSpriteRect::from_u16(
+            atlas_size,
+            [
+                sprite_data.coords[0] as u16 * tile_size[0] as u16,
+                sprite_data.coords[1] as u16 * tile_size[1] as u16,
+            ],
+            [
+                sprite_data.size[0] as u16 * tile_size[0] as u16,
+                sprite_data.size[1] as u16 * tile_size[1] as u16,
+            ],
+        );
+
+        let y_step = (rect.max.y - rect.min.y) / 3f32;
+        let editor_name_y = rect.min.y + y_step / 2f32;
+        let description_y = editor_name_y + y_step;
+
+        let top = rect.min.y + 4f32;
+        let bottom = rect.max.y - 4f32;
+
+        let h = bottom - top;
+        let zoom = h / sprite_rect.size_px().y;
+        let w = sprite_rect.size_px().x * zoom;
+
+        let sp_rect = Rect::from_min_max(
+            [rect.min.x + 4f32, rect.min.y + 4f32].into(),
+            [rect.min.x + 4f32 + w, rect.min.y + 4f32 + h].into(),
+        );
+
+        ui.painter().image(
+            atlas_texture,
+            sp_rect,
+            sprite_rect.uv_rect(),
+            Color32::WHITE,
+        );
+
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, editor_name_y),
+            Align2::LEFT_CENTER,
+            editor_name,
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
+
+        ui.painter().text(
+            pos2(rect.min.x + w + 8f32, description_y),
+            Align2::LEFT_CENTER,
+            &effect_config.description,
+            TextStyle::Button.resolve(ui.style()),
+            text_color,
+        );
+    }
+
+    response
+}
+
+pub fn effect_selector_popup(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    popup_id: Id,
+    response: &Response,
+    atlas_texture: TextureId,
+    atlas_size: [u16; 2],
+    mut foo: impl FnMut(ConfigId<EffectConfig>) -> ()
+) {
+    egui::popup_below_widget(
+        ui,
+        popup_id,
+        response,
+        PopupCloseBehavior::IgnoreClicks,
+        |ui| {
+            ui.set_min_width(300f32);
+            ui.label("Для отмены выбора нажмите ESC");
+            ui.vertical(|ui|{
+                for (uuid, _) in asset_db.list_all_assets(AssetKind::EffectConfig) {
+                    let config_id = ConfigId::from_uuid(uuid);
+                    ui.add_space(4f32);
+
+                    let response = effect_config_id_button(
                         ui,
                         asset_db,
                         false,
