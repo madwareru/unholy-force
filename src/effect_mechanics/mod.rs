@@ -712,14 +712,10 @@ pub fn get_node_hash<N: EffectNodeImpl, H: Hash>(node: &N, salt_hash: H) -> u128
     salt_hash.hash(&mut salt_hasher);
     let salt_hash = salt_hasher.finish() as u128;
 
-    let mut hasher = DefaultHasher::new();
-    node.get_node_id().hash(&mut hasher);
-    let result_hash = (hasher.finish() & 0xFFFF_FFFF) as u128;
-
     let pos = node.get_node_pos();
+    let result_hash = (node.get_node_id().0 as u128) & 0xFFFF_FFFF;
     let result_hash = (result_hash << 16) | ((pos.x as u128) & 0xFFFF);
     let result_hash = (result_hash << 16) | ((pos.y as u128) & 0xFFFF);
-
     let result_hash = (result_hash << 64) | salt_hash;
     result_hash
 }

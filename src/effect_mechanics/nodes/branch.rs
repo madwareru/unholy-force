@@ -64,7 +64,6 @@ impl EffectNodeImpl for BranchNode {
         effect_id: EntityId,
         _effect_queue: &mut EffectQueue
     ) -> EffectControlFlow {
-
         let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
             return EffectControlFlow::Complete;
         };

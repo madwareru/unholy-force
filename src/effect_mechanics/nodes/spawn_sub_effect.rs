@@ -9,7 +9,7 @@ use crate::{
         EffectNodeImpl,
         EFFECT_GRAPH_TARGET,
         EffectNode,
-        nodes::{get_effect_context, get_effect_env, get_effect_env_mut, SharedNodeData}
+        nodes::{get_effect_context, SharedNodeData}
     },
     game_config::{
         ConfigId,
@@ -57,35 +57,17 @@ impl EffectNodeImpl for SpawnSubEffectNode{
         effect_id: EntityId,
         effect_queue: &mut EffectQueue
     ) -> EffectControlFlow {
-        const EFFECT_HAS_SPAWN_HASH: &str = "effect_has_spawn";
-
-        let effect_has_spawn = match get_effect_env(game_world, effect_id) {
-            Some(effect_env) => effect_env.get(self, EFFECT_HAS_SPAWN_HASH).is_some(),
+        match get_effect_context(game_world, effect_id) {
+            Some(effect_context) => {
+                effect_queue.push(self.effect_config_id, *effect_context);
+            }
             _ => {
                 error!(
                     target: EFFECT_GRAPH_TARGET,
-                    "Попытка проверить статус порождения эффекта провалилась"
+                    "Попытка породить эффект провалилась"
                 );
                 return EffectControlFlow::Complete;
             }
-        };
-
-        if !effect_has_spawn {
-            match get_effect_context(game_world, effect_id) {
-                Some(effect_context) => {
-                    effect_queue.push(self.effect_config_id, *effect_context);
-                }
-                _ => {
-                    error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка породить эффект провалилась"
-                );
-                    return EffectControlFlow::Complete;
-                }
-            }
-
-            get_effect_env_mut(game_world, effect_id)
-                .map(|mut effect_env| effect_env.set(self, EFFECT_HAS_SPAWN_HASH, 1f32));
         }
 
         self.then_node

@@ -10,8 +10,6 @@ use crate::{
     effect_mechanics::{
         nodes::{
             get_effect_context,
-            get_effect_env,
-            get_effect_env_mut,
             SharedNodeData,
             ValueSource
         },
@@ -76,6 +74,10 @@ impl EffectNodeImpl for AddTagNode {
         effect_queue: &mut EffectQueue
     ) -> EffectControlFlow {
         let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
+            error!(
+                target: EFFECT_GRAPH_TARGET,
+                "Не удалось получить количество лычек для добавления"
+            );
             return EffectControlFlow::Complete;
         };
 
@@ -119,7 +121,7 @@ impl EffectNodeImpl for AddTagNode {
         }
 
         self.then_node
-            .map(|id| EffectControlFlow::AndThen(id) )
+            .map(|id| EffectControlFlow::AndThen(id))
             .unwrap_or(EffectControlFlow::Complete)
     }
 }

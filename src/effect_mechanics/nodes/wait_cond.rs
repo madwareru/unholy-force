@@ -9,7 +9,7 @@ use crate::{
         EffectNodeImpl,
         EffectQueue,
         EFFECT_GRAPH_TARGET,
-        nodes::{get_effect_env, get_effect_env_mut, get_value_source_entity_id, SharedNodeData, ValueSource},
+        nodes::{get_value_source_entity_id, SharedNodeData, ValueSource},
         EffectNode
     },
     game_config::{
@@ -65,8 +65,6 @@ impl EffectNodeImpl for WaitForConditionNode {
         effect_id: EntityId,
         _effect_queue: &mut EffectQueue
     ) -> EffectControlFlow {
-        const WAIT_COMPLETE_HASH: &str = "wait_complete";
-
         let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
             error!(
                 target: EFFECT_GRAPH_TARGET,
@@ -75,37 +73,23 @@ impl EffectNodeImpl for WaitForConditionNode {
             return EffectControlFlow::Complete;
         };
 
-        let Some(memoized_value) = get_effect_env(game_world, effect_id)
-            .map(|env| env.get(self, WAIT_COMPLETE_HASH)) else {
+        let Some(condition) = get_entity_parameter_value(
+            game_config_provider,
+            game_world,
+            value_source_id,
+            self.condition_parameter_id
+        ) else {
             error!(
                 target: EFFECT_GRAPH_TARGET,
                 "Попытка получить значение условия завершилась неудачей"
             );
             return EffectControlFlow::Complete;
         };
-        let is_complete = memoized_value.is_some();
 
-        if !is_complete {
-            let Some(condition) = get_entity_parameter_value(
-                game_config_provider,
-                game_world,
-                value_source_id,
-                self.condition_parameter_id
-            ) else {
-                error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка получить значение условия завершилась неудачей"
-                );
-                return EffectControlFlow::Complete;
-            };
-
-            if condition <= 0f32 {
-                return EffectControlFlow::Suspend;
-            } else {
-                get_effect_env_mut(game_world, effect_id)
-                    .map(|mut effect_env| effect_env.set(self, WAIT_COMPLETE_HASH, 1f32));
-            }
+        if condition <= 0f32 {
+            return EffectControlFlow::Suspend;
         }
+        
         self.then_node
             .map(|id| EffectControlFlow::AndThen(id))
             .unwrap_or(EffectControlFlow::Complete)
