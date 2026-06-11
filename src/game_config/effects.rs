@@ -13,7 +13,6 @@ use crate::{
             add_tag::AddTagNode,
             SharedNodeData,
             spawn_sub_effect::SpawnSubEffectNode,
-            terminator::TerminatorNode,
             wait_cond::WaitForConditionNode,
             wait_ticks::WaitTicksNode,
             branch::BranchNode
@@ -27,6 +26,7 @@ use crate::{
     },
 };
 use crate::app::editor_stage::widgets::SpriteHolder;
+use crate::effect_mechanics::EffectNodeId;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EffectConfig {
@@ -604,7 +604,7 @@ impl EffectConfig {
     pub fn new() -> Self {
         let mut snarl = Snarl::new();
         let pos = pos2(0f32, 0f32);
-        let entry_node_id = snarl.insert_node(
+        snarl.insert_node(
             pos,
             EffectGraphNode::EntryPoint(
                 EntryPointEffectGraphNode {
@@ -612,20 +612,12 @@ impl EffectConfig {
                 }
             )
         );
-        let shared_node_data = SharedNodeData {
-            node_id: entry_node_id,
-            pos
-        };
         Self {
             description: Default::default(),
             sprite_name: Default::default(),
             sprite_pivot: Default::default(),
             snarl,
-            compiled_root: EffectRoot::new(
-                TerminatorNode::new(shared_node_data).into(),
-                TerminatorNode::new(shared_node_data).into(),
-                TerminatorNode::new(shared_node_data).into()
-            )
+            compiled_root: EffectRoot::new(Vec::new(), None, None, None)
         }
     }
 
@@ -712,109 +704,101 @@ impl EffectConfig {
     }
 
     fn recompile_root_node(&mut self) {
-        fn parse(node_id: NodeId, snarl: &Snarl<EffectGraphNode>) -> EffectNode {
-            let shared_data = SharedNodeData {
-                node_id,
-                pos: snarl.get_node_info(node_id)
-                    .map(|it| it.pos)
-                    .expect("There should be a node info"),
-            };
-            match &snarl[node_id] {
-                EffectGraphNode::EntryPoint(_) => {
-                    unreachable!("There should be no entrypoint node during traversal")
-                }
+        fn parse_or_none(
+            snarl: &Snarl<EffectGraphNode>,
+            nodes: &mut Vec<EffectNode>,
+            node_id: NodeId,
+            id: usize
+        ) -> Option<EffectNodeId> {
+            match snarl.out_pin(OutPinId { node: node_id, output: id }).remotes.as_slice() {
+                [remote] => Some(parse(snarl, nodes, remote.node)),
+                _ => None,
+            }
+        }
+
+        fn parse(
+            snarl: &Snarl<EffectGraphNode>,
+            nodes: &mut Vec<EffectNode>,
+            node_id: NodeId
+        ) -> EffectNodeId {
+            let new_node = match &snarl[node_id] {
+                EffectGraphNode::EntryPoint(_) => unreachable!(),
                 EffectGraphNode::AddTag(add_tag_data) => {
-                    let then_pin = snarl.out_pin(OutPinId { node: node_id, output: 0 });
-                    let then_node = match &then_pin.remotes[..] {
-                        [] => TerminatorNode::new(shared_data).into(),
-                        [then_remote] => {
-                            parse(then_remote.node, snarl)
-                        },
-                        _ => unreachable!("There should be at most one then pin")
-                    };
+                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
                     AddTagNode::new(
-                        shared_data,
+                        SharedNodeData {
+                            node_id: EffectNodeId::new(nodes.len() as u32),
+                            pos: snarl.get_node_info(node_id)
+                                .map(|it| it.pos)
+                                .expect("There should be a node info"),
+                        },
                         add_tag_data.value_source(),
                         add_tag_data.value_parameter_id(),
                         add_tag_data.tag_id(),
-                        then_node
+                        then_id
                     ).into()
-                }
+                },
                 EffectGraphNode::Branch(branch_data) => {
-                    let then_pin = snarl.out_pin(OutPinId { node: node_id, output: 0 });
-                    let then_node = match &then_pin.remotes[..] {
-                        [] => TerminatorNode::new(shared_data).into(),
-                        [then_remote] => {
-                            parse(then_remote.node, snarl)
-                        },
-                        _ => unreachable!("There should be at most one then pin")
-                    };
-
-                    let else_pin = snarl.out_pin(OutPinId { node: node_id, output: 0 });
-                    let else_node = match &else_pin.remotes[..] {
-                        [] => TerminatorNode::new(shared_data).into(),
-                        [else_remote] => {
-                            parse(else_remote.node, snarl)
-                        },
-                        _ => unreachable!("There should be at most one else pin")
-                    };
-
+                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
+                    let else_id = parse_or_none(snarl, nodes, node_id, 1);
                     BranchNode::new(
-                        shared_data,
+                        SharedNodeData {
+                            node_id: EffectNodeId::new(nodes.len() as u32),
+                            pos: snarl.get_node_info(node_id)
+                                .map(|it| it.pos)
+                                .expect("There should be a node info"),
+                        },
                         branch_data.value_source(),
                         branch_data.condition_parameter_id(),
-                        then_node,
-                        else_node
+                        then_id,
+                        else_id
                     ).into()
-                }
+                },
                 EffectGraphNode::WaitForCondition(wait_cond_data) => {
-                    let then_pin = snarl.out_pin(OutPinId { node: node_id, output: 0 });
-                    let then_node = match &then_pin.remotes[..] {
-                        [] => TerminatorNode::new(shared_data).into(),
-                        [then_remote] => {
-                            parse(then_remote.node, snarl)
-                        },
-                        _ => unreachable!("There should be at most one then pin")
-                    };
+                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
                     WaitForConditionNode::new(
-                        shared_data,
+                        SharedNodeData {
+                            node_id: EffectNodeId::new(nodes.len() as u32),
+                            pos: snarl.get_node_info(node_id)
+                                .map(|it| it.pos)
+                                .expect("There should be a node info"),
+                        },
                         wait_cond_data.value_source(),
                         wait_cond_data.condition_parameter_id(),
-                        then_node
+                        then_id
                     ).into()
-                }
+                },
                 EffectGraphNode::WaitForTicks(wait_ticks_data) => {
-                    let then_pin = snarl.out_pin(OutPinId { node: node_id, output: 0 });
-                    let then_node = match &then_pin.remotes[..] {
-                        [] => TerminatorNode::new(shared_data).into(),
-                        [then_remote] => {
-                            parse(then_remote.node, snarl)
-                        },
-                        _ => unreachable!("There should be at most one then pin")
-                    };
+                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
                     WaitTicksNode::new(
-                        shared_data,
+                        SharedNodeData {
+                            node_id: EffectNodeId::new(nodes.len() as u32),
+                            pos: snarl.get_node_info(node_id)
+                                .map(|it| it.pos)
+                                .expect("There should be a node info"),
+                        },
                         wait_ticks_data.value_source(),
                         wait_ticks_data.tick_count_parameter_id(),
-                        then_node
+                        then_id
                     ).into()
-                }
+                },
                 EffectGraphNode::SpawnSubEffect(spawn_sub_effect_data) => {
-                    let then_pin = snarl.out_pin(OutPinId { node: node_id, output: 0 });
-                    let then_node = match &then_pin.remotes[..] {
-                        [] => TerminatorNode::new(shared_data).into(),
-                        [then_remote] => {
-                            parse(then_remote.node, snarl)
-                        },
-                        _ => unreachable!("There should be at most one then pin")
-                    };
+                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
                     SpawnSubEffectNode::new(
-                        shared_data,
+                        SharedNodeData {
+                            node_id: EffectNodeId::new(nodes.len() as u32),
+                            pos: snarl.get_node_info(node_id)
+                                .map(|it| it.pos)
+                                .expect("There should be a node info"),
+                        },
                         spawn_sub_effect_data.effect_config_id(),
-                        then_node
+                        then_id
                     ).into()
-                }
-            }
+                },
+            };
+            let id = EffectNodeId::new(nodes.len() as u32);
+            nodes.push(new_node);
+            id
         }
 
         let (entry_node_id, entry_node) = self.snarl
@@ -823,42 +807,14 @@ impl EffectConfig {
             .expect("No entry point found");
 
         let EffectGraphNode::EntryPoint(_) = entry_node else { unreachable!() };
-        let shared_data = SharedNodeData {
-            node_id: entry_node_id,
-            pos: self.snarl.get_node_info(entry_node_id)
-                .map(|it| it.pos)
-                .expect("There should be a node info"),
-        };
+        let mut nodes = Vec::new();
+        let setup = parse_or_none(&self.snarl, &mut nodes, entry_node_id, 0);
+        let tick = parse_or_none(&self.snarl, &mut nodes, entry_node_id, 1);
+        let on_destroy = parse_or_none(&self.snarl, &mut nodes, entry_node_id, 2);
 
-        let setup_pin = self.snarl.out_pin(OutPinId { node: entry_node_id, output: 0 });
-        let tick_pin = self.snarl.out_pin(OutPinId { node: entry_node_id, output: 1 });
-        let on_destroy_pin = self.snarl.out_pin(OutPinId { node: entry_node_id, output: 2 });
-        let setup_node = match &setup_pin.remotes[..] {
-            [] => TerminatorNode::new(shared_data).into(),
-            [setup_remote] => {
-                parse(setup_remote.node, &self.snarl)
-            },
-            _ => unreachable!("there should be at most one setup pin"),
-        };
-
-        let tick_node = match &tick_pin.remotes[..] {
-            [] => TerminatorNode::new(shared_data).into(),
-            [tick_remote] => {
-                parse(tick_remote.node, &self.snarl)
-            },
-            _ => unreachable!("there should be at most one tick pin")
-        };
-
-        let on_destroy_node = match &on_destroy_pin.remotes[..] {
-            [] => TerminatorNode::new(shared_data).into(),
-            [on_destroy_remote] => {
-                parse(on_destroy_remote.node, &self.snarl)
-            },
-            _ => unreachable!("there should be at most one on_destroy pin"),
-        };
-
-        self.compiled_root = EffectRoot::new(setup_node, tick_node, on_destroy_node);
+        self.compiled_root = EffectRoot::new(nodes, setup, tick, on_destroy);
     }
 }
+
 
 impl Config for EffectConfig {}

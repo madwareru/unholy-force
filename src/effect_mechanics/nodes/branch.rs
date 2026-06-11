@@ -3,11 +3,10 @@ use crate::{
     effect_mechanics::{
         nodes::{SharedNodeData, ValueSource},
         EffectQueue,
-        EffectFlow,
+        EffectControlFlow,
         EffectNodeImpl,
         EFFECT_GRAPH_TARGET,
         EffectNode,
-        nodes::{get_memoized_parameter_value}
     },
     game_config::{
         parameters::ParameterConfig,
@@ -16,21 +15,22 @@ use crate::{
     }
 };
 use egui::Pos2;
-use egui_snarl::NodeId;
 use serde::{Deserialize, Serialize};
 use tracing::{error};
+use crate::effect_mechanics::{get_entity_parameter_value, EffectNodeId};
+use crate::effect_mechanics::nodes::get_value_source_entity_id;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct BranchNode {
     shared_node_data: SharedNodeData,
     value_source: ValueSource,
     condition_parameter_id: ConfigId<ParameterConfig>,
-    then_node: EffectNode,
-    else_node: EffectNode,
+    then_node: Option<EffectNodeId>,
+    else_node: Option<EffectNodeId>,
 }
 impl Into<EffectNode> for BranchNode {
     fn into(self) -> EffectNode {
-        EffectNode::BranchNode(Box::new(self))
+        EffectNode::BranchNode(self)
     }
 }
 
@@ -39,8 +39,8 @@ impl BranchNode {
         shared_node_data: SharedNodeData,
         value_source: ValueSource,
         condition_parameter_id: ConfigId<ParameterConfig>,
-        then_node: EffectNode,
-        else_node: EffectNode
+        then_node: Option<EffectNodeId>,
+        else_node: Option<EffectNodeId>
     ) -> Self {
         Self {
             shared_node_data,
@@ -53,7 +53,7 @@ impl BranchNode {
 }
 
 impl EffectNodeImpl for BranchNode {
-    fn get_node_id(&self) -> NodeId { self.shared_node_data.node_id }
+    fn get_node_id(&self) -> EffectNodeId { self.shared_node_data.node_id }
 
     fn get_node_pos(&self) -> Pos2 { self.shared_node_data.pos }
 
@@ -62,28 +62,32 @@ impl EffectNodeImpl for BranchNode {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        effect_queue: &mut EffectQueue
-    ) -> EffectFlow {
-        let Some(condition) = get_memoized_parameter_value(
-            self,
+        _effect_queue: &mut EffectQueue
+    ) -> EffectControlFlow {
+
+        let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
+            return EffectControlFlow::Complete;
+        };
+
+        let Some(condition) = get_entity_parameter_value(
             game_config_provider,
             game_world,
-            effect_id,
-            self.value_source,
+            value_source_id,
             self.condition_parameter_id
         ) else {
             error!(
                 target: EFFECT_GRAPH_TARGET,
                 "Попытка получить значение условия завершилась неудачей"
             );
-            return EffectFlow::Complete;
+            return EffectControlFlow::Complete;
         };
 
-        // При отрицательности значения считаем, что надо уйти в else ветку, иначе в then
+        // При отрицательности значения или при нуле считаем, что надо уйти в else ветку, иначе в then
         if condition > 0f32 {
-            self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
+            self.then_node
         } else {
-            self.else_node.tick(game_config_provider, game_world, effect_id, effect_queue)
-        }
+            self.else_node
+        }.map(|id| EffectControlFlow::AndThen(id))
+            .unwrap_or(EffectControlFlow::Complete)
     }
 }

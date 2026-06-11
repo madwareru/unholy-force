@@ -1,12 +1,11 @@
 use egui::Pos2;
-use egui_snarl::NodeId;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
         EffectQueue,
-        EffectFlow,
+        EffectControlFlow,
         EffectNodeImpl,
         EFFECT_GRAPH_TARGET,
         EffectNode,
@@ -18,17 +17,17 @@ use crate::{
         effects::EffectConfig
     }
 };
+use crate::effect_mechanics::EffectNodeId;
 
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SpawnSubEffectNode{
     shared_node_data: SharedNodeData,
     effect_config_id: ConfigId<EffectConfig>,
-    then_node: EffectNode
+    then_node: Option<EffectNodeId>
 }
 impl Into<EffectNode> for SpawnSubEffectNode {
     fn into(self) -> EffectNode {
-        EffectNode::SpawnSubEffectNode(Box::new(self))
+        EffectNode::SpawnSubEffectNode(self)
     }
 }
 
@@ -36,14 +35,14 @@ impl SpawnSubEffectNode {
     pub fn new(
         shared_node_data: SharedNodeData,
         effect_config_id: ConfigId<EffectConfig>,
-        then_node: EffectNode
+        then_node: Option<EffectNodeId>
     ) -> Self {
         Self { shared_node_data, effect_config_id, then_node }
     }
 }
 
 impl EffectNodeImpl for SpawnSubEffectNode{
-    fn get_node_id(&self) -> NodeId {
+    fn get_node_id(&self) -> EffectNodeId {
         self.shared_node_data.node_id
     }
 
@@ -53,11 +52,11 @@ impl EffectNodeImpl for SpawnSubEffectNode{
 
     fn tick(
         &self,
-        game_config_provider: &ConfigProvider,
+        _game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
         effect_queue: &mut EffectQueue
-    ) -> EffectFlow {
+    ) -> EffectControlFlow {
         const EFFECT_HAS_SPAWN_HASH: &str = "effect_has_spawn";
 
         let effect_has_spawn = match get_effect_env(game_world, effect_id) {
@@ -67,7 +66,7 @@ impl EffectNodeImpl for SpawnSubEffectNode{
                     target: EFFECT_GRAPH_TARGET,
                     "Попытка проверить статус порождения эффекта провалилась"
                 );
-                return EffectFlow::Complete;
+                return EffectControlFlow::Complete;
             }
         };
 
@@ -81,7 +80,7 @@ impl EffectNodeImpl for SpawnSubEffectNode{
                     target: EFFECT_GRAPH_TARGET,
                     "Попытка породить эффект провалилась"
                 );
-                    return EffectFlow::Complete;
+                    return EffectControlFlow::Complete;
                 }
             }
 
@@ -89,6 +88,8 @@ impl EffectNodeImpl for SpawnSubEffectNode{
                 .map(|mut effect_env| effect_env.set(self, EFFECT_HAS_SPAWN_HASH, 1f32));
         }
 
-        self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
+        self.then_node
+            .map(|id| EffectControlFlow::AndThen(id))
+            .unwrap_or(EffectControlFlow::Complete)
     }
 }

@@ -3,8 +3,7 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher}
 };
 use std::fmt::Debug;
-use bumpalo::{Bump, collections::Vec};
-use egui_snarl::NodeId;
+use bumpalo::{Bump};
 use rand::RngExt;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -18,7 +17,6 @@ use crate::{
             branch::BranchNode,
             effect_context_is_expired,
             spawn_sub_effect::SpawnSubEffectNode,
-            terminator::TerminatorNode,
             wait_cond::WaitForConditionNode,
             wait_ticks::WaitTicksNode
         }
@@ -109,8 +107,9 @@ impl EffectRegistry {
         bump: &Bump,
         game_config_provider: &ConfigProvider,
         effect_id: EntityId,
+        mut current_node_id: Option<EffectNodeId>,
         game_world: &mut GameWorld
-    ) {
+    ) -> Option<EffectNodeId> {
         let effect_config_id = {
             match game_world.get::<&ConfigId<EffectConfig>>(effect_id) {
                 Ok(mechanic_setting) => *mechanic_setting,
@@ -122,14 +121,34 @@ impl EffectRegistry {
             game_config_provider,
             effect_config_id
         ) else {
-            return;
+            return None;
         };
 
-        let mut queue = EffectQueue(Vec::new_in(bump));
+        let mut queue = EffectQueue(bumpalo::collections::Vec::new_in(bump));
 
-        if let EffectFlow::Complete = root_node.tick(game_config_provider, game_world, effect_id, &mut queue) {
-            root_node.on_destroy(game_config_provider, game_world, effect_id, &mut queue);
-            game_world.despawn(effect_id).expect("Failed to despawn effect");
+        'chain: loop {
+            let result = root_node.tick(
+                game_config_provider,
+                game_world,
+                effect_id,
+                current_node_id,
+                &mut queue
+            );
+
+            match result {
+                EffectControlFlow::Complete => {
+                    root_node.on_destroy(game_config_provider, game_world, effect_id, &mut queue);
+                    game_world.despawn(effect_id).expect("Failed to despawn effect");
+                    return None;
+                }
+                EffectControlFlow::AndThen(then_node_id) => {
+                    current_node_id = Some(then_node_id);
+                    continue 'chain;
+                }
+                EffectControlFlow::Suspend => {
+                    break 'chain;
+                }
+            }
         }
 
         let mut offset = 0;
@@ -150,6 +169,8 @@ impl EffectRegistry {
             let effect_id = game_world.spawn((effect_config_id, effect_env, effect_context));
             root_node.setup(game_config_provider, game_world, effect_id, &mut queue);
         }
+
+        current_node_id
     }
 }
 
@@ -168,10 +189,10 @@ impl ScheduledEffect {
     }
 }
 
-pub struct EffectQueue<'a>(Vec<'a, ScheduledEffect>);
+pub struct EffectQueue<'a>(bumpalo::collections::Vec<'a, ScheduledEffect>);
 impl<'a> EffectQueue<'a> {
     pub fn new_in(bump: &'a Bump) -> Self {
-        EffectQueue(Vec::new_in(bump))
+        EffectQueue(bumpalo::collections::Vec::new_in(bump))
     }
 
     pub fn push(
@@ -189,6 +210,7 @@ impl<'a> EffectQueue<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub struct EffectContext {
+    pub current_node_id: Option<EffectNodeId>,
     caster_id: EntityId,
     target_id: EntityId
 }
@@ -204,8 +226,9 @@ pub trait EffectFlowExt<T> {
     fn fail_execution() -> Self;
 }
 
-pub enum EffectFlow {
-    Continue,
+pub enum EffectControlFlow {
+    Suspend,
+    AndThen(EffectNodeId),
     Complete
 }
 
@@ -655,6 +678,7 @@ pub fn add_entity_tag_count(
                     delayed_effect_queue.push(
                         effect_config_id,
                         EffectContext {
+                            current_node_id: None,
                             caster_id: global_values_entity_id,
                             target_id: entity_id
                         }
@@ -701,7 +725,7 @@ pub fn get_node_hash<N: EffectNodeImpl, H: Hash>(node: &N, salt_hash: H) -> u128
 }
 
 pub trait EffectNodeImpl {
-    fn get_node_id(&self) -> NodeId;
+    fn get_node_id(&self) -> EffectNodeId;
     fn get_node_pos(&self) -> egui::Pos2;
     fn tick(
         &self,
@@ -709,17 +733,17 @@ pub trait EffectNodeImpl {
         game_world: &mut GameWorld,
         effect_id: EntityId,
         effect_queue: &mut EffectQueue
-    ) -> EffectFlow;
+    ) -> EffectControlFlow;
 }
 
 macro_rules! enum_dispatched {
     (pub enum $name:ident { $($variant:ident),* }) => {
-        #[derive(Clone, Debug, Serialize, Deserialize)]
+        #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
         pub enum $name {
-            $($variant(Box<$variant>)),*
+            $($variant($variant)),*
         }
         impl EffectNodeImpl for $name {
-            fn get_node_id(&self) -> NodeId {
+            fn get_node_id(&self) -> EffectNodeId {
                 match self {
                     $(Self::$variant(x) => x.get_node_id(),)*
                 }
@@ -735,7 +759,7 @@ macro_rules! enum_dispatched {
                 game_world: &mut GameWorld,
                 effect_id: EntityId,
                 effect_queue: &mut EffectQueue
-            ) -> EffectFlow {
+            ) -> EffectControlFlow {
                 match self {
                     $(Self::$variant(x) => x.tick(game_config_provider, game_world, effect_id, effect_queue),)*
                 }
@@ -749,26 +773,36 @@ enum_dispatched!(
         AddTagNode,
         BranchNode,
         SpawnSubEffectNode,
-        TerminatorNode,
         WaitForConditionNode,
         WaitTicksNode
     }
 );
 
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Hash)]
+pub struct EffectNodeId(u32);
+impl EffectNodeId {
+    pub fn new(id: u32) -> Self {
+        Self(id)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EffectRoot {
-    setup: EffectNode,
-    tick: EffectNode,
-    on_destroy: EffectNode,
+    nodes: Vec<EffectNode>,
+    setup: Option<EffectNodeId>,
+    tick: Option<EffectNodeId>,
+    on_destroy: Option<EffectNodeId>,
 }
 
 impl EffectRoot {
     pub fn new(
-        setup: EffectNode,
-        tick: EffectNode,
-        on_destroy: EffectNode,
+        nodes: Vec<EffectNode>,
+        setup: Option<EffectNodeId>,
+        tick: Option<EffectNodeId>,
+        on_destroy: Option<EffectNodeId>,
     ) -> Self {
-        Self { setup, tick, on_destroy }
+        Self { nodes, setup, tick, on_destroy }
     }
 
     pub fn setup(
@@ -787,21 +821,22 @@ impl EffectRoot {
             return;
         }
 
-        match self.setup.tick(
-            game_config_provider,
-            game_world,
-            effect_id,
-            effect_queue
-        ) {
-            EffectFlow::Continue => {
-                warn!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "В слот установки подключен узел, ожидающийся для работы в несколько тиков. Подобное поведение \
-                    не поддерживается и скорее всего ожидаемый результат будет некорректным. Для достижения вызова \
-                    продолжающегося поведения во время установки, нужно использовать узел, порождающий дочерний эффект."
-                );
-            }
-            EffectFlow::Complete => {}
+        let result = self.setup
+            .map(|id| self.nodes[id.0 as usize].tick(
+                game_config_provider,
+                game_world,
+                effect_id,
+                effect_queue
+            )).unwrap_or(EffectControlFlow::Complete);
+
+        match result {
+            EffectControlFlow::Complete => {}
+            _ => warn!(
+                target: EFFECT_GRAPH_TARGET,
+                "В слот установки подключен узел, ожидающийся для работы в несколько тиков. Подобное поведение \
+                не поддерживается и скорее всего ожидаемый результат будет некорректным. Для достижения вызова \
+                продолжающегося поведения во время установки, нужно использовать узел, порождающий дочерний эффект."
+            )
         }
     }
 
@@ -810,23 +845,30 @@ impl EffectRoot {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
+        mut current_node_id: Option<EffectNodeId>,
         effect_queue: &mut EffectQueue
-    ) -> EffectFlow {
+    ) -> EffectControlFlow {
         if effect_context_is_expired(game_world, effect_id) {
             info!(
                 target: EFFECT_GRAPH_TARGET,
                 "Цепочка эффекта {:?} прервана ввиду утери актуальности контекста",
                 effect_id
             );
-            return EffectFlow::Complete;
+            return EffectControlFlow::Complete;
         }
 
-        self.tick.tick(
-            game_config_provider,
-            game_world,
-            effect_id,
-            effect_queue
-        )
+        if current_node_id.is_none() {
+            current_node_id = self.tick;
+        }
+
+        current_node_id
+            .map(|id| self.nodes[id.0 as usize].tick(
+                game_config_provider,
+                game_world,
+                effect_id,
+                effect_queue
+            ))
+            .unwrap_or(EffectControlFlow::Complete)
     }
 
     pub fn on_destroy(
@@ -845,21 +887,22 @@ impl EffectRoot {
             return;
         }
 
-        match self.on_destroy.tick(
-            game_config_provider,
-            game_world,
-            effect_id,
-            effect_queue
-        ) {
-            EffectFlow::Continue => {
-                warn!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "В слот очистки подключен узел, ожидающийся для работы в несколько тиков. Подобное поведение \
-                    не поддерживается и скорее всего ожидаемый результат будет некорректным. Для достижения вызова \
-                    продолжающегося поведения во время очистки, нужно использовать узел, порождающий дочерний эффект."
-                );
-            }
-            EffectFlow::Complete => {}
+        let result = self.on_destroy.as_ref()
+            .map(|id| self.nodes[id.0 as usize].tick(
+                game_config_provider,
+                game_world,
+                effect_id,
+                effect_queue
+            )).unwrap_or(EffectControlFlow::Complete);
+
+        match result {
+            EffectControlFlow::Complete => {}
+            _ => warn!(
+                target: EFFECT_GRAPH_TARGET,
+                "В слот очистки подключен узел, ожидающийся для работы в несколько тиков. Подобное поведение \
+                не поддерживается и скорее всего ожидаемый результат будет некорректным. Для достижения вызова \
+                продолжающегося поведения во время очистки, нужно использовать узел, порождающий дочерний эффект."
+            )
         }
     }
 }

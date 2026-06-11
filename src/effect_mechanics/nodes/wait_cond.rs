@@ -1,12 +1,11 @@
 use egui::Pos2;
-use egui_snarl::NodeId;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
         get_entity_parameter_value,
-        EffectFlow,
+        EffectControlFlow,
         EffectNodeImpl,
         EffectQueue,
         EFFECT_GRAPH_TARGET,
@@ -19,17 +18,18 @@ use crate::{
         parameters::ParameterConfig
     },
 };
+use crate::effect_mechanics::EffectNodeId;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct WaitForConditionNode {
     shared_node_data: SharedNodeData,
     value_source: ValueSource,
     condition_parameter_id: ConfigId<ParameterConfig>,
-    then_node: EffectNode,
+    then_node: Option<EffectNodeId>,
 }
 impl Into<EffectNode> for WaitForConditionNode {
     fn into(self) -> EffectNode {
-        EffectNode::WaitForConditionNode(Box::new(self))
+        EffectNode::WaitForConditionNode(self)
     }
 }
 
@@ -38,7 +38,7 @@ impl WaitForConditionNode {
         shared_node_data: SharedNodeData,
         value_source: ValueSource,
         condition_parameter_id: ConfigId<ParameterConfig>,
-        then_node: EffectNode
+        then_node: Option<EffectNodeId>
     ) -> Self {
         Self {
             shared_node_data,
@@ -50,7 +50,7 @@ impl WaitForConditionNode {
 }
 
 impl EffectNodeImpl for WaitForConditionNode {
-    fn get_node_id(&self) -> NodeId {
+    fn get_node_id(&self) -> EffectNodeId {
         self.shared_node_data.node_id
     }
 
@@ -63,8 +63,8 @@ impl EffectNodeImpl for WaitForConditionNode {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        effect_queue: &mut EffectQueue
-    ) -> EffectFlow {
+        _effect_queue: &mut EffectQueue
+    ) -> EffectControlFlow {
         const WAIT_COMPLETE_HASH: &str = "wait_complete";
 
         let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
@@ -72,7 +72,7 @@ impl EffectNodeImpl for WaitForConditionNode {
                 target: EFFECT_GRAPH_TARGET,
                 "Попытка получить значение условия завершилась неудачей"
             );
-            return EffectFlow::Complete;
+            return EffectControlFlow::Complete;
         };
 
         let Some(memoized_value) = get_effect_env(game_world, effect_id)
@@ -81,7 +81,7 @@ impl EffectNodeImpl for WaitForConditionNode {
                 target: EFFECT_GRAPH_TARGET,
                 "Попытка получить значение условия завершилась неудачей"
             );
-            return EffectFlow::Complete;
+            return EffectControlFlow::Complete;
         };
         let is_complete = memoized_value.is_some();
 
@@ -96,16 +96,18 @@ impl EffectNodeImpl for WaitForConditionNode {
                     target: EFFECT_GRAPH_TARGET,
                     "Попытка получить значение условия завершилась неудачей"
                 );
-                return EffectFlow::Complete;
+                return EffectControlFlow::Complete;
             };
 
             if condition <= 0f32 {
-                return EffectFlow::Continue;
+                return EffectControlFlow::Suspend;
             } else {
                 get_effect_env_mut(game_world, effect_id)
                     .map(|mut effect_env| effect_env.set(self, WAIT_COMPLETE_HASH, 1f32));
             }
         }
-        self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
+        self.then_node
+            .map(|id| EffectControlFlow::AndThen(id))
+            .unwrap_or(EffectControlFlow::Complete)
     }
 }

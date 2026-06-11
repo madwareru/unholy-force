@@ -1,12 +1,11 @@
 use egui::Pos2;
-use egui_snarl::NodeId;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
         EffectQueue,
-        EffectFlow,
+        EffectControlFlow,
         EffectNodeImpl,
         EFFECT_GRAPH_TARGET,
         nodes::{
@@ -23,18 +22,18 @@ use crate::{
         parameters::ParameterConfig
     },
 };
+use crate::effect_mechanics::EffectNodeId;
 
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct WaitTicksNode {
     shared_node_data: SharedNodeData,
     value_source: ValueSource,
     tick_count_parameter_id: ConfigId<ParameterConfig>,
-    then_node: EffectNode
+    then_node: Option<EffectNodeId>
 }
 impl Into<EffectNode> for WaitTicksNode {
     fn into(self) -> EffectNode {
-        EffectNode::WaitTicksNode(Box::new(self))
+        EffectNode::WaitTicksNode(self)
     }
 }
 
@@ -43,7 +42,7 @@ impl WaitTicksNode {
         shared_node_data: SharedNodeData,
         value_source: ValueSource,
         tick_count_parameter_id: ConfigId<ParameterConfig>,
-        then_node: EffectNode
+        then_node: Option<EffectNodeId>
     ) -> Self {
         Self {
             shared_node_data,
@@ -55,7 +54,7 @@ impl WaitTicksNode {
 }
 
 impl EffectNodeImpl for WaitTicksNode {
-    fn get_node_id(&self) -> NodeId { self.shared_node_data.node_id }
+    fn get_node_id(&self) -> EffectNodeId { self.shared_node_data.node_id }
 
     fn get_node_pos(&self) -> Pos2 { self.shared_node_data.pos }
 
@@ -64,10 +63,13 @@ impl EffectNodeImpl for WaitTicksNode {
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
-        effect_queue: &mut EffectQueue
-    ) -> EffectFlow {
+        _effect_queue: &mut EffectQueue
+    ) -> EffectControlFlow {
         const TICK_COUNT_HASH: &str = "tick_count_elapsed";
 
+        // Так как данный узел может быть проигран множество раз,
+        // для корректной его работы количество тиков, которое нужно ждать,
+        // вычисляется только один раз через механизм мемоизации
         let Some(ticks_to_wait) = get_memoized_parameter_value(
             self,
             game_config_provider,
@@ -80,7 +82,7 @@ impl EffectNodeImpl for WaitTicksNode {
                 target: EFFECT_GRAPH_TARGET,
                 "Попытка получить количество тиков для ожидания завершилась неудачей"
             );
-            return EffectFlow::Complete;
+            return EffectControlFlow::Complete;
         };
 
         match get_effect_env_mut(game_world, effect_id) {
@@ -89,7 +91,7 @@ impl EffectNodeImpl for WaitTicksNode {
                 if tick_count_elapsed < ticks_to_wait {
                     tick_count_elapsed += 1f32;
                     effect_env.set(self, TICK_COUNT_HASH, tick_count_elapsed);
-                    return EffectFlow::Continue;
+                    return EffectControlFlow::Suspend;
                 }
             }
             _ => {
@@ -97,9 +99,12 @@ impl EffectNodeImpl for WaitTicksNode {
                     target: EFFECT_GRAPH_TARGET,
                     "Попытка обновить количество тиков для ожидания провалилась"
                 );
-                return EffectFlow::Complete;
+                return EffectControlFlow::Complete;
             }
         }
-        self.then_node.tick(game_config_provider, game_world, effect_id, effect_queue)
+
+        self.then_node
+            .map(|id| EffectControlFlow::AndThen(id))
+            .unwrap_or(EffectControlFlow::Complete)
     }
 }

@@ -76,12 +76,15 @@ impl GameContext {
         let game_config_provider = &self.game_config_provider;
 
         let mut effect_entities = bumpalo::collections::Vec::new_in(&self.bump);
-        for (entity_id, _, _) in world.query::<(EntityId, &EffectEnv, &EffectContext)>().iter() {
-            effect_entities.push(entity_id);
+        for (entity_id, _, effect_ctx) in world.query::<(EntityId, &EffectEnv, &EffectContext)>().iter() {
+            effect_entities.push((entity_id, effect_ctx.current_node_id));
         }
 
-        for effect_id in effect_entities.drain(..) {
-            effect_registry.tick(&self.bump, game_config_provider, effect_id, world);
+        for (effect_id, current_node_id) in effect_entities.drain(..) {
+            let next_node_id = effect_registry.tick(&self.bump, game_config_provider, effect_id, current_node_id, world);
+            if let Ok((effect_ctx,)) = world.query_one::<(&mut EffectContext,)>(effect_id).get() {
+                effect_ctx.current_node_id = next_node_id;
+            }
         }
     }
 

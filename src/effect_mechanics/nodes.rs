@@ -20,17 +20,17 @@ use crate::{
         parameters::ParameterConfig
     }
 };
+use crate::effect_mechanics::EffectNodeId;
 
 pub mod wait_ticks;
 pub mod wait_cond;
 pub mod branch;
 pub mod spawn_sub_effect;
 pub mod add_tag;
-pub mod terminator;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SharedNodeData{
-    pub node_id: NodeId,
+    pub node_id: EffectNodeId,
     pub pos: Pos2,
 }
 
