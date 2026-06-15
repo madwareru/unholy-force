@@ -32,6 +32,32 @@ pub enum ParameterOperator {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+/// Простой язык выражений
+/// ```
+/// alpha           = _{ 'a'..'z' | 'A'..'Z' | 'а'..'я' | 'А'..'Я' }
+/// digit           = _{ '0'..'9' }
+/// ident           = _{ alpha ~ (alpha | digit | "_")* }
+/// number          =  { digit+ ~ "." ~ digit+ | digit+ }
+/// parameter_value =  { "{" ~ ident ~ "}" }
+/// tag_count       =  { "[" ~ ident ~ "]" }
+/// operator        =  {
+///     "+"
+///   | "-"
+///   | "*"
+///   | "/"
+///   | "max"
+///   | "min"
+///   | "clamp"
+///   | "rand"
+///   | "round"
+/// }
+/// expression      =  {
+///     number
+///   | parameter_value
+///   | tag_count
+///   | " "* ~ "(" ~ " "* ~ operator ~ " "* ~ (" "* ~ expression ~ " "*)* ~ ")" ~ " "*
+/// }
+/// ```
 pub enum ExpressionParameterNode {
     /// `{имя_черты}`
     ParameterValue(ConfigId<ParameterConfig>),

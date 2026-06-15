@@ -15,7 +15,7 @@ use crate::graphics::{
     WANG_MASK_SOUTH_WEST, WallGraphicsTileGroup,
 };
 use egui::text::LayoutJob;
-use egui::{Align, Align2, Color32, CornerRadius, Layout, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId, Ui, UiBuilder, Vec2, pos2, vec2, Id, PopupCloseBehavior};
+use egui::{Align, Align2, Color32, CornerRadius, Layout, Rect, Response, Sense, Stroke, StrokeKind, TextStyle, TextureId, Ui, UiBuilder, Vec2, pos2, vec2, Id, PopupCloseBehavior, Button};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug)]
@@ -2015,6 +2015,20 @@ pub fn broken_uuid_button(ui: &mut Ui, button_size: [f32; 2], uuid: Uuid) -> Res
     response
 }
 
+pub fn broken_uuid_button_small(ui: &mut Ui, uuid: Uuid) -> Response {
+    let text = if uuid.is_nil() {
+        "Нет ссылки"
+    } else {
+        "Битая ссылка"
+    };
+    let color = if uuid.is_nil() {
+        Color32::DARK_GRAY
+    } else {
+        Color32::MAGENTA
+    };
+    ui.add(Button::new(text).fill(color))
+}
+
 pub fn fpa_id_button(
     ui: &mut Ui,
     asset_db: &AssetDb,
@@ -2438,6 +2452,36 @@ pub fn parameter_config_id_button(
             config_name,
             &config,
         )
+    }
+}
+
+pub fn parameter_config_id_button_small(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    selected: bool,
+    parameter_config_id: ConfigId<ParameterConfig>,
+) -> Response {
+    if !asset_db.has_asset(AssetKind::ParameterConfig, parameter_config_id.uuid) {
+        broken_uuid_button_small(ui, parameter_config_id.uuid)
+    } else {
+        let config_text = asset_db.load_json5_asset(AssetKind::ParameterConfig, parameter_config_id.uuid);
+        let config: ParameterConfig = json5::from_str(config_text).expect("Failed to parse parameter config");
+        ui.add(Button::new(format!("{{{}}}", &config.bound_name)).selected(selected))
+    }
+}
+
+pub fn tag_config_id_button_small(
+    ui: &mut Ui,
+    asset_db: &AssetDb,
+    selected: bool,
+    parameter_config_id: ConfigId<TagConfig>,
+) -> Response {
+    if !asset_db.has_asset(AssetKind::TagConfig, parameter_config_id.uuid) {
+        broken_uuid_button_small(ui, parameter_config_id.uuid)
+    } else {
+        let config_text = asset_db.load_json5_asset(AssetKind::TagConfig, parameter_config_id.uuid);
+        let config: TagConfig = json5::from_str(config_text).expect("Failed to parse parameter config");
+        ui.add(Button::new(format!("[{}]", &config.bound_name)).selected(selected))
     }
 }
 

@@ -37,6 +37,8 @@ use crate::{
         }
     },
 };
+use crate::effect_mechanics::nodes::join::JoinNode;
+use crate::effect_mechanics::nodes::SharedNodeData;
 
 pub mod nodes;
 
@@ -213,6 +215,18 @@ pub struct EffectContext {
     pub current_node_id: Option<EffectNodeId>,
     caster_id: EntityId,
     target_id: EntityId
+}
+impl EffectContext {
+    pub fn new(
+        caster_id: EntityId,
+        target_id: EntityId
+    ) -> Self {
+        Self {
+            current_node_id: None,
+            caster_id,
+            target_id,
+        }
+    }
 }
 
 pub enum EffectCompletionCause {
@@ -770,7 +784,8 @@ enum_dispatched!(
         BranchNode,
         SpawnSubEffectNode,
         WaitForConditionNode,
-        WaitTicksNode
+        WaitTicksNode,
+        JoinNode
     }
 );
 

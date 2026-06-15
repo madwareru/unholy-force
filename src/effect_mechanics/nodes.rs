@@ -1,5 +1,4 @@
 use egui::Pos2;
-use egui_snarl::NodeId;
 use hecs::{Ref, RefMut};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
@@ -27,6 +26,7 @@ pub mod wait_cond;
 pub mod branch;
 pub mod spawn_sub_effect;
 pub mod add_tag;
+pub mod join;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SharedNodeData{
@@ -35,18 +35,18 @@ pub struct SharedNodeData{
 }
 
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
-pub enum ValueSource {
+pub enum Holder {
     #[default]
     Global,
     Caster,
     Target
 }
-impl ValueSource {
+impl Holder {
     pub fn display_name(&self) -> &'static str {
         match self {
-            ValueSource::Global => "Глобальное",
-            ValueSource::Caster => "Источник",
-            ValueSource::Target => "Приёмник"
+            Holder::Global => "Мир",
+            Holder::Caster => "Стрелок",
+            Holder::Target => "Цель"
         }
     }
 }
@@ -69,10 +69,10 @@ pub fn get_memoized_parameter_value<N: EffectNodeImpl>(
     game_config_provider: &ConfigProvider,
     game_world: &GameWorld,
     effect_id: EntityId,
-    value_source: ValueSource,
+    value_source: Holder,
     parameter_config_id: ConfigId<ParameterConfig>
 ) -> Option<f32> {
-    let value_source_id = get_value_source_entity_id(game_world, effect_id, value_source)?;
+    let value_source_id = get_direction_entity_id(game_world, effect_id, value_source)?;
     let memoized_value = get_effect_env(game_world, effect_id)?
         .get(node, parameter_config_id);
 
@@ -152,16 +152,16 @@ pub fn get_value_holder_mut(game_world: &mut GameWorld, entity_id: EntityId) -> 
     }
 }
 
-pub fn get_value_source_entity_id(
+pub fn get_direction_entity_id(
     game_world: &GameWorld,
     effect_id: EntityId,
-    value_source: ValueSource
+    value_source: Holder
 ) -> Option<EntityId>  {
     match get_effect_context(game_world, effect_id) {
         Some(context) => match value_source {
-            ValueSource::Global => GlobalValuesHolder::get_entity_id(game_world),
-            ValueSource::Caster => Some(context.caster_id),
-            ValueSource::Target => Some(context.target_id)
+            Holder::Global => GlobalValuesHolder::get_entity_id(game_world),
+            Holder::Caster => Some(context.caster_id),
+            Holder::Target => Some(context.target_id)
         },
         _ => {
             error!(

@@ -1,15 +1,16 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
-use egui::{pos2, Color32, Frame, Pos2, TextureId, Ui};
+use egui::{pos2, Button, Color32, Frame, Pos2, TextureId, Ui};
+use egui::ahash::{HashMap, HashMapExt};
 use egui_snarl::{InPin, NodeId, OutPin, OutPinId, Snarl};
 use egui_snarl::ui::{PinInfo, SnarlPin, SnarlStyle, SnarlViewer, WireStyle};
 use serde::{Deserialize, Serialize};
 use crate::{
     assets::{AssetDb},
-    app::editor_stage::widgets::{parameter_config_id_button, parameter_selector_popup, tag_config_id_button, tag_selector_popup},
+    app::editor_stage::widgets::{parameter_config_id_button_small, parameter_selector_popup, tag_config_id_button_small, tag_selector_popup},
     effect_mechanics::{
         EffectRoot,
         nodes::{
-            ValueSource,
+            Holder,
             add_tag::AddTagNode,
             SharedNodeData,
             spawn_sub_effect::SpawnSubEffectNode,
@@ -25,8 +26,9 @@ use crate::{
         parameters::{ParameterConfig, TagConfig}
     },
 };
-use crate::app::editor_stage::widgets::SpriteHolder;
+use crate::app::editor_stage::widgets::{effect_config_id_button, effect_selector_popup, SpriteHolder};
 use crate::effect_mechanics::EffectNodeId;
+use crate::effect_mechanics::nodes::join::JoinNode;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EffectConfig {
@@ -55,113 +57,105 @@ impl SpriteHolder for EffectConfig {
 pub enum EffectGraphNode {
     EntryPoint(EntryPointEffectGraphNode),
     AddTag(AddTagEffectGraphNode),
+    DecTag(AddTagEffectGraphNode),
     Branch(BranchEffectGraphNode),
+    Join(JoinEffectGraphNode),
     WaitForCondition(WaitForConditionEffectGraphNode),
     WaitForTicks(WaitForTicksEffectGraphNode),
     SpawnSubEffect(SpawnSubEffectGraphNode),
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct EntryPointEffectGraphNode {
-    comment: String,
-}
-impl EntryPointEffectGraphNode {
-    pub fn comment(&self) -> &str {
-        &self.comment
-    }
-}
+pub struct EntryPointEffectGraphNode;
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct JoinEffectGraphNode;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct AddTagEffectGraphNode {
-    value_source: ValueSource,
+    value_holder: Holder,
     value_parameter_id: ConfigId<ParameterConfig>,
+    tag_holder: Holder,
     tag_config_id: ConfigId<TagConfig>,
-    comment: String,
 }
 impl AddTagEffectGraphNode {
-    pub fn value_source(&self) -> ValueSource {
-        self.value_source
+    pub fn value_holder(&self) -> Holder {
+        self.value_holder
     }
     pub fn value_parameter_id(&self) -> ConfigId<ParameterConfig> {
         self.value_parameter_id
     }
+    pub fn tag_holder(&self) -> Holder {
+        self.tag_holder
+    }
     pub fn tag_id(&self) -> ConfigId<TagConfig> {
         self.tag_config_id
-    }
-    pub fn comment(&self) -> &str {
-        &self.comment
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct BranchEffectGraphNode {
-    value_source: ValueSource,
+    value_source: Holder,
     condition_parameter_id: ConfigId<ParameterConfig>,
-    comment: String,
 }
 impl BranchEffectGraphNode {
-    pub fn value_source(&self) -> ValueSource {
+    pub fn value_source(&self) -> Holder {
         self.value_source
     }
     pub fn condition_parameter_id(&self) -> ConfigId<ParameterConfig> {
         self.condition_parameter_id
-    }
-    pub fn comment(&self) -> &str {
-        &self.comment
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct WaitForConditionEffectGraphNode {
-    value_source: ValueSource,
+    value_source: Holder,
     condition_parameter_id: ConfigId<ParameterConfig>,
-    comment: String,
 }
 impl WaitForConditionEffectGraphNode {
-    pub fn value_source(&self) -> ValueSource {
+    pub fn value_source(&self) -> Holder {
         self.value_source
     }
     pub fn condition_parameter_id(&self) -> ConfigId<ParameterConfig> {
         self.condition_parameter_id
     }
-    pub fn comment(&self) -> &str {
-        &self.comment
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct WaitForTicksEffectGraphNode {
-    value_source: ValueSource,
+    value_source: Holder,
     tick_count_parameter_id: ConfigId<ParameterConfig>,
-    comment: String,
 }
 impl WaitForTicksEffectGraphNode {
-    pub fn value_source(&self) -> ValueSource {
+    pub fn value_source(&self) -> Holder {
         self.value_source
     }
     pub fn tick_count_parameter_id(&self) -> ConfigId<ParameterConfig> {
         self.tick_count_parameter_id
-    }
-    pub fn comment(&self) -> &str {
-        &self.comment
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct SpawnSubEffectGraphNode {
     effect_config_id: ConfigId<EffectConfig>,
-    comment: String,
+    caster: Holder,
+    target: Holder,
 }
 impl SpawnSubEffectGraphNode {
     pub fn effect_config_id(&self) -> ConfigId<EffectConfig> {
         self.effect_config_id
     }
-    pub fn comment(&self) -> &str {
-        &self.comment
+    pub fn caster(&self) -> Holder {
+        self.caster
+    }
+    pub fn target(&self) -> Holder {
+        self.target
     }
 }
 
 const ENTRY_NODE_COLOR: Color32 = Color32::from_rgb(177 / 3, 93 / 3, 62 / 3);
+const SUSPENDABLE_NODE_COLOR: Color32 = Color32::from_rgb(158 / 3, 177 / 3, 62 / 3);
+const CONTROL_FLOW_NODE_COLOR: Color32 = Color32::from_rgb(62 / 3, 152 / 3, 177 / 3);
 const NODE_COLOR: Color32 = Color32::from_rgb(217 / 3, 117 / 3, 54 / 3);
 const PIN_COLOR: Color32 = Color32::from_rgb(217, 117, 54);
 
@@ -183,12 +177,14 @@ impl<'a> EffectGraphViewer<'a> {
 impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
     fn title(&mut self, node: &EffectGraphNode) -> String {
         match node {
-            EffectGraphNode::EntryPoint(_) => "Точка входа".to_owned(),
-            EffectGraphNode::AddTag(_) => "Добавить/снять лычки".to_owned(),
-            EffectGraphNode::Branch(_) => "Распутье".to_owned(),
-            EffectGraphNode::WaitForCondition(_) => "Ждать возможности".to_owned(),
-            EffectGraphNode::WaitForTicks(_) => "Отсчитать и продолжить".to_owned(),
-            EffectGraphNode::SpawnSubEffect(_) => "Спровоцировать эффект".to_owned(),
+            EffectGraphNode::EntryPoint(_) => "Эффект".to_owned(),
+            EffectGraphNode::AddTag(_) => "Добавь".to_owned(),
+            EffectGraphNode::DecTag(_) => "Убавь".to_owned(),
+            EffectGraphNode::Branch(_) => "Развилка".to_owned(),
+            EffectGraphNode::WaitForCondition(_) => "Жди возможности".to_owned(),
+            EffectGraphNode::WaitForTicks(_) => "Жди отсчёта".to_owned(),
+            EffectGraphNode::SpawnSubEffect(_) => "Стреляй".to_owned(),
+            EffectGraphNode::Join(_) => "Объединение".to_owned()
         }
     }
 
@@ -201,7 +197,11 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
         snarl: &Snarl<EffectGraphNode>
     ) -> Frame {
         match snarl[node] {
-            EffectGraphNode::EntryPoint(_) => frame.fill(ENTRY_NODE_COLOR),
+            | EffectGraphNode::EntryPoint(_) => frame.fill(ENTRY_NODE_COLOR),
+            | EffectGraphNode::WaitForTicks(_)
+            | EffectGraphNode::WaitForCondition(_) => frame.fill(SUSPENDABLE_NODE_COLOR),
+            | EffectGraphNode::Branch(_)
+            | EffectGraphNode::Join(_) => frame.fill(CONTROL_FLOW_NODE_COLOR),
             _ => frame.fill(NODE_COLOR),
         }
     }
@@ -209,6 +209,7 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
     fn inputs(&mut self, node: &EffectGraphNode) -> usize {
         match node {
             EffectGraphNode::EntryPoint(_) => 0,
+            EffectGraphNode::Join(_) => 2,
             _ => 1,
         }
     }
@@ -229,53 +230,9 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
                     ui.label("Нет данных");
                     PinInfo::square().with_fill(PIN_COLOR)
                 },
-                [remote] => match snarl[remote.node] {
-                    EffectGraphNode::EntryPoint(_) => {
-                        ui.label(match remote.output {
-                            0 => "Точка входа (установка)",
-                            1 => "Точка входа (шаг)",
-                            2 => "Точка входа (очистка)",
-                            _ => unreachable!()
-                        });
-                        PinInfo::square()
-                            .with_fill(PIN_COLOR)
-                            .with_wire_style(WireStyle::Bezier5)
-                    }
-                    EffectGraphNode::AddTag(_) => {
-                        ui.label("Лычки");
-                        PinInfo::square()
-                            .with_fill(PIN_COLOR)
-                            .with_wire_style(WireStyle::Bezier5)
-                    }
-                    EffectGraphNode::Branch(_) => {
-                        ui.label(match remote.output {
-                            0 => "Распутье (да)",
-                            1 => "Распутье (нет)",
-                            _ => unreachable!()
-                        });
-                        PinInfo::square()
-                            .with_fill(PIN_COLOR)
-                            .with_wire_style(WireStyle::Bezier5)
-                    }
-                    EffectGraphNode::WaitForCondition(_) => {
-                        ui.label("Выжидание");
-                        PinInfo::square()
-                            .with_fill(PIN_COLOR)
-                            .with_wire_style(WireStyle::Bezier5)
-                    }
-                    EffectGraphNode::WaitForTicks(_) => {
-                        ui.label("Отсчёт");
-                        PinInfo::square()
-                            .with_fill(PIN_COLOR)
-                            .with_wire_style(WireStyle::Bezier5)
-                    }
-                    EffectGraphNode::SpawnSubEffect(_) => {
-                        ui.label("Провокация");
-                        PinInfo::square()
-                            .with_fill(PIN_COLOR)
-                            .with_wire_style(WireStyle::Bezier5)
-                    }
-                },
+                [_] => PinInfo::square()
+                    .with_fill(PIN_COLOR)
+                    .with_wire_style(WireStyle::Bezier5),
                 _ => unreachable!(),
             }
         }
@@ -285,10 +242,12 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
         match node {
             EffectGraphNode::EntryPoint(_) => 3,
             EffectGraphNode::AddTag(_) => 1,
+            EffectGraphNode::DecTag(_) => 1,
             EffectGraphNode::Branch(_) => 2,
             EffectGraphNode::WaitForCondition(_) => 1,
             EffectGraphNode::WaitForTicks(_) => 1,
             EffectGraphNode::SpawnSubEffect(_) => 1,
+            EffectGraphNode::Join(_) => 1
         }
     }
 
@@ -331,87 +290,90 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
         let atlas_size = self.atlas_size;
 
         match node_data {
-            EffectGraphNode::EntryPoint(data) => {
+            EffectGraphNode::EntryPoint(_) => {}
+            EffectGraphNode::Join(_) => {}
+              EffectGraphNode::AddTag(data)
+            | EffectGraphNode::DecTag(data) => {
                 ui.vertical(|ui| {
-                    ui.label("Комментарий:");
-                    ui.text_edit_multiline(&mut data.comment);
-                });
-            }
-            EffectGraphNode::AddTag(data) => {
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui|{
-                        ui.label("Источник значения:");
-                        egui::ComboBox::from_id_salt("value_source")
-                            .selected_text(data.value_source.display_name())
+                    ui.label("Лычка:");
+                    ui.horizontal(|ui| {
+                        egui::ComboBox::from_id_salt("tag_holder")
+                            .selected_text(data.tag_holder.display_name())
                             .show_ui(ui, |ui| {
-                                for v in [ValueSource::Global, ValueSource::Caster, ValueSource::Target ] {
+                                for v in [Holder::Global, Holder::Caster, Holder::Target ] {
                                     ui.selectable_value(
-                                        &mut data.value_source,
+                                        &mut data.tag_holder,
                                         v,
                                         v.display_name()
                                     );
                                 }
                             });
+                        ui.label(".");
+                        let response = tag_config_id_button_small(
+                            ui,
+                            &self.asset_db,
+                            false,
+                            data.tag_config_id
+                        );
+                        let popup_id = ui.make_persistent_id("Выбор лычки");
+                        if response.clicked() {
+                            ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                        }
+                        tag_selector_popup(
+                            ui,
+                            &self.asset_db,
+                            popup_id,
+                            &response,
+                            texture_id,
+                            atlas_size,
+                            |config_id| data.tag_config_id = config_id
+                        );
                     });
 
-                    ui.label("Количество лычек:");
-                    let response = parameter_config_id_button(
-                        ui,
-                        &self.asset_db,
-                        false,
-                        texture_id,
-                        atlas_size,
-                        data.value_parameter_id
-                    );
-                    let popup_id = ui.make_persistent_id("Выбор черты для значения количества лычек");
-                    if response.clicked() {
-                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                    }
-                    parameter_selector_popup(
-                        ui,
-                        &self.asset_db,
-                        popup_id,
-                        &response,
-                        texture_id,
-                        atlas_size,
-                        |config_id| data.value_parameter_id = config_id
-                    );
-
-                    ui.label("Лычка:");
-                    let response = tag_config_id_button(
-                        ui,
-                        &self.asset_db,
-                        false,
-                        texture_id,
-                        atlas_size,
-                        data.tag_config_id
-                    );
-                    let popup_id = ui.make_persistent_id("Выбор лычки");
-                    if response.clicked() {
-                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                    }
-                    tag_selector_popup(
-                        ui,
-                        &self.asset_db,
-                        popup_id,
-                        &response,
-                        texture_id,
-                        atlas_size,
-                        |config_id| data.tag_config_id = config_id
-                    );
-
-                    ui.label("Комментарий:");
-                    ui.text_edit_multiline(&mut data.comment);
+                    ui.label("Значение:");
+                    ui.horizontal(|ui|{
+                        egui::ComboBox::from_id_salt("value_holder")
+                            .selected_text(data.value_holder.display_name())
+                            .show_ui(ui, |ui| {
+                                for v in [Holder::Global, Holder::Caster, Holder::Target ] {
+                                    ui.selectable_value(
+                                        &mut data.value_holder,
+                                        v,
+                                        v.display_name()
+                                    );
+                                }
+                            });
+                        ui.label(".");
+                        let response = parameter_config_id_button_small(
+                            ui,
+                            &self.asset_db,
+                            false,
+                            data.value_parameter_id
+                        );
+                        let popup_id = ui.make_persistent_id("Выбор черты для значения количества лычек");
+                        if response.clicked() {
+                            ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                        }
+                        parameter_selector_popup(
+                            ui,
+                            &self.asset_db,
+                            popup_id,
+                            &response,
+                            texture_id,
+                            atlas_size,
+                            |config_id| data.value_parameter_id = config_id
+                        );
+                    });
                 });
             }
             EffectGraphNode::Branch(data) => {
                 ui.vertical(|ui| {
+                    ui.label("Условие:");
                     ui.horizontal(|ui|{
-                        ui.label("Источник значения:");
                         egui::ComboBox::from_id_salt("value_source")
                             .selected_text(data.value_source.display_name())
                             .show_ui(ui, |ui| {
-                                for v in [ValueSource::Global, ValueSource::Caster, ValueSource::Target ] {
+                                for v in [Holder::Global, Holder::Caster, Holder::Target ] {
                                     ui.selectable_value(
                                         &mut data.value_source,
                                         v,
@@ -419,43 +381,37 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
                                     );
                                 }
                             });
+                        ui.label(".");
+                        let response = parameter_config_id_button_small(
+                            ui,
+                            &self.asset_db,
+                            false,
+                            data.condition_parameter_id
+                        );
+                        let popup_id = ui.make_persistent_id("Выбор черты для условия ветвления");
+                        if response.clicked() {
+                            ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                        }
+                        parameter_selector_popup(
+                            ui,
+                            &self.asset_db,
+                            popup_id,
+                            &response,
+                            texture_id,
+                            atlas_size,
+                            |config_id| data.condition_parameter_id = config_id
+                        );
                     });
-
-                    ui.label("Условие:");
-                    let response = parameter_config_id_button(
-                        ui,
-                        &self.asset_db,
-                        false,
-                        texture_id,
-                        atlas_size,
-                        data.condition_parameter_id
-                    );
-                    let popup_id = ui.make_persistent_id("Выбор черты для условия ветвления");
-                    if response.clicked() {
-                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                    }
-                    parameter_selector_popup(
-                        ui,
-                        &self.asset_db,
-                        popup_id,
-                        &response,
-                        texture_id,
-                        atlas_size,
-                        |config_id| data.condition_parameter_id = config_id
-                    );
-
-                    ui.label("Комментарий:");
-                    ui.text_edit_multiline(&mut data.comment);
                 });
             }
             EffectGraphNode::WaitForCondition(data) => {
                 ui.vertical(|ui| {
+                    ui.label("Условие:");
                     ui.horizontal(|ui|{
-                        ui.label("Источник значения:");
                         egui::ComboBox::from_id_salt("value_source")
                             .selected_text(data.value_source.display_name())
                             .show_ui(ui, |ui| {
-                                for v in [ValueSource::Global, ValueSource::Caster, ValueSource::Target ] {
+                                for v in [Holder::Global, Holder::Caster, Holder::Target ] {
                                     ui.selectable_value(
                                         &mut data.value_source,
                                         v,
@@ -463,43 +419,37 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
                                     );
                                 }
                             });
+                        ui.label(".");
+                        let response = parameter_config_id_button_small(
+                            ui,
+                            &self.asset_db,
+                            false,
+                            data.condition_parameter_id
+                        );
+                        let popup_id = ui.make_persistent_id("Выбор черты для условия ожидания");
+                        if response.clicked() {
+                            ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                        }
+                        parameter_selector_popup(
+                            ui,
+                            &self.asset_db,
+                            popup_id,
+                            &response,
+                            texture_id,
+                            atlas_size,
+                            |config_id| data.condition_parameter_id = config_id
+                        );
                     });
-
-                    ui.label("Условие:");
-                    let response = parameter_config_id_button(
-                        ui,
-                        &self.asset_db,
-                        false,
-                        texture_id,
-                        atlas_size,
-                        data.condition_parameter_id
-                    );
-                    let popup_id = ui.make_persistent_id("Выбор черты для условия ожидания");
-                    if response.clicked() {
-                        ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-                    }
-                    parameter_selector_popup(
-                        ui,
-                        &self.asset_db,
-                        popup_id,
-                        &response,
-                        texture_id,
-                        atlas_size,
-                        |config_id| data.condition_parameter_id = config_id
-                    );
-
-                    ui.label("Комментарий:");
-                    ui.text_edit_multiline(&mut data.comment);
                 });
             }
             EffectGraphNode::WaitForTicks(data) => {
                 ui.vertical(|ui| {
+                    ui.label("Количество шагов:");
                     ui.horizontal(|ui|{
-                        ui.label("Источник значения:");
                         egui::ComboBox::from_id_salt("value_source")
                             .selected_text(data.value_source.display_name())
                             .show_ui(ui, |ui| {
-                                for v in [ValueSource::Global, ValueSource::Caster, ValueSource::Target ] {
+                                for v in [Holder::Global, Holder::Caster, Holder::Target ] {
                                     ui.selectable_value(
                                         &mut data.value_source,
                                         v,
@@ -507,40 +457,69 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
                                     );
                                 }
                             });
+                        ui.label(".");
+                        let response = parameter_config_id_button_small(
+                            ui,
+                            &self.asset_db,
+                            false,
+                            data.tick_count_parameter_id
+                        );
+                        let popup_id = ui.make_persistent_id("Выбор черты для количества шагов");
+                        if response.clicked() {
+                            ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                        }
+                        parameter_selector_popup(
+                            ui,
+                            &self.asset_db,
+                            popup_id,
+                            &response,
+                            texture_id,
+                            atlas_size,
+                            |config_id| data.tick_count_parameter_id = config_id
+                        );
                     });
-
-                    ui.label("Количество шагов:");
-                    let response = parameter_config_id_button(
+                });
+            }
+            EffectGraphNode::SpawnSubEffect(data) => {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui|{
+                        egui::ComboBox::from_id_salt("caster")
+                            .selected_text(data.caster.display_name())
+                            .show_ui(ui, |ui| {
+                                for v in [Holder::Global, Holder::Caster, Holder::Target ] {
+                                    ui.selectable_value(&mut data.caster, v, v.display_name());
+                                }
+                            });
+                        ui.label("->");
+                        egui::ComboBox::from_id_salt("target")
+                            .selected_text(data.target.display_name())
+                            .show_ui(ui, |ui| {
+                                for v in [Holder::Global, Holder::Caster, Holder::Target ] {
+                                    ui.selectable_value(&mut data.target, v, v.display_name());
+                                }
+                            });
+                    });
+                    let response = effect_config_id_button(
                         ui,
                         &self.asset_db,
                         false,
                         texture_id,
                         atlas_size,
-                        data.tick_count_parameter_id
+                        data.effect_config_id
                     );
-                    let popup_id = ui.make_persistent_id("Выбор черты для количества шагов");
+                    let popup_id = ui.make_persistent_id("Выбор эффекта");
                     if response.clicked() {
                         ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                     }
-                    parameter_selector_popup(
+                    effect_selector_popup(
                         ui,
                         &self.asset_db,
                         popup_id,
                         &response,
                         texture_id,
                         atlas_size,
-                        |config_id| data.tick_count_parameter_id = config_id
+                        |config_id| data.effect_config_id = config_id
                     );
-
-                    ui.label("Комментарий:");
-                    ui.text_edit_multiline(&mut data.comment);
-                });
-            }
-            EffectGraphNode::SpawnSubEffect(data) => {
-                ui.vertical(|ui| {
-                    // todo: выбор эффекта тут добавить
-                    ui.label("Комментарий:");
-                    ui.text_edit_multiline(&mut data.comment);
                 });
             }
         }
@@ -556,22 +535,43 @@ impl<'a> SnarlViewer<EffectGraphNode> for EffectGraphViewer<'a> {
         snarl: &mut Snarl<EffectGraphNode>
     ) {
         ui.label("Добавить узел");
-        if ui.button("Добавить/снять лычки").clicked(){
-            snarl.insert_node(pos, EffectGraphNode::AddTag(Default::default()));
-            ui.close_menu();
-        } else if ui.button("Распутье").clicked(){
-            snarl.insert_node(pos, EffectGraphNode::Branch(Default::default()));
-            ui.close_menu();
-        } else if ui.button("Ждать возможности").clicked(){
-            snarl.insert_node(pos, EffectGraphNode::WaitForCondition(Default::default()));
-            ui.close_menu();
-        } else if ui.button("Отсчитать и продолжить").clicked(){
-            snarl.insert_node(pos, EffectGraphNode::WaitForTicks(Default::default()));
-            ui.close_menu();
-        } else if ui.button("Спровоцировать эффект").clicked(){
-            snarl.insert_node(pos, EffectGraphNode::SpawnSubEffect(Default::default()));
-            ui.close_menu();
-        }
+        ui.group(|ui| {
+            ui.label("Контроль управления");
+            if ui.add(Button::new("Развилка").fill(CONTROL_FLOW_NODE_COLOR)).clicked(){
+                snarl.insert_node(pos, EffectGraphNode::Branch(Default::default()));
+                ui.close_menu();
+            }
+            if ui.add(Button::new("Объединение").fill(CONTROL_FLOW_NODE_COLOR)).clicked(){
+                snarl.insert_node(pos, EffectGraphNode::Join(Default::default()));
+                ui.close_menu();
+            }
+        });
+        ui.group(|ui| {
+            ui.label("Продолжительные");
+            if ui.add(Button::new("Жди возможности").fill(SUSPENDABLE_NODE_COLOR)).clicked(){
+                snarl.insert_node(pos, EffectGraphNode::WaitForCondition(Default::default()));
+                ui.close_menu();
+            }
+            if ui.add(Button::new("Жди отсчёта").fill(SUSPENDABLE_NODE_COLOR)).clicked(){
+                snarl.insert_node(pos, EffectGraphNode::WaitForTicks(Default::default()));
+                ui.close_menu();
+            }
+        });
+        ui.group(|ui|{
+            ui.label("Мгновенные");
+            if ui.add(Button::new("Добавь").fill(NODE_COLOR)).clicked(){
+                snarl.insert_node(pos, EffectGraphNode::AddTag(Default::default()));
+                ui.close_menu();
+            }
+            if ui.add(Button::new("Убавь").fill(NODE_COLOR)).clicked(){
+                snarl.insert_node(pos, EffectGraphNode::DecTag(Default::default()));
+                ui.close_menu();
+            }
+            if ui.add(Button::new("Стреляй").fill(NODE_COLOR)).clicked(){
+                snarl.insert_node(pos, EffectGraphNode::SpawnSubEffect(Default::default()));
+                ui.close_menu();
+            }
+        });
     }
 
     fn has_node_menu(&mut self, _node: &EffectGraphNode) -> bool { true }
@@ -606,11 +606,7 @@ impl EffectConfig {
         let pos = pos2(0f32, 0f32);
         snarl.insert_node(
             pos,
-            EffectGraphNode::EntryPoint(
-                EntryPointEffectGraphNode {
-                    comment: "".to_string(),
-                }
-            )
+            EffectGraphNode::EntryPoint(EntryPointEffectGraphNode)
         );
         Self {
             description: Default::default(),
@@ -640,39 +636,42 @@ impl EffectConfig {
                 pos.x.to_bits().hash(&mut hasher);
                 pos.y.to_bits().hash(&mut hasher);
                 match node {
-                    EffectGraphNode::EntryPoint(entry) => {
+                    EffectGraphNode::EntryPoint(_) => {
                         0u8.hash(&mut hasher);
-                        entry.comment().hash(&mut hasher);
                     }
                     EffectGraphNode::AddTag(add_tag) => {
                         1u8.hash(&mut hasher);
-                        add_tag.value_source().hash(&mut hasher);
+                        add_tag.value_holder().hash(&mut hasher);
                         add_tag.value_parameter_id().hash(&mut hasher);
                         add_tag.tag_id().hash(&mut hasher);
-                        add_tag.comment().hash(&mut hasher);
                     }
                     EffectGraphNode::Branch(branch) => {
                         2u8.hash(&mut hasher);
                         branch.value_source().hash(&mut hasher);
                         branch.condition_parameter_id().hash(&mut hasher);
-                        branch.comment().hash(&mut hasher);
                     }
                     EffectGraphNode::WaitForCondition(wait_for) => {
                         3u8.hash(&mut hasher);
                         wait_for.value_source().hash(&mut hasher);
                         wait_for.condition_parameter_id().hash(&mut hasher);
-                        wait_for.comment().hash(&mut hasher);
                     }
                     EffectGraphNode::WaitForTicks(wait_ticks) => {
                         4u8.hash(&mut hasher);
                         wait_ticks.value_source().hash(&mut hasher);
                         wait_ticks.tick_count_parameter_id().hash(&mut hasher);
-                        wait_ticks.comment().hash(&mut hasher);
                     }
                     EffectGraphNode::SpawnSubEffect(spawn_sub_effect) => {
                         5u8.hash(&mut hasher);
                         spawn_sub_effect.effect_config_id().hash(&mut hasher);
-                        spawn_sub_effect.comment().hash(&mut hasher);
+                    }
+                    EffectGraphNode::Join(_) => {
+                        6u8.hash(&mut hasher);
+                    }
+                    EffectGraphNode::DecTag(dec_tag) => {
+                        7u8.hash(&mut hasher);
+                        dec_tag.value_holder().hash(&mut hasher);
+                        dec_tag.value_parameter_id().hash(&mut hasher);
+                        dec_tag.tag_id().hash(&mut hasher);
                     }
                 }
             }
@@ -706,25 +705,35 @@ impl EffectConfig {
     fn recompile_root_node(&mut self) {
         fn parse_or_none(
             snarl: &Snarl<EffectGraphNode>,
+            memoizer: &mut HashMap<NodeId, EffectNodeId>,
             nodes: &mut Vec<EffectNode>,
             node_id: NodeId,
             id: usize
         ) -> Option<EffectNodeId> {
             match snarl.out_pin(OutPinId { node: node_id, output: id }).remotes.as_slice() {
-                [remote] => Some(parse(snarl, nodes, remote.node)),
+                [remote] =>
+                    match memoizer.get(&remote.node).copied() {
+                        Some(memoized_id) => Some(memoized_id),
+                        _ => {
+                            let id = parse(snarl, memoizer, nodes, remote.node);
+                            memoizer.insert(remote.node, id);
+                            Some(id)
+                        }
+                    }
                 _ => None,
             }
         }
 
         fn parse(
             snarl: &Snarl<EffectGraphNode>,
+            memoizer: &mut HashMap<NodeId, EffectNodeId>,
             nodes: &mut Vec<EffectNode>,
             node_id: NodeId
         ) -> EffectNodeId {
             let new_node = match &snarl[node_id] {
                 EffectGraphNode::EntryPoint(_) => unreachable!(),
                 EffectGraphNode::AddTag(add_tag_data) => {
-                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
                     AddTagNode::new(
                         SharedNodeData {
                             node_id: EffectNodeId::new(nodes.len() as u32),
@@ -732,15 +741,34 @@ impl EffectConfig {
                                 .map(|it| it.pos)
                                 .expect("There should be a node info"),
                         },
-                        add_tag_data.value_source(),
-                        add_tag_data.value_parameter_id(),
+                        false,
+                        add_tag_data.tag_holder(),
                         add_tag_data.tag_id(),
+                        add_tag_data.value_holder(),
+                        add_tag_data.value_parameter_id(),
+                        then_id
+                    ).into()
+                },
+                EffectGraphNode::DecTag(dec_tag_data) => {
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    AddTagNode::new(
+                        SharedNodeData {
+                            node_id: EffectNodeId::new(nodes.len() as u32),
+                            pos: snarl.get_node_info(node_id)
+                                .map(|it| it.pos)
+                                .expect("There should be a node info"),
+                        },
+                        true,
+                        dec_tag_data.tag_holder(),
+                        dec_tag_data.tag_id(),
+                        dec_tag_data.value_holder(),
+                        dec_tag_data.value_parameter_id(),
                         then_id
                     ).into()
                 },
                 EffectGraphNode::Branch(branch_data) => {
-                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
-                    let else_id = parse_or_none(snarl, nodes, node_id, 1);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    let else_id = parse_or_none(snarl, memoizer, nodes, node_id, 1);
                     BranchNode::new(
                         SharedNodeData {
                             node_id: EffectNodeId::new(nodes.len() as u32),
@@ -754,8 +782,20 @@ impl EffectConfig {
                         else_id
                     ).into()
                 },
+                EffectGraphNode::Join(_) => {
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    JoinNode::new(
+                        SharedNodeData {
+                            node_id: EffectNodeId::new(nodes.len() as u32),
+                            pos: snarl.get_node_info(node_id)
+                                .map(|it| it.pos)
+                                .expect("There should be a node info"),
+                        },
+                        then_id
+                    ).into()
+                },
                 EffectGraphNode::WaitForCondition(wait_cond_data) => {
-                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
                     WaitForConditionNode::new(
                         SharedNodeData {
                             node_id: EffectNodeId::new(nodes.len() as u32),
@@ -769,7 +809,7 @@ impl EffectConfig {
                     ).into()
                 },
                 EffectGraphNode::WaitForTicks(wait_ticks_data) => {
-                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
                     WaitTicksNode::new(
                         SharedNodeData {
                             node_id: EffectNodeId::new(nodes.len() as u32),
@@ -783,7 +823,7 @@ impl EffectConfig {
                     ).into()
                 },
                 EffectGraphNode::SpawnSubEffect(spawn_sub_effect_data) => {
-                    let then_id = parse_or_none(snarl, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
                     SpawnSubEffectNode::new(
                         SharedNodeData {
                             node_id: EffectNodeId::new(nodes.len() as u32),
@@ -792,6 +832,8 @@ impl EffectConfig {
                                 .expect("There should be a node info"),
                         },
                         spawn_sub_effect_data.effect_config_id(),
+                        spawn_sub_effect_data.caster(),
+                        spawn_sub_effect_data.target(),
                         then_id
                     ).into()
                 },
@@ -808,9 +850,10 @@ impl EffectConfig {
 
         let EffectGraphNode::EntryPoint(_) = entry_node else { unreachable!() };
         let mut nodes = Vec::new();
-        let setup = parse_or_none(&self.snarl, &mut nodes, entry_node_id, 0);
-        let tick = parse_or_none(&self.snarl, &mut nodes, entry_node_id, 1);
-        let on_destroy = parse_or_none(&self.snarl, &mut nodes, entry_node_id, 2);
+        let mut memoizer = HashMap::new();
+        let setup = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, entry_node_id, 0);
+        let tick = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, entry_node_id, 1);
+        let on_destroy = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, entry_node_id, 2);
 
         self.compiled_root = EffectRoot::new(nodes, setup, tick, on_destroy);
     }

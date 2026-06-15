@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use egui::{PopupCloseBehavior, Stroke, TextEdit, Ui};
 use egui_snarl::ui::{NodeLayout, PinPlacement, PinShape, SnarlStyle};
 use uuid::Uuid;
@@ -20,7 +19,7 @@ pub struct EffectConfigEditorSection {
     selected_effect_config_id: Option<Uuid>,
     selected_effect_name: String,
     current_effect_config: Option<EffectConfig>,
-    style: Rc<SnarlStyle>,
+    style: SnarlStyle,
 }
 
 impl Default for EffectConfigEditorSection {
@@ -30,13 +29,13 @@ impl Default for EffectConfigEditorSection {
             selected_effect_config_id: None,
             selected_effect_name: String::new(),
             current_effect_config: None,
-            style: Rc::new(SnarlStyle {
+            style: SnarlStyle {
                 pin_placement: Some(PinPlacement::Edge),
                 node_layout: Some(NodeLayout::Sandwich),
                 pin_shape: Some(PinShape::Square),
                 pin_stroke: Some(Stroke::NONE),
                 ..Default::default()
-            }),
+            },
         }
     }
 }
@@ -45,14 +44,15 @@ impl EditorStage {
     fn update_current_effect_config(
         &mut self,
         asset_db: &mut AssetDb,
-        foo: impl FnOnce(&AssetDb, &mut String, &mut EffectConfig) -> UpdateState,
+        foo: impl FnOnce(&AssetDb, &mut String, &mut EffectConfig, &SnarlStyle) -> UpdateState,
     ) {
         let section = &mut self.effect_section;
         let name = &mut section.selected_effect_name;
         let cur_effect = &mut section.current_effect_config;
+        let style = &section.style;
 
         if let Some(current_effect_config) = cur_effect {
-            if foo(asset_db, name, current_effect_config) == UpdateState::Changed {
+            if foo(asset_db, name, current_effect_config, style) == UpdateState::Changed {
                 if let Some(id) = section.selected_effect_config_id {
                     asset_db.update_asset_mut(
                         AssetKind::EffectConfig,
@@ -198,14 +198,13 @@ impl EditorStage {
             unreachable!()
         };
         let atlas_size = self.atlas_size;
-        let style = Rc::clone(&self.effect_section.style);
 
         let mut asset_db = crate::assets::ASSET_DATABASE.lock()
             .expect("Failed to lock asset database");
 
         self.update_current_effect_config(
             &mut asset_db,
-            |asset_db, effect_name, current_effect_config| {
+            |asset_db, effect_name, current_effect_config, style| {
                 let mut update_state = UpdateState::Unchanged;
                 ui.vertical(|ui| {
                     ui.group(|ui| {
@@ -349,7 +348,7 @@ impl EditorStage {
                             &asset_db,
                             texture_id,
                             atlas_size,
-                            &style,
+                            style,
                         ) {
                             update_state = UpdateState::Changed;
                         }

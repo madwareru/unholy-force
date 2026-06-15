@@ -9,9 +9,8 @@ use crate::{
     },
     effect_mechanics::{
         nodes::{
-            get_effect_context,
             SharedNodeData,
-            ValueSource
+            Holder
         },
         add_entity_tag_count,
         EffectQueue,
@@ -23,14 +22,17 @@ use crate::{
     app::game_stage::{EntityId, GameWorld},
 };
 use crate::effect_mechanics::{get_entity_parameter_value, EffectNodeId};
-use crate::effect_mechanics::nodes::get_value_source_entity_id;
+use crate::effect_mechanics::nodes::get_direction_entity_id;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct AddTagNode {
     shared_node_data: SharedNodeData,
-    value_source: ValueSource,
-    value_parameter_id: ConfigId<ParameterConfig>,
+    #[serde(default)]
+    sign_flipped: bool,
+    tag_holder: Holder,
     tag_config_id: ConfigId<TagConfig>,
+    value_holder: Holder,
+    value_parameter_id: ConfigId<ParameterConfig>,
     then_node: Option<EffectNodeId>,
 }
 impl Into<EffectNode> for AddTagNode {
@@ -42,16 +44,20 @@ impl Into<EffectNode> for AddTagNode {
 impl AddTagNode {
     pub fn new(
         shared_node_data: SharedNodeData,
-        value_source: ValueSource,
-        value_parameter_id: ConfigId<ParameterConfig>,
+        sign_flipped: bool,
+        tag_holder: Holder,
         tag_config_id: ConfigId<TagConfig>,
+        value_holder: Holder,
+        value_parameter_id: ConfigId<ParameterConfig>,
         then_node: Option<EffectNodeId>,
     ) -> Self {
         Self {
+            sign_flipped,
             shared_node_data,
-            value_source,
-            value_parameter_id,
+            tag_holder,
             tag_config_id,
+            value_holder,
+            value_parameter_id,
             then_node,
         }
     }
@@ -73,7 +79,7 @@ impl EffectNodeImpl for AddTagNode {
         effect_id: EntityId,
         effect_queue: &mut EffectQueue
     ) -> EffectControlFlow {
-        let Some(value_source_id) = get_value_source_entity_id(game_world, effect_id, self.value_source) else {
+        let Some(value_source_id) = get_direction_entity_id(game_world, effect_id, self.value_holder) else {
             error!(
                 target: EFFECT_GRAPH_TARGET,
                 "Не удалось получить количество лычек для добавления"
@@ -94,15 +100,12 @@ impl EffectNodeImpl for AddTagNode {
             return EffectControlFlow::Complete;
         };
 
-        let target_id = match get_effect_context(game_world, effect_id) {
-            Some(effect_context) => effect_context.target_id,
-            None => {
-                error!(
-                    target: EFFECT_GRAPH_TARGET,
-                    "Попытка получить цель для выдачи лычек провалилась"
-                );
-                return EffectControlFlow::Complete;
-            }
+        let Some(target_id) = get_direction_entity_id(game_world, effect_id, self.tag_holder) else {
+            error!(
+                target: EFFECT_GRAPH_TARGET,
+                "Попытка получить цель для выдачи лычек провалилась"
+            );
+            return EffectControlFlow::Complete;
         };
 
         if !add_entity_tag_count(
@@ -110,7 +113,7 @@ impl EffectNodeImpl for AddTagNode {
             game_world,
             target_id,
             self.tag_config_id,
-            value,
+            if self.sign_flipped { -value } else { value },
             effect_queue
         ) {
             info!(
