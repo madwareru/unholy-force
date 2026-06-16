@@ -1,4 +1,3 @@
-use egui::Pos2;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
     },
     effect_mechanics::{
         nodes::{
-            SharedNodeData,
+            EffectNodeInfo,
             Holder
         },
         add_entity_tag_count,
@@ -26,12 +25,9 @@ use crate::effect_mechanics::nodes::get_direction_entity_id;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct AddTagNode {
-    shared_node_data: SharedNodeData,
     #[serde(default)]
-    sign_flipped: bool,
-    tag_holder: Holder,
+    flags: u8,
     tag_config_id: ConfigId<TagConfig>,
-    value_holder: Holder,
     value_parameter_id: ConfigId<ParameterConfig>,
     then_node: Option<EffectNodeId>,
 }
@@ -42,8 +38,25 @@ impl Into<EffectNode> for AddTagNode {
 }
 
 impl AddTagNode {
+    fn sign_flipped(&self) -> bool {
+        self.flags & 0b0000_0001 == 0b0000_0001
+    }
+    fn tag_holder(&self) -> Holder {
+        match (self.flags & 0b0000_0110) >> 1 {
+            0b01 => Holder::Caster,
+            0b10 => Holder::Target,
+            _ => Holder::Global
+        }
+    }
+    fn value_holder(&self) -> Holder {
+        match (self.flags & 0b0001_1000) >> 3 {
+            0b01 => Holder::Caster,
+            0b10 => Holder::Target,
+            _ => Holder::Global
+        }
+    }
+
     pub fn new(
-        shared_node_data: SharedNodeData,
         sign_flipped: bool,
         tag_holder: Holder,
         tag_config_id: ConfigId<TagConfig>,
@@ -51,12 +64,21 @@ impl AddTagNode {
         value_parameter_id: ConfigId<ParameterConfig>,
         then_node: Option<EffectNodeId>,
     ) -> Self {
+        let flags = 0u8;
+        let flags = if !sign_flipped { flags } else { flags | 0b0000_0001 };
+        let flags = match tag_holder {
+            Holder::Global => flags,
+            Holder::Caster => flags | 0b00_01_0,
+            Holder::Target => flags | 0b00_10_0,
+        };
+        let flags = match value_holder {
+            Holder::Global => flags,
+            Holder::Caster => flags | 0b01_00_0,
+            Holder::Target => flags | 0b10_00_0,
+        };
         Self {
-            sign_flipped,
-            shared_node_data,
-            tag_holder,
+            flags,
             tag_config_id,
-            value_holder,
             value_parameter_id,
             then_node,
         }
@@ -64,22 +86,15 @@ impl AddTagNode {
 }
 
 impl EffectNodeImpl for AddTagNode {
-    fn get_node_id(&self) -> EffectNodeId {
-        self.shared_node_data.node_id
-    }
-
-    fn get_node_pos(&self) -> Pos2 {
-        self.shared_node_data.pos
-    }
-
     fn tick(
         &self,
+        _node_info: EffectNodeInfo,
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
         effect_queue: &mut EffectQueue
     ) -> EffectControlFlow {
-        let Some(value_source_id) = get_direction_entity_id(game_world, effect_id, self.value_holder) else {
+        let Some(value_source_id) = get_direction_entity_id(game_world, effect_id, self.value_holder()) else {
             error!(
                 target: EFFECT_GRAPH_TARGET,
                 "Не удалось получить количество лычек для добавления"
@@ -100,7 +115,7 @@ impl EffectNodeImpl for AddTagNode {
             return EffectControlFlow::Complete;
         };
 
-        let Some(target_id) = get_direction_entity_id(game_world, effect_id, self.tag_holder) else {
+        let Some(target_id) = get_direction_entity_id(game_world, effect_id, self.tag_holder()) else {
             error!(
                 target: EFFECT_GRAPH_TARGET,
                 "Попытка получить цель для выдачи лычек провалилась"
@@ -113,7 +128,7 @@ impl EffectNodeImpl for AddTagNode {
             game_world,
             target_id,
             self.tag_config_id,
-            if self.sign_flipped { -value } else { value },
+            if self.sign_flipped() { -value } else { value },
             effect_queue
         ) {
             info!(

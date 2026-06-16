@@ -3,6 +3,7 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher}
 };
 use std::fmt::Debug;
+use std::num::NonZeroU16;
 use bumpalo::{Bump};
 use rand::RngExt;
 use tracing::{error, info, warn};
@@ -38,7 +39,7 @@ use crate::{
     },
 };
 use crate::effect_mechanics::nodes::join::JoinNode;
-use crate::effect_mechanics::nodes::SharedNodeData;
+use crate::effect_mechanics::nodes::EffectNodeInfo;
 
 pub mod nodes;
 
@@ -255,13 +256,13 @@ impl EffectEnv {
         Self { buckets: smallvec::SmallVec::new() }
     }
 
-    pub fn get<N: EffectNodeImpl, H: Hash>(&self, node: &N, salt_hash: H) -> Option<f32> {
-        let id = get_node_hash(node, salt_hash);
+    pub fn get<H: Hash>(&self, node_info: EffectNodeInfo, salt_hash: H) -> Option<f32> {
+        let id = get_node_hash(node_info, salt_hash);
         self.buckets.iter().find(|it| it.0 == id).map(|it| it.1)
     }
 
-    pub fn set<N: EffectNodeImpl, H: Hash>(&mut self, node: &N, salt_hash: H, value: f32) {
-        let id = get_node_hash(node, salt_hash);
+    pub fn set<H: Hash>(&mut self, node_info: EffectNodeInfo, salt_hash: H, value: f32) {
+        let id = get_node_hash(node_info, salt_hash);
         if self.buckets.iter_mut().find(|it| it.0 == id).map(|it| it.1 = value).is_none() {
             self.buckets.push((id, value));
         }
@@ -721,24 +722,23 @@ pub fn add_entity_tag_count(
     true
 }
 
-pub fn get_node_hash<N: EffectNodeImpl, H: Hash>(node: &N, salt_hash: H) -> u128 {
+pub fn get_node_hash<H: Hash>(node_info: EffectNodeInfo, salt_hash: H) -> u128 {
     let mut salt_hasher = DefaultHasher::new();
     salt_hash.hash(&mut salt_hasher);
     let salt_hash = salt_hasher.finish() as u128;
 
-    let pos = node.get_node_pos();
-    let result_hash = (node.get_node_id().0 as u128) & 0xFFFF_FFFF;
-    let result_hash = (result_hash << 16) | ((pos.x as u128) & 0xFFFF);
-    let result_hash = (result_hash << 16) | ((pos.y as u128) & 0xFFFF);
+    let pos = node_info.pos;
+    let result_hash = (node_info.node_id.get() as u128) & 0xFFFF_FFFF;
+    let result_hash = (result_hash << 16) | (pos[0] as u128);
+    let result_hash = (result_hash << 16) | (pos[1] as u128);
     let result_hash = (result_hash << 64) | salt_hash;
     result_hash
 }
 
 pub trait EffectNodeImpl {
-    fn get_node_id(&self) -> EffectNodeId;
-    fn get_node_pos(&self) -> egui::Pos2;
     fn tick(
         &self,
+        node_info: EffectNodeInfo,
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
@@ -753,25 +753,16 @@ macro_rules! enum_dispatched {
             $($variant($variant)),*
         }
         impl EffectNodeImpl for $name {
-            fn get_node_id(&self) -> EffectNodeId {
-                match self {
-                    $(Self::$variant(x) => x.get_node_id(),)*
-                }
-            }
-            fn get_node_pos(&self) -> egui::Pos2 {
-                match self {
-                    $(Self::$variant(x) => x.get_node_pos(),)*
-                }
-            }
             fn tick(
                 &self,
+                node_info: EffectNodeInfo,
                 game_config_provider: &ConfigProvider,
                 game_world: &mut GameWorld,
                 effect_id: EntityId,
                 effect_queue: &mut EffectQueue
             ) -> EffectControlFlow {
                 match self {
-                    $(Self::$variant(x) => x.tick(game_config_provider, game_world, effect_id, effect_queue),)*
+                    $(Self::$variant(x) => x.tick(node_info, game_config_provider, game_world, effect_id, effect_queue),)*
                 }
             }
         }
@@ -789,18 +780,15 @@ enum_dispatched!(
     }
 );
 
-
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Hash)]
-pub struct EffectNodeId(u32);
-impl EffectNodeId {
-    pub fn new(id: u32) -> Self {
-        Self(id)
-    }
+pub type EffectNodeId = NonZeroU16;
+pub fn make_effect_node_id(id: u16) -> EffectNodeId {
+    EffectNodeId::new(id + 1).unwrap()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EffectRoot {
     nodes: Vec<EffectNode>,
+    node_info_store: Vec<EffectNodeInfo>,
     setup: Option<EffectNodeId>,
     tick: Option<EffectNodeId>,
     on_destroy: Option<EffectNodeId>,
@@ -809,11 +797,12 @@ pub struct EffectRoot {
 impl EffectRoot {
     pub fn new(
         nodes: Vec<EffectNode>,
+        node_info_store: Vec<EffectNodeInfo>,
         setup: Option<EffectNodeId>,
         tick: Option<EffectNodeId>,
         on_destroy: Option<EffectNodeId>,
     ) -> Self {
-        Self { nodes, setup, tick, on_destroy }
+        Self { nodes, node_info_store, setup, tick, on_destroy }
     }
 
     pub fn setup(
@@ -833,12 +822,17 @@ impl EffectRoot {
         }
 
         let result = self.setup
-            .map(|id| self.nodes[id.0 as usize].tick(
-                game_config_provider,
-                game_world,
-                effect_id,
-                effect_queue
-            )).unwrap_or(EffectControlFlow::Complete);
+            .map(|id| {
+                let id = id.get() as usize - 1;
+                let node_info = self.node_info_store[id];
+                self.nodes[id].tick(
+                    node_info,
+                    game_config_provider,
+                    game_world,
+                    effect_id,
+                    effect_queue
+                )
+            }).unwrap_or(EffectControlFlow::Complete);
 
         match result {
             EffectControlFlow::Complete => {}
@@ -873,12 +867,17 @@ impl EffectRoot {
         }
 
         current_node_id
-            .map(|id| self.nodes[id.0 as usize].tick(
-                game_config_provider,
-                game_world,
-                effect_id,
-                effect_queue
-            ))
+            .map(|id| {
+                let id = id.get() as usize - 1;
+                let node_info = self.node_info_store[id];
+                self.nodes[id].tick(
+                    node_info,
+                    game_config_provider,
+                    game_world,
+                    effect_id,
+                    effect_queue
+                )
+            })
             .unwrap_or(EffectControlFlow::Complete)
     }
 
@@ -899,12 +898,17 @@ impl EffectRoot {
         }
 
         let result = self.on_destroy.as_ref()
-            .map(|id| self.nodes[id.0 as usize].tick(
-                game_config_provider,
-                game_world,
-                effect_id,
-                effect_queue
-            )).unwrap_or(EffectControlFlow::Complete);
+            .map(|id| {
+                let id = id.get() as usize - 1;
+                let node_info = self.node_info_store[id];
+                self.nodes[id].tick(
+                    node_info,
+                    game_config_provider,
+                    game_world,
+                    effect_id,
+                    effect_queue
+                )
+            }).unwrap_or(EffectControlFlow::Complete);
 
         match result {
             EffectControlFlow::Complete => {}

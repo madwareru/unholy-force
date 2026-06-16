@@ -1,4 +1,3 @@
-use egui::Pos2;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
         EffectNodeImpl,
         EffectQueue,
         EFFECT_GRAPH_TARGET,
-        nodes::{get_direction_entity_id, SharedNodeData, Holder},
+        nodes::{get_direction_entity_id, EffectNodeInfo, Holder},
         EffectNode
     },
     game_config::{
@@ -22,7 +21,6 @@ use crate::effect_mechanics::EffectNodeId;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct WaitForConditionNode {
-    shared_node_data: SharedNodeData,
     value_source: Holder,
     condition_parameter_id: ConfigId<ParameterConfig>,
     then_node: Option<EffectNodeId>,
@@ -35,13 +33,11 @@ impl Into<EffectNode> for WaitForConditionNode {
 
 impl WaitForConditionNode {
     pub fn new(
-        shared_node_data: SharedNodeData,
         value_source: Holder,
         condition_parameter_id: ConfigId<ParameterConfig>,
         then_node: Option<EffectNodeId>
     ) -> Self {
         Self {
-            shared_node_data,
             value_source,
             condition_parameter_id,
             then_node,
@@ -50,16 +46,9 @@ impl WaitForConditionNode {
 }
 
 impl EffectNodeImpl for WaitForConditionNode {
-    fn get_node_id(&self) -> EffectNodeId {
-        self.shared_node_data.node_id
-    }
-
-    fn get_node_pos(&self) -> Pos2 {
-        self.shared_node_data.pos
-    }
-
     fn tick(
         &self,
+        _node_info: EffectNodeInfo,
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,

@@ -1,4 +1,3 @@
-use egui::Pos2;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
         EffectNodeImpl,
         EFFECT_GRAPH_TARGET,
         nodes::{
-            SharedNodeData,
+            EffectNodeInfo,
             Holder,
             get_effect_env_mut
         },
@@ -26,7 +25,6 @@ use crate::effect_mechanics::EffectNodeId;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct WaitTicksNode {
-    shared_node_data: SharedNodeData,
     value_source: Holder,
     tick_count_parameter_id: ConfigId<ParameterConfig>,
     then_node: Option<EffectNodeId>
@@ -39,13 +37,11 @@ impl Into<EffectNode> for WaitTicksNode {
 
 impl WaitTicksNode {
     pub fn new(
-        shared_node_data: SharedNodeData,
         value_source: Holder,
         tick_count_parameter_id: ConfigId<ParameterConfig>,
         then_node: Option<EffectNodeId>
     ) -> Self {
         Self {
-            shared_node_data,
             value_source,
             tick_count_parameter_id,
             then_node
@@ -54,12 +50,9 @@ impl WaitTicksNode {
 }
 
 impl EffectNodeImpl for WaitTicksNode {
-    fn get_node_id(&self) -> EffectNodeId { self.shared_node_data.node_id }
-
-    fn get_node_pos(&self) -> Pos2 { self.shared_node_data.pos }
-
     fn tick(
         &self,
+        node_info: EffectNodeInfo,
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
@@ -71,7 +64,7 @@ impl EffectNodeImpl for WaitTicksNode {
         // для корректной его работы количество тиков, которое нужно ждать,
         // вычисляется только один раз через механизм мемоизации
         let Some(ticks_to_wait) = get_memoized_parameter_value(
-            self,
+            node_info,
             game_config_provider,
             game_world,
             effect_id,
@@ -87,10 +80,10 @@ impl EffectNodeImpl for WaitTicksNode {
 
         match get_effect_env_mut(game_world, effect_id) {
             Some(mut effect_env) => {
-                let mut tick_count_elapsed = effect_env.get(self, TICK_COUNT_HASH).unwrap_or(0f32);
+                let mut tick_count_elapsed = effect_env.get(node_info, TICK_COUNT_HASH).unwrap_or(0f32);
                 if tick_count_elapsed < ticks_to_wait {
                     tick_count_elapsed += 1f32;
-                    effect_env.set(self, TICK_COUNT_HASH, tick_count_elapsed);
+                    effect_env.set(node_info, TICK_COUNT_HASH, tick_count_elapsed);
                     return EffectControlFlow::Suspend;
                 }
             }

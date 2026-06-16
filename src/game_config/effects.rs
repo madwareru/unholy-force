@@ -12,7 +12,7 @@ use crate::{
         nodes::{
             Holder,
             add_tag::AddTagNode,
-            SharedNodeData,
+            EffectNodeInfo,
             spawn_sub_effect::SpawnSubEffectNode,
             wait_cond::WaitForConditionNode,
             wait_ticks::WaitTicksNode,
@@ -27,7 +27,7 @@ use crate::{
     },
 };
 use crate::app::editor_stage::widgets::{effect_config_id_button, effect_selector_popup, SpriteHolder};
-use crate::effect_mechanics::EffectNodeId;
+use crate::effect_mechanics::{make_effect_node_id, EffectNodeId};
 use crate::effect_mechanics::nodes::join::JoinNode;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -613,7 +613,7 @@ impl EffectConfig {
             sprite_name: Default::default(),
             sprite_pivot: Default::default(),
             snarl,
-            compiled_root: EffectRoot::new(Vec::new(), None, None, None)
+            compiled_root: EffectRoot::new(Vec::new(), Vec::new(), None, None, None)
         }
     }
 
@@ -707,6 +707,7 @@ impl EffectConfig {
             snarl: &Snarl<EffectGraphNode>,
             memoizer: &mut HashMap<NodeId, EffectNodeId>,
             nodes: &mut Vec<EffectNode>,
+            node_info_store: &mut Vec<EffectNodeInfo>,
             node_id: NodeId,
             id: usize
         ) -> Option<EffectNodeId> {
@@ -715,7 +716,7 @@ impl EffectConfig {
                     match memoizer.get(&remote.node).copied() {
                         Some(memoized_id) => Some(memoized_id),
                         _ => {
-                            let id = parse(snarl, memoizer, nodes, remote.node);
+                            let id = parse(snarl, memoizer, nodes, node_info_store, remote.node);
                             memoizer.insert(remote.node, id);
                             Some(id)
                         }
@@ -728,19 +729,14 @@ impl EffectConfig {
             snarl: &Snarl<EffectGraphNode>,
             memoizer: &mut HashMap<NodeId, EffectNodeId>,
             nodes: &mut Vec<EffectNode>,
+            node_info_store: &mut Vec<EffectNodeInfo>,
             node_id: NodeId
         ) -> EffectNodeId {
             let new_node = match &snarl[node_id] {
                 EffectGraphNode::EntryPoint(_) => unreachable!(),
                 EffectGraphNode::AddTag(add_tag_data) => {
-                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 0);
                     AddTagNode::new(
-                        SharedNodeData {
-                            node_id: EffectNodeId::new(nodes.len() as u32),
-                            pos: snarl.get_node_info(node_id)
-                                .map(|it| it.pos)
-                                .expect("There should be a node info"),
-                        },
                         false,
                         add_tag_data.tag_holder(),
                         add_tag_data.tag_id(),
@@ -750,14 +746,8 @@ impl EffectConfig {
                     ).into()
                 },
                 EffectGraphNode::DecTag(dec_tag_data) => {
-                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 0);
                     AddTagNode::new(
-                        SharedNodeData {
-                            node_id: EffectNodeId::new(nodes.len() as u32),
-                            pos: snarl.get_node_info(node_id)
-                                .map(|it| it.pos)
-                                .expect("There should be a node info"),
-                        },
                         true,
                         dec_tag_data.tag_holder(),
                         dec_tag_data.tag_id(),
@@ -767,15 +757,9 @@ impl EffectConfig {
                     ).into()
                 },
                 EffectGraphNode::Branch(branch_data) => {
-                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
-                    let else_id = parse_or_none(snarl, memoizer, nodes, node_id, 1);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 0);
+                    let else_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 1);
                     BranchNode::new(
-                        SharedNodeData {
-                            node_id: EffectNodeId::new(nodes.len() as u32),
-                            pos: snarl.get_node_info(node_id)
-                                .map(|it| it.pos)
-                                .expect("There should be a node info"),
-                        },
                         branch_data.value_source(),
                         branch_data.condition_parameter_id(),
                         then_id,
@@ -783,54 +767,30 @@ impl EffectConfig {
                     ).into()
                 },
                 EffectGraphNode::Join(_) => {
-                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
-                    JoinNode::new(
-                        SharedNodeData {
-                            node_id: EffectNodeId::new(nodes.len() as u32),
-                            pos: snarl.get_node_info(node_id)
-                                .map(|it| it.pos)
-                                .expect("There should be a node info"),
-                        },
-                        then_id
-                    ).into()
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 0);
+                    JoinNode::new(then_id).into()
                 },
                 EffectGraphNode::WaitForCondition(wait_cond_data) => {
-                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 0);
                     WaitForConditionNode::new(
-                        SharedNodeData {
-                            node_id: EffectNodeId::new(nodes.len() as u32),
-                            pos: snarl.get_node_info(node_id)
-                                .map(|it| it.pos)
-                                .expect("There should be a node info"),
-                        },
                         wait_cond_data.value_source(),
                         wait_cond_data.condition_parameter_id(),
                         then_id
                     ).into()
                 },
                 EffectGraphNode::WaitForTicks(wait_ticks_data) => {
-                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 0);
                     WaitTicksNode::new(
-                        SharedNodeData {
-                            node_id: EffectNodeId::new(nodes.len() as u32),
-                            pos: snarl.get_node_info(node_id)
-                                .map(|it| it.pos)
-                                .expect("There should be a node info"),
-                        },
+
                         wait_ticks_data.value_source(),
                         wait_ticks_data.tick_count_parameter_id(),
                         then_id
                     ).into()
                 },
                 EffectGraphNode::SpawnSubEffect(spawn_sub_effect_data) => {
-                    let then_id = parse_or_none(snarl, memoizer, nodes, node_id, 0);
+                    let then_id = parse_or_none(snarl, memoizer, nodes, node_info_store, node_id, 0);
                     SpawnSubEffectNode::new(
-                        SharedNodeData {
-                            node_id: EffectNodeId::new(nodes.len() as u32),
-                            pos: snarl.get_node_info(node_id)
-                                .map(|it| it.pos)
-                                .expect("There should be a node info"),
-                        },
+
                         spawn_sub_effect_data.effect_config_id(),
                         spawn_sub_effect_data.caster(),
                         spawn_sub_effect_data.target(),
@@ -838,8 +798,14 @@ impl EffectConfig {
                     ).into()
                 },
             };
-            let id = EffectNodeId::new(nodes.len() as u32);
+            let id = make_effect_node_id(nodes.len() as u16);
             nodes.push(new_node);
+            node_info_store.push(EffectNodeInfo {
+                node_id: id,
+                pos: snarl.get_node_info(node_id)
+                    .map(|it| [it.pos.x as u16, it.pos.y as u16])
+                    .expect("There should be a node info"),
+            });
             id
         }
 
@@ -850,12 +816,13 @@ impl EffectConfig {
 
         let EffectGraphNode::EntryPoint(_) = entry_node else { unreachable!() };
         let mut nodes = Vec::new();
+        let mut node_info_store = Vec::new();
         let mut memoizer = HashMap::new();
-        let setup = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, entry_node_id, 0);
-        let tick = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, entry_node_id, 1);
-        let on_destroy = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, entry_node_id, 2);
+        let setup = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, &mut node_info_store, entry_node_id, 0);
+        let tick = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, &mut node_info_store, entry_node_id, 1);
+        let on_destroy = parse_or_none(&self.snarl, &mut memoizer, &mut nodes, &mut node_info_store, entry_node_id, 2);
 
-        self.compiled_root = EffectRoot::new(nodes, setup, tick, on_destroy);
+        self.compiled_root = EffectRoot::new(nodes, node_info_store, setup, tick, on_destroy);
     }
 }
 

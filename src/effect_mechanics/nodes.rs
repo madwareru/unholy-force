@@ -1,4 +1,3 @@
-use egui::Pos2;
 use hecs::{Ref, RefMut};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
@@ -7,7 +6,6 @@ use crate::{
         get_entity_parameter_value,
         EffectContext,
         EffectEnv,
-        EffectNodeImpl,
         EntityValueHolder,
         GlobalValuesHolder,
         EFFECT_GRAPH_TARGET
@@ -29,9 +27,9 @@ pub mod add_tag;
 pub mod join;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct SharedNodeData{
+pub struct EffectNodeInfo {
     pub node_id: EffectNodeId,
-    pub pos: Pos2,
+    pub pos: [u16; 2],
 }
 
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
@@ -64,8 +62,8 @@ pub fn get_effect_context(game_world: &GameWorld, effect_id: EntityId) -> Option
     }
 }
 
-pub fn get_memoized_parameter_value<N: EffectNodeImpl>(
-    node: &N,
+pub fn get_memoized_parameter_value(
+    node_info: EffectNodeInfo,
     game_config_provider: &ConfigProvider,
     game_world: &GameWorld,
     effect_id: EntityId,
@@ -74,7 +72,7 @@ pub fn get_memoized_parameter_value<N: EffectNodeImpl>(
 ) -> Option<f32> {
     let value_source_id = get_direction_entity_id(game_world, effect_id, value_source)?;
     let memoized_value = get_effect_env(game_world, effect_id)?
-        .get(node, parameter_config_id);
+        .get(node_info, parameter_config_id);
 
     let value = match memoized_value {
         Some(value) => value,
@@ -87,7 +85,7 @@ pub fn get_memoized_parameter_value<N: EffectNodeImpl>(
             )?;
 
             get_effect_env_mut(game_world, effect_id)
-                .map(|mut effect_env| effect_env.set(node, parameter_config_id, value));
+                .map(|mut effect_env| effect_env.set(node_info, parameter_config_id, value));
 
             value
         }

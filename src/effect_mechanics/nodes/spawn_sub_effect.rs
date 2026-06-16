@@ -1,4 +1,3 @@
-use egui::Pos2;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
         EffectNodeImpl,
         EFFECT_GRAPH_TARGET,
         EffectNode,
-        nodes::{SharedNodeData}
+        nodes::{EffectNodeInfo}
     },
     game_config::{
         ConfigId,
@@ -22,7 +21,6 @@ use crate::effect_mechanics::nodes::{get_direction_entity_id, Holder};
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SpawnSubEffectNode{
-    shared_node_data: SharedNodeData,
     effect_config_id: ConfigId<EffectConfig>,
     caster: Holder,
     target: Holder,
@@ -36,27 +34,19 @@ impl Into<EffectNode> for SpawnSubEffectNode {
 
 impl SpawnSubEffectNode {
     pub fn new(
-        shared_node_data: SharedNodeData,
         effect_config_id: ConfigId<EffectConfig>,
         caster: Holder,
         target: Holder,
         then_node: Option<EffectNodeId>
     ) -> Self {
-        Self { shared_node_data, effect_config_id, caster, target, then_node }
+        Self { effect_config_id, caster, target, then_node }
     }
 }
 
 impl EffectNodeImpl for SpawnSubEffectNode{
-    fn get_node_id(&self) -> EffectNodeId {
-        self.shared_node_data.node_id
-    }
-
-    fn get_node_pos(&self) -> Pos2 {
-        self.shared_node_data.pos
-    }
-
     fn tick(
         &self,
+        _node_info: EffectNodeInfo,
         _game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,

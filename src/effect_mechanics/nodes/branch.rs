@@ -1,7 +1,7 @@
 use crate::{
     app::game_stage::{EntityId, GameWorld},
     effect_mechanics::{
-        nodes::{SharedNodeData, Holder},
+        nodes::{EffectNodeInfo, Holder},
         EffectQueue,
         EffectControlFlow,
         EffectNodeImpl,
@@ -14,7 +14,6 @@ use crate::{
         ConfigProvider
     }
 };
-use egui::Pos2;
 use serde::{Deserialize, Serialize};
 use tracing::{error};
 use crate::effect_mechanics::{get_entity_parameter_value, EffectNodeId};
@@ -22,7 +21,6 @@ use crate::effect_mechanics::nodes::get_direction_entity_id;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct BranchNode {
-    shared_node_data: SharedNodeData,
     value_holder: Holder,
     condition_parameter_id: ConfigId<ParameterConfig>,
     then_node: Option<EffectNodeId>,
@@ -36,14 +34,12 @@ impl Into<EffectNode> for BranchNode {
 
 impl BranchNode {
     pub fn new(
-        shared_node_data: SharedNodeData,
         value_holder: Holder,
         condition_parameter_id: ConfigId<ParameterConfig>,
         then_node: Option<EffectNodeId>,
         else_node: Option<EffectNodeId>
     ) -> Self {
         Self {
-            shared_node_data,
             value_holder,
             condition_parameter_id,
             then_node,
@@ -53,12 +49,9 @@ impl BranchNode {
 }
 
 impl EffectNodeImpl for BranchNode {
-    fn get_node_id(&self) -> EffectNodeId { self.shared_node_data.node_id }
-
-    fn get_node_pos(&self) -> Pos2 { self.shared_node_data.pos }
-
     fn tick(
         &self,
+        _node_info: EffectNodeInfo,
         game_config_provider: &ConfigProvider,
         game_world: &mut GameWorld,
         effect_id: EntityId,
